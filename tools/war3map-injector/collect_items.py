@@ -69,44 +69,48 @@ def parse_itemfunc(path):
 def main():
     map_dir = sys.argv[1] if len(sys.argv) > 1 else None
 
-    # 1. standard items from the game
-    std_ids = []
-    if os.path.isfile(GAME_SLK):
-        std_ids = parse_slk(GAME_SLK)
-    std_set = set(std_ids)
-    print("standard items:", len(std_ids))
+    # The map's own itemdata.slk is the AUTHORITATIVE list of items that
+    # actually exist / can be created in this map. If a map has its own
+    # itemdata.slk, only those IDs are creatable — standard game items NOT
+    # listed there have been removed by the map author.
+    map_slk_path = os.path.join(map_dir, "units", "itemdata.slk") if map_dir else None
+    map_func_path = os.path.join(map_dir, "units", "itemfunc.txt") if map_dir else None
 
-    # 2. custom items from the map (id -> name)
-    custom = {}  # id -> name
-    if map_dir:
-        func = os.path.join(map_dir, "units", "itemfunc.txt")
-        if os.path.isfile(func):
-            for iid, nm in parse_itemfunc(func):
-                custom[iid] = nm
-        slk = os.path.join(map_dir, "units", "itemdata.slk")
-        if os.path.isfile(slk):
-            for iid in parse_slk(slk):
-                custom.setdefault(iid, "")
+    names = {}  # id -> name (from itemfunc.txt)
+    if map_func_path and os.path.isfile(map_func_path):
+        for iid, nm in parse_itemfunc(map_func_path):
+            names[iid] = nm
 
-    # A custom item is one that is NOT a standard game item.
-    custom_only = [(iid, nm) for iid, nm in custom.items() if iid not in std_set]
-    print("custom-only items:", len(custom_only))
+    if map_slk_path and os.path.isfile(map_slk_path):
+        creatable = parse_slk(map_slk_path)
+        print("map itemdata.slk (creatable):", len(creatable))
+    else:
+        # No map slk -> use the game's standard list
+        creatable = parse_slk(GAME_SLK) if os.path.isfile(GAME_SLK) else []
+        print("no map slk; using game standard:", len(creatable))
 
-    # Names for standard items come from the map's itemfunc if present.
+    game = set(parse_slk(GAME_SLK)) if os.path.isfile(GAME_SLK) else set()
+
     std_out = []
-    for iid in std_ids:
-        nm = custom.get(iid, "")
-        std_out.append((iid, nm))
+    cus_out = []
+    for iid in creatable:
+        nm = names.get(iid, "")
+        if iid in game:
+            std_out.append((iid, nm))
+        else:
+            cus_out.append((iid, nm))
 
-    # Output: standard first (flag S), then custom (flag C).
+    print("standard (creatable):", len(std_out))
+    print("custom (creatable):", len(cus_out))
+
     out = os.path.join(HERE, "_itemids.txt")
     with open(out, "w", encoding="utf-8") as fh:
         for iid, nm in std_out:
             fh.write("S\t%s\t%s\n" % (iid, nm))
-        for iid, nm in custom_only:
+        for iid, nm in cus_out:
             fh.write("C\t%s\t%s\n" % (iid, nm))
     print("wrote %s: %d standard + %d custom = %d" % (
-        out, len(std_out), len(custom_only), len(std_out) + len(custom_only)))
+        out, len(std_out), len(cus_out), len(std_out) + len(cus_out)))
 
 
 if __name__ == "__main__":

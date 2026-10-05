@@ -68,6 +68,18 @@ python tools/war3map-injector/inject_map.py "maps/LostTemple/LostTemple.w3m" scr
 | `f.j` | `main` 函数之前 | 函数定义 |
 | `m.j` | `main` 函数开头 | 初始化调用 |
 
+### ⚠️ 编码要求（重要）
+
+**War3 1.27 以 GBK(ANSI) 解析地图脚本。** 工作区里的脚本以 **UTF-8** 保存
+（便于编辑），但注入前 **必须转换为 GBK**，否则会出现：
+
+- 中文字符串字面量被 GBK 误读
+- UTF-8 尾字节落在 `0x81-0xFE` 区间时会「吞掉」后面的引号
+- 字符串永不闭合 → **脚本解析失败 → 加载地图后回到选图界面**
+
+`inject_map.py` 的 `stage_scripts()` 已**自动完成 UTF-8 → GBK 转换**，
+无需手动处理。若手工复制脚本到 `HkeData`，请务必先转 GBK。
+
 ### 示例
 
 **g.j**

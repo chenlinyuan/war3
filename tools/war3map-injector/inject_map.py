@@ -151,13 +151,24 @@ def handle_popups(verbose=True):
 # 主流程
 # ---------------------------------------------------------------------------
 def stage_scripts(script_dir):
-    print("[1] 复制脚本到 HkeData")
+    """把 f.j/g.j/m.j 复制到 HkeData。
+
+    重要：War3 1.27 以 GBK(ANSI) 解析地图脚本。若脚本以 UTF-8 保存，
+    中文字符的字节序列会被 GBK 误读（例如 UTF-8 尾字节落在 0x81-0xFE
+    区间时会吞掉后面的引号），导致字符串字面量损坏、脚本解析失败，
+    表现为「加载地图后回到选图界面」。因此这里统一转为 GBK 再复制。
+    """
+    print("[1] 复制脚本到 HkeData (UTF-8 -> GBK)")
     for f in ("f.j", "g.j", "m.j"):
         src = os.path.join(script_dir, f)
         if not os.path.isfile(src):
             raise FileNotFoundError("缺少 %s" % src)
-        shutil.copy2(src, os.path.join(HKE_DATA, f))
-        print("    %s -> %s" % (f, HKE_DATA))
+        with open(src, "r", encoding="utf-8") as fh:
+            text = fh.read()
+        dst = os.path.join(HKE_DATA, f)
+        with open(dst, "w", encoding="gbk", errors="replace", newline="") as fh:
+            fh.write(text)
+        print("    %s -> %s (%d chars, GBK)" % (f, HKE_DATA, len(text)))
 
 
 def launch_tool():

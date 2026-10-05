@@ -24,6 +24,24 @@ additem 吸血面罩 3    → 添加 3 个
 itembrowser          → 显示帮助
 ```
 
+## 工作原理（进游戏立即可用）
+
+物品 ID 列表在**注入时预先扫描并硬编码**到脚本中，因此：
+
+- **进游戏立即可用**（无需等待枚举，之前 2-3 分钟的枚举已移除）
+- 物品 ID 来自游戏 `Units\ItemData.slk`（273 个标准物品）
+- 搜索时用 `GetObjectName` 获取运行时中文名进行匹配
+
+### 重新生成物品列表
+
+若游戏版本不同或需要自定义物品：
+
+```powershell
+# 1. 解析 itemdata.slk 生成 _itemids.txt（见 tools/war3map-injector/_slk 脚本逻辑）
+# 2. 把列表嵌入 f.j
+python tools/war3map-injector/build_fj.py
+```
+
 ## 编码要求（重要）
 
 War3 1.27 以 **GBK(ANSI)** 解析地图脚本。本目录的 `.j` 文件以 **UTF-8** 保存，

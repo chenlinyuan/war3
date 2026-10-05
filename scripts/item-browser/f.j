@@ -8,19 +8,21 @@
 //   输入 "itembrowser"      显示帮助
 //
 // 说明:
-//   - 地图启动后自动枚举所有物品类型（约 2-3 分钟，视电脑性能）
-//   - 枚举完成后屏幕提示 "装备列表加载完成"
-//   - 支持中文名称匹配
+//   - 物品 ID 列表在注入时预先扫描并硬编码，进游戏立即可用（无需枚举）
+//   - 支持中文名称匹配（不区分大小写）
 //============================================================================
 
 //---------------------------------------------------------------------------
-// [工具] 去除颜色代码 |cXXXXXXXX 和 |r
+// [工具] 去除颜色代码 |cXXXXXXXX 和 |r，并去除首尾空格
 //---------------------------------------------------------------------------
 function IB_StripColorCodes takes string s returns string
     local integer len = StringLength(s)
     local integer i = 0
     local string result = ""
     local string ch
+    local integer start = 0
+    local integer stop = 0
+
     loop
         exitwhen i >= len
         set ch = SubString(s, i, i + 1)
@@ -38,7 +40,35 @@ function IB_StripColorCodes takes string s returns string
             set i = i + 1
         endif
     endloop
-    return result
+
+    // 去除首尾空格
+    set len = StringLength(result)
+    set i = 0
+    set start = 0
+    loop
+        exitwhen i >= len
+        if SubString(result, i, i + 1) == " " then
+            set i = i + 1
+        else
+            set start = i
+            set i = len
+        endif
+    endloop
+    set stop = len
+    set i = len - 1
+    loop
+        exitwhen i < 0
+        if SubString(result, i, i + 1) == " " then
+            set i = i - 1
+        else
+            set stop = i + 1
+            set i = -1
+        endif
+    endloop
+    if start >= stop then
+        return ""
+    endif
+    return SubString(result, start, stop)
 endfunction
 
 //---------------------------------------------------------------------------
@@ -56,12 +86,13 @@ function IB_Message takes player p, string msg returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
-// [工具] 判断物品名称是否包含关键词
+// [工具] 判断物品名称是否包含关键词（不区分大小写）
 //---------------------------------------------------------------------------
 function IB_IsItemMatch takes integer itemId, string keyword returns boolean
-    local string name = IB_StripColorCodes(GetObjectName(itemId))
+    local string name = StringCase(IB_StripColorCodes(GetObjectName(itemId)), false)
+    local string key = StringCase(keyword, false)
     local integer nameLen = StringLength(name)
-    local integer keyLen = StringLength(keyword)
+    local integer keyLen = StringLength(key)
     local integer i = 0
     local integer j
     local boolean matched
@@ -79,7 +110,7 @@ function IB_IsItemMatch takes integer itemId, string keyword returns boolean
         set matched = true
         loop
             exitwhen j >= keyLen
-            if SubString(name, i + j, i + j + 1) != SubString(keyword, j, j + 1) then
+            if SubString(name, i + j, i + j + 1) != SubString(key, j, j + 1) then
                 set matched = false
                 set j = keyLen
             endif
@@ -138,7 +169,7 @@ function IB_Search takes player p, string keyword returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
-// 添加装备（精确匹配名称）
+// 添加装备（不区分大小写精确匹配，找不到则取第一个包含关键词的）
 //---------------------------------------------------------------------------
 function IB_AddItem takes player p, string itemName, integer count returns nothing
     local integer i = 0
@@ -148,6 +179,9 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
     local real x
     local real y
     local string name
+    local string target = StringCase(IB_StripColorCodes(itemName), false)
+    local integer exactId = 0
+    local integer partialId = 0
 
     if count < 1 then
         set count = 1
@@ -159,30 +193,54 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
         return
     endif
 
-    set x = GetUnitX(u)
-    set y = GetUnitY(u)
-
+    // 第一遍：精确匹配
     loop
-        exitwhen i >= ib_itemCount or added >= count
-        set name = IB_StripColorCodes(GetObjectName(ib_itemList[i]))
-        if name == itemName then
-            set it = CreateItem(ib_itemList[i], x, y)
-            if it != null then
-                if not UnitAddItem(u, it) then
-                    call SetItemPosition(it, x, y)
-                endif
-                set added = added + 1
-            endif
-            set it = null
+        exitwhen i >= ib_itemCount or exactId != 0
+        set name = StringCase(IB_StripColorCodes(GetObjectName(ib_itemList[i])), false)
+        if name == target then
+            set exactId = ib_itemList[i]
         endif
         set i = i + 1
     endloop
 
-    if added == 0 then
-        call IB_Message(p, "未找到装备 \"" + itemName + "\"")
-    else
-        call IB_Message(p, "已添加 " + I2S(added) + " 个 \"" + itemName + "\"")
+    // 第二遍：包含匹配（取第一个）
+    if exactId == 0 then
+        set i = 0
+        loop
+            exitwhen i >= ib_itemCount or partialId != 0
+            if IB_IsItemMatch(ib_itemList[i], itemName) then
+                set partialId = ib_itemList[i]
+            endif
+            set i = i + 1
+        endloop
     endif
+
+    if exactId != 0 then
+        set partialId = exactId
+    endif
+
+    if partialId == 0 then
+        call IB_Message(p, "未找到装备 \"" + itemName + "\"")
+        set u = null
+        return
+    endif
+
+    set x = GetUnitX(u)
+    set y = GetUnitY(u)
+
+    loop
+        exitwhen added >= count
+        set it = CreateItem(partialId, x, y)
+        if it != null then
+            if not UnitAddItem(u, it) then
+                call SetItemPosition(it, x, y)
+            endif
+            set added = added + 1
+        endif
+        set it = null
+    endloop
+
+    call IB_Message(p, "已添加 " + I2S(added) + " 个 \"" + IB_StripColorCodes(GetObjectName(partialId)) + "\"")
     set u = null
 endfunction
 
@@ -293,85 +351,284 @@ function IB_RegisterChat takes nothing returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
-// 物品列表初始化
-//---------------------------------------------------------------------------
-function IB_InitItemCharMap takes nothing returns nothing
-    local integer i = 0
-    loop
-        exitwhen i >= 62
-        if i <= 9 then
-            set ib_charMap[i] = i + 48
-        elseif i <= 35 then
-            set ib_charMap[i] = i + 55
-        else
-            set ib_charMap[i] = i + 61
-        endif
-        set i = i + 1
-    endloop
-endfunction
-
-function IB_EnumD takes nothing returns nothing
-    local integer i = 0
-    local item it
-    loop
-        set it = CreateItem(ib_idA + ib_idB + ib_idC + ib_charMap[i], 0, 0)
-        if it != null then
-            set ib_itemList[ib_itemCount] = GetItemTypeId(it)
-            set ib_itemCount = ib_itemCount + 1
-        endif
-        call RemoveItem(it)
-        exitwhen i == 61
-        set i = i + 1
-    endloop
-    set it = null
-endfunction
-
-function IB_EnumC takes nothing returns nothing
-    set ib_idC = 256 * ib_charMap[ib_iC]
-    set ib_iC = ib_iC + 1
-    if ib_iC == 62 then
-        call PauseTimer(ib_timerC)
-        call DestroyTimer(ib_timerC)
-        set ib_iC = 0
-    endif
-    call IB_EnumD()
-endfunction
-
-function IB_EnumB takes nothing returns nothing
-    set ib_idB = 256 * 256 * ib_charMap[ib_iB]
-    set ib_iB = ib_iB + 1
-    if ib_iB == 62 then
-        call PauseTimer(ib_timerB)
-        call DestroyTimer(ib_timerB)
-        set ib_iB = 0
-    endif
-    set ib_timerC = CreateTimer()
-    call TimerStart(ib_timerC, 0.0005, true, function IB_EnumC)
-endfunction
-
-function IB_EnumA takes nothing returns nothing
-    set ib_idA = 256 * 256 * 256 * ib_charMap[ib_iA]
-    set ib_iA = ib_iA + 1
-    if ib_iA == 62 then
-        call PauseTimer(ib_timerA)
-        call DestroyTimer(ib_timerA)
-        set ib_iA = 0
-        call IB_Message(GetLocalPlayer(), "装备列表加载完成，共 " + I2S(ib_itemCount) + " 件")
-        call IB_RegisterChat()
-    endif
-    set ib_timerB = CreateTimer()
-    call TimerStart(ib_timerB, 0.0322, true, function IB_EnumB)
-endfunction
-
-//---------------------------------------------------------------------------
-// 入口
+// 入口：直接填充预扫描的物品 ID 列表，立即注册聊天事件（无需枚举）
 //---------------------------------------------------------------------------
 function IB_Init takes nothing returns nothing
-    call IB_InitItemCharMap()
-    set ib_iA = 0
-    set ib_iB = 0
-    set ib_iC = 0
     set ib_itemCount = 0
-    set ib_timerA = CreateTimer()
-    call TimerStart(ib_timerA, 2.0, true, function IB_EnumA)
+    set ib_itemList[0] = 'ckng'
+    set ib_itemList[1] = 'modt'
+    set ib_itemList[2] = 'tkno'
+    set ib_itemList[3] = 'ratf'
+    set ib_itemList[4] = 'rde4'
+    set ib_itemList[5] = 'ofro'
+    set ib_itemList[6] = 'desc'
+    set ib_itemList[7] = 'fgdg'
+    set ib_itemList[8] = 'infs'
+    set ib_itemList[9] = 'shar'
+    set ib_itemList[10] = 'sand'
+    set ib_itemList[11] = 'wild'
+    set ib_itemList[12] = 'srrc'
+    set ib_itemList[13] = 'odef'
+    set ib_itemList[14] = 'rde3'
+    set ib_itemList[15] = 'pmna'
+    set ib_itemList[16] = 'rhth'
+    set ib_itemList[17] = 'ssil'
+    set ib_itemList[18] = 'spsh'
+    set ib_itemList[19] = 'sres'
+    set ib_itemList[20] = 'pdiv'
+    set ib_itemList[21] = 'pres'
+    set ib_itemList[22] = 'totw'
+    set ib_itemList[23] = 'fgfh'
+    set ib_itemList[24] = 'fgrd'
+    set ib_itemList[25] = 'fgrg'
+    set ib_itemList[26] = 'hcun'
+    set ib_itemList[27] = 'hval'
+    set ib_itemList[28] = 'mcou'
+    set ib_itemList[29] = 'ajen'
+    set ib_itemList[30] = 'clfm'
+    set ib_itemList[31] = 'ratc'
+    set ib_itemList[32] = 'ward'
+    set ib_itemList[33] = 'kpin'
+    set ib_itemList[34] = 'crys'
+    set ib_itemList[35] = 'lgdh'
+    set ib_itemList[36] = 'ankh'
+    set ib_itemList[37] = 'whwd'
+    set ib_itemList[38] = 'fgsk'
+    set ib_itemList[39] = 'wcyc'
+    set ib_itemList[40] = 'hlst'
+    set ib_itemList[41] = 'mnst'
+    set ib_itemList[42] = 'belv'
+    set ib_itemList[43] = 'bgst'
+    set ib_itemList[44] = 'ciri'
+    set ib_itemList[45] = 'lhst'
+    set ib_itemList[46] = 'afac'
+    set ib_itemList[47] = 'sbch'
+    set ib_itemList[48] = 'brac'
+    set ib_itemList[49] = 'rwiz'
+    set ib_itemList[50] = 'pghe'
+    set ib_itemList[51] = 'pgma'
+    set ib_itemList[52] = 'pnvu'
+    set ib_itemList[53] = 'sror'
+    set ib_itemList[54] = 'woms'
+    set ib_itemList[55] = 'evtl'
+    set ib_itemList[56] = 'penr'
+    set ib_itemList[57] = 'prvt'
+    set ib_itemList[58] = 'rat9'
+    set ib_itemList[59] = 'rde2'
+    set ib_itemList[60] = 'rlif'
+    set ib_itemList[61] = 'bspd'
+    set ib_itemList[62] = 'rej3'
+    set ib_itemList[63] = 'will'
+    set ib_itemList[64] = 'wlsd'
+    set ib_itemList[65] = 'wswd'
+    set ib_itemList[66] = 'cnob'
+    set ib_itemList[67] = 'gcel'
+    set ib_itemList[68] = 'rat6'
+    set ib_itemList[69] = 'rde1'
+    set ib_itemList[70] = 'tdx2'
+    set ib_itemList[71] = 'texp'
+    set ib_itemList[72] = 'tin2'
+    set ib_itemList[73] = 'tpow'
+    set ib_itemList[74] = 'tst2'
+    set ib_itemList[75] = 'pnvl'
+    set ib_itemList[76] = 'clsd'
+    set ib_itemList[77] = 'rag1'
+    set ib_itemList[78] = 'rin1'
+    set ib_itemList[79] = 'rst1'
+    set ib_itemList[80] = 'manh'
+    set ib_itemList[81] = 'tdex'
+    set ib_itemList[82] = 'tint'
+    set ib_itemList[83] = 'tstr'
+    set ib_itemList[84] = 'pomn'
+    set ib_itemList[85] = 'wshs'
+    set ib_itemList[86] = 'rej6'
+    set ib_itemList[87] = 'rej5'
+    set ib_itemList[88] = 'rej4'
+    set ib_itemList[89] = 'ram4'
+    set ib_itemList[90] = 'dsum'
+    set ib_itemList[91] = 'ofir'
+    set ib_itemList[92] = 'ocor'
+    set ib_itemList[93] = 'oli2'
+    set ib_itemList[94] = 'oven'
+    set ib_itemList[95] = 'ram3'
+    set ib_itemList[96] = 'tret'
+    set ib_itemList[97] = 'tgrh'
+    set ib_itemList[98] = 'rej2'
+    set ib_itemList[99] = 'gemt'
+    set ib_itemList[100] = 'ram2'
+    set ib_itemList[101] = 'stel'
+    set ib_itemList[102] = 'stwp'
+    set ib_itemList[103] = 'wneg'
+    set ib_itemList[104] = 'sneg'
+    set ib_itemList[105] = 'wneu'
+    set ib_itemList[106] = 'shea'
+    set ib_itemList[107] = 'sman'
+    set ib_itemList[108] = 'rej1'
+    set ib_itemList[109] = 'pspd'
+    set ib_itemList[110] = 'dust'
+    set ib_itemList[111] = 'ram1'
+    set ib_itemList[112] = 'pinv'
+    set ib_itemList[113] = 'phea'
+    set ib_itemList[114] = 'pman'
+    set ib_itemList[115] = 'spro'
+    set ib_itemList[116] = 'hslv'
+    set ib_itemList[117] = 'moon'
+    set ib_itemList[118] = 'shas'
+    set ib_itemList[119] = 'skul'
+    set ib_itemList[120] = 'mcri'
+    set ib_itemList[121] = 'rnec'
+    set ib_itemList[122] = 'tsct'
+    set ib_itemList[123] = 'azhr'
+    set ib_itemList[124] = 'bzbe'
+    set ib_itemList[125] = 'bzbf'
+    set ib_itemList[126] = 'ches'
+    set ib_itemList[127] = 'cnhn'
+    set ib_itemList[128] = 'glsk'
+    set ib_itemList[129] = 'gopr'
+    set ib_itemList[130] = 'k3m1'
+    set ib_itemList[131] = 'k3m2'
+    set ib_itemList[132] = 'k3m3'
+    set ib_itemList[133] = 'ktrm'
+    set ib_itemList[134] = 'kybl'
+    set ib_itemList[135] = 'kygh'
+    set ib_itemList[136] = 'kymn'
+    set ib_itemList[137] = 'kysn'
+    set ib_itemList[138] = 'ledg'
+    set ib_itemList[139] = 'phlt'
+    set ib_itemList[140] = 'sehr'
+    set ib_itemList[141] = 'engs'
+    set ib_itemList[142] = 'sorf'
+    set ib_itemList[143] = 'gmfr'
+    set ib_itemList[144] = 'jpnt'
+    set ib_itemList[145] = 'shwd'
+    set ib_itemList[146] = 'skrt'
+    set ib_itemList[147] = 'thle'
+    set ib_itemList[148] = 'sclp'
+    set ib_itemList[149] = 'wtlg'
+    set ib_itemList[150] = 'wolg'
+    set ib_itemList[151] = 'mgtk'
+    set ib_itemList[152] = 'mort'
+    set ib_itemList[153] = 'dphe'
+    set ib_itemList[154] = 'dkfw'
+    set ib_itemList[155] = 'dthb'
+    set ib_itemList[156] = 'fgun'
+    set ib_itemList[157] = 'lure'
+    set ib_itemList[158] = 'olig'
+    set ib_itemList[159] = 'amrc'
+    set ib_itemList[160] = 'ccmd'
+    set ib_itemList[161] = 'flag'
+    set ib_itemList[162] = 'gobm'
+    set ib_itemList[163] = 'gsou'
+    set ib_itemList[164] = 'nflg'
+    set ib_itemList[165] = 'nspi'
+    set ib_itemList[166] = 'oflg'
+    set ib_itemList[167] = 'pams'
+    set ib_itemList[168] = 'pgin'
+    set ib_itemList[169] = 'rat3'
+    set ib_itemList[170] = 'rde0'
+    set ib_itemList[171] = 'rnsp'
+    set ib_itemList[172] = 'soul'
+    set ib_itemList[173] = 'tels'
+    set ib_itemList[174] = 'tgxp'
+    set ib_itemList[175] = 'uflg'
+    set ib_itemList[176] = 'anfg'
+    set ib_itemList[177] = 'brag'
+    set ib_itemList[178] = 'drph'
+    set ib_itemList[179] = 'iwbr'
+    set ib_itemList[180] = 'jdrn'
+    set ib_itemList[181] = 'lnrn'
+    set ib_itemList[182] = 'mlst'
+    set ib_itemList[183] = 'oslo'
+    set ib_itemList[184] = 'sbok'
+    set ib_itemList[185] = 'sksh'
+    set ib_itemList[186] = 'sprn'
+    set ib_itemList[187] = 'tmmt'
+    set ib_itemList[188] = 'vddl'
+    set ib_itemList[189] = 'spre'
+    set ib_itemList[190] = 'sfog'
+    set ib_itemList[191] = 'sor1'
+    set ib_itemList[192] = 'sor2'
+    set ib_itemList[193] = 'sor3'
+    set ib_itemList[194] = 'sor4'
+    set ib_itemList[195] = 'sor5'
+    set ib_itemList[196] = 'sor6'
+    set ib_itemList[197] = 'sor7'
+    set ib_itemList[198] = 'sor8'
+    set ib_itemList[199] = 'sor9'
+    set ib_itemList[200] = 'sora'
+    set ib_itemList[201] = 'fwss'
+    set ib_itemList[202] = 'shtm'
+    set ib_itemList[203] = 'esaz'
+    set ib_itemList[204] = 'btst'
+    set ib_itemList[205] = 'tbsm'
+    set ib_itemList[206] = 'tfar'
+    set ib_itemList[207] = 'tlum'
+    set ib_itemList[208] = 'tbar'
+    set ib_itemList[209] = 'tbak'
+    set ib_itemList[210] = 'gldo'
+    set ib_itemList[211] = 'stre'
+    set ib_itemList[212] = 'horl'
+    set ib_itemList[213] = 'hbth'
+    set ib_itemList[214] = 'blba'
+    set ib_itemList[215] = 'rugt'
+    set ib_itemList[216] = 'frhg'
+    set ib_itemList[217] = 'gvsm'
+    set ib_itemList[218] = 'crdt'
+    set ib_itemList[219] = 'arsc'
+    set ib_itemList[220] = 'scul'
+    set ib_itemList[221] = 'tmsc'
+    set ib_itemList[222] = 'dtsb'
+    set ib_itemList[223] = 'grsl'
+    set ib_itemList[224] = 'arsh'
+    set ib_itemList[225] = 'shdt'
+    set ib_itemList[226] = 'shhn'
+    set ib_itemList[227] = 'shen'
+    set ib_itemList[228] = 'thdm'
+    set ib_itemList[229] = 'stpg'
+    set ib_itemList[230] = 'shrs'
+    set ib_itemList[231] = 'bfhr'
+    set ib_itemList[232] = 'cosl'
+    set ib_itemList[233] = 'shcw'
+    set ib_itemList[234] = 'srbd'
+    set ib_itemList[235] = 'frgd'
+    set ib_itemList[236] = 'envl'
+    set ib_itemList[237] = 'rump'
+    set ib_itemList[238] = 'srtl'
+    set ib_itemList[239] = 'stwa'
+    set ib_itemList[240] = 'klmm'
+    set ib_itemList[241] = 'rots'
+    set ib_itemList[242] = 'axas'
+    set ib_itemList[243] = 'mnsf'
+    set ib_itemList[244] = 'schl'
+    set ib_itemList[245] = 'asbl'
+    set ib_itemList[246] = 'kgal'
+    set ib_itemList[247] = 'gold'
+    set ib_itemList[248] = 'lmbr'
+    set ib_itemList[249] = 'gfor'
+    set ib_itemList[250] = 'guvi'
+    set ib_itemList[251] = 'rspl'
+    set ib_itemList[252] = 'rre1'
+    set ib_itemList[253] = 'rre2'
+    set ib_itemList[254] = 'gomn'
+    set ib_itemList[255] = 'rsps'
+    set ib_itemList[256] = 'rspd'
+    set ib_itemList[257] = 'rman'
+    set ib_itemList[258] = 'rma2'
+    set ib_itemList[259] = 'rres'
+    set ib_itemList[260] = 'rreb'
+    set ib_itemList[261] = 'rhe1'
+    set ib_itemList[262] = 'rhe2'
+    set ib_itemList[263] = 'rhe3'
+    set ib_itemList[264] = 'rdis'
+    set ib_itemList[265] = 'rwat'
+    set ib_itemList[266] = 'pclr'
+    set ib_itemList[267] = 'plcl'
+    set ib_itemList[268] = 'silk'
+    set ib_itemList[269] = 'vamp'
+    set ib_itemList[270] = 'sreg'
+    set ib_itemList[271] = 'ssan'
+    set ib_itemList[272] = 'tcas'
+    set ib_itemCount = 273
+    call IB_Message(GetLocalPlayer(), "装备系统就绪，共 " + I2S(ib_itemCount) + " 件装备")
+    call IB_RegisterChat()
 endfunction

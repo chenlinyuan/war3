@@ -69,33 +69,44 @@ def parse_itemfunc(path):
 def main():
     map_dir = sys.argv[1] if len(sys.argv) > 1 else None
 
-    ids = {}  # id -> name
-
-    # 1. standard items
+    # 1. standard items from the game
+    std_ids = []
     if os.path.isfile(GAME_SLK):
-        for iid in parse_slk(GAME_SLK):
-            ids[iid] = ""
-        print("standard items:", len(ids))
+        std_ids = parse_slk(GAME_SLK)
+    std_set = set(std_ids)
+    print("standard items:", len(std_ids))
 
-    # 2. custom items from map
+    # 2. custom items from the map (id -> name)
+    custom = {}  # id -> name
     if map_dir:
         func = os.path.join(map_dir, "units", "itemfunc.txt")
         if os.path.isfile(func):
             for iid, nm in parse_itemfunc(func):
-                ids[iid] = nm
-            print("after custom itemfunc:", len(ids))
+                custom[iid] = nm
         slk = os.path.join(map_dir, "units", "itemdata.slk")
         if os.path.isfile(slk):
             for iid in parse_slk(slk):
-                ids.setdefault(iid, "")
-            print("after custom itemdata.slk:", len(ids))
+                custom.setdefault(iid, "")
 
-    # write
+    # A custom item is one that is NOT a standard game item.
+    custom_only = [(iid, nm) for iid, nm in custom.items() if iid not in std_set]
+    print("custom-only items:", len(custom_only))
+
+    # Names for standard items come from the map's itemfunc if present.
+    std_out = []
+    for iid in std_ids:
+        nm = custom.get(iid, "")
+        std_out.append((iid, nm))
+
+    # Output: standard first (flag S), then custom (flag C).
     out = os.path.join(HERE, "_itemids.txt")
     with open(out, "w", encoding="utf-8") as fh:
-        for iid in ids:
-            fh.write("%s\t%s\n" % (iid, ids[iid]))
-    print("wrote %s with %d items" % (out, len(ids)))
+        for iid, nm in std_out:
+            fh.write("S\t%s\t%s\n" % (iid, nm))
+        for iid, nm in custom_only:
+            fh.write("C\t%s\t%s\n" % (iid, nm))
+    print("wrote %s: %d standard + %d custom = %d" % (
+        out, len(std_out), len(custom_only), len(std_out) + len(custom_only)))
 
 
 if __name__ == "__main__":

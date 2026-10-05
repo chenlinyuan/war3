@@ -466,7 +466,7 @@ endfunction
 function IB_RegisterChat takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
-    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r RegisterChat 开始 t=" + I2S(t))
+    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r RegisterChat 开始")
     loop
         exitwhen i > 11
         call TriggerRegisterPlayerChatEvent(t, Player(i), "search", false)

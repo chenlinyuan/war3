@@ -466,6 +466,7 @@ endfunction
 function IB_RegisterChat takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
+    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r RegisterChat 开始 t=" + I2S(t))
     loop
         exitwhen i > 11
         call TriggerRegisterPlayerChatEvent(t, Player(i), "search", false)
@@ -473,9 +474,11 @@ function IB_RegisterChat takes nothing returns nothing
         call TriggerRegisterPlayerChatEvent(t, Player(i), "itembrowser", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "ibtest", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "ibcount", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "test", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)
+    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r RegisterChat 完成")
     set t = null
 endfunction
 
@@ -1753,8 +1756,8 @@ endfunction
 
 function IB_Init takes nothing returns nothing
     set ib_itemCount = 0
-    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r IB_Init 已执行")
     call IB_RegisterChat()
+    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r IB_Init 已执行")
     set ib_fillIdx = 0
     set ib_fillTotal = 6
     set ib_fillTimer = CreateTimer()

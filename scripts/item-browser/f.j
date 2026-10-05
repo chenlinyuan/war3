@@ -408,7 +408,7 @@ endfunction
 //---------------------------------------------------------------------------
 // 解析聊天命令
 //---------------------------------------------------------------------------
-function IB_OnChat takes nothing returns boolean
+function IB_OnChat takes nothing returns nothing
     local string s = GetEventPlayerChatString()
     local player p = GetTriggerPlayer()
     local integer len = StringLength(s)
@@ -454,13 +454,12 @@ function IB_OnChat takes nothing returns boolean
         call IB_Message(p, "统计 \"" + arg + "\" 匹配数...")
         call IB_CountMatch(p, arg)
     endif
-    return false
 endfunction
 
 //---------------------------------------------------------------------------
 // 注册聊天事件
-// 用具体命令前缀注册（与地图自带命令同样方式），提高兼容性：
-// 有些地图会拦截/限制通配聊天事件，但具体字符串匹配的命令仍可用。
+// 用 TriggerAddAction（而非 Condition）注册：部分地图/版本下仅含 condition
+// 的聊天触发器不会触发；用 action 更可靠。
 //---------------------------------------------------------------------------
 function IB_RegisterChat takes nothing returns nothing
     local integer i = 0
@@ -474,7 +473,7 @@ function IB_RegisterChat takes nothing returns nothing
         call TriggerRegisterPlayerChatEvent(t, Player(i), "ibcount", false)
         set i = i + 1
     endloop
-    call TriggerAddCondition(t, Condition(function IB_OnChat))
+    call TriggerAddAction(t, function IB_OnChat)
     set t = null
 endfunction
 

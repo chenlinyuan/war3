@@ -26,10 +26,11 @@ itembrowser          → 显示帮助
 
 ## 工作原理（进游戏立即可用）
 
-物品 ID 列表在**注入时预先扫描并硬编码**到脚本中，因此：
+物品 **ID + 名称** 在**注入时预先扫描并硬编码**到脚本中，因此：
 
 - **进游戏立即可用**（无需等待枚举，之前 2-3 分钟的枚举已移除）
-- 搜索时用 `GetObjectName` 获取运行时中文名进行匹配
+- 搜索直接匹配**预扫描的名称**，不依赖 `GetObjectName`
+  （自定义物品的 `GetObjectName` 可能返回空，故必须内嵌名称）
 
 ### 物品来源（标准 + 自定义）
 
@@ -37,7 +38,7 @@ itembrowser          → 显示帮助
 
 1. **游戏标准物品**：`H:\Games\War3\...\units\itemdata.slk`（273 项）
 2. **地图自定义物品**：地图内 `units\itemfunc.txt`（含名称，如 `I000`=风痕之刃）
-3. **地图物品表**：地图内 `units\itemdata.slk`（补充）
+3. **地图物品表**：地图内 `units\itemdata.slk`（含自定义物品 ID + 名称）
 
 > ⚠️ 不同地图的自定义物品不同，**每张地图都要重新运行 `collect_items.py`**。
 
@@ -47,10 +48,10 @@ itembrowser          → 显示帮助
 # 1. 解压地图全部文件
 python tools/war3map-injector/extract_all.py "maps/你的地图.w3x"
 
-# 2. 收集标准 + 自定义物品 ID
+# 2. 收集标准 + 自定义物品 ID 与名称
 python tools/war3map-injector/collect_items.py "maps/你的地图"
 
-# 3. 把列表嵌入 f.j
+# 3. 把列表嵌入 f.j（ID + 名称）
 python tools/war3map-injector/build_fj.py
 ```
 

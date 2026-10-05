@@ -23,19 +23,29 @@ def detect_decode(path):
 
 
 def parse_slk(path):
-    """Return list of item IDs from an itemdata.slk."""
+    """Return list of item IDs from an itemdata.slk.
+
+    SLK cells are scanned in order. A cell may set the current row via `Y<n>`
+    and/or the column via `X<n>`; if a coordinate is omitted, the previous
+    value is reused (SLK semantics). The itemID column is X1.
+    """
     txt, _ = detect_decode(path)
-    cells = {}
-    for m in re.finditer(r'C;X(\d+);(?:Y(\d+);)?K"((?:[^"]|"")*)"', txt):
-        x = int(m.group(1))
-        y = int(m.group(2)) if m.group(2) else 1
-        cells[(x, y)] = m.group(3).replace('""', '"')
-    maxy = max((y for (x, y) in cells), default=1)
+    cur_x = 1
+    cur_y = 1
     ids = []
-    for y in range(2, maxy + 1):
-        iid = cells.get((1, y))
-        if iid and len(iid) == 4:
-            ids.append(iid)
+    # each cell: C;...;K"value"  (coordinates appear before K)
+    for m in re.finditer(r'C;([^K]*);K"((?:[^"]|"")*)"', txt):
+        coords = m.group(1)
+        val = m.group(2).replace('""', '"')
+        xm = re.search(r"X(\d+)", coords)
+        ym = re.search(r"Y(\d+)", coords)
+        if xm:
+            cur_x = int(xm.group(1))
+        if ym:
+            cur_y = int(ym.group(1))
+        # itemID column is X1, data starts at row 2
+        if cur_x == 1 and cur_y >= 2 and len(val) == 4:
+            ids.append(val)
     return ids
 
 

@@ -4,4 +4,6 @@
 
 // 物品 ID 列表（注入时预扫描硬编码）
 integer array ib_itemList
+// 物品名称列表（注入时预扫描硬编码，避免依赖 GetObjectName）
+string array ib_itemName
 integer ib_itemCount = 0

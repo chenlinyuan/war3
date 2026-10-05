@@ -82,26 +82,37 @@ def main():
         time.sleep(0.5)
     print("对话框:", hex(dlg) if dlg else None)
     if dlg:
-        # 找文件名编辑框 (ComboBoxEx32 -> ComboBox -> Edit)
+        # 列出对话框所有控件,帮助诊断
+        for cls in ("Edit", "Button", "ComboBox", "ComboBoxEx32", "Static"):
+            cs = im.find_child(dlg, cls)
+            for c in cs:
+                print("   %s %#x text=%r" % (cls, c, im.get_text(c)))
+        # 找文件名编辑框
         edit = im.find_child(dlg, "Edit")
         print("edit:", edit)
         if edit:
-            user32.SendMessageW(edit[0], 0x000C, 0, ctypes.c_wchar_p(script_path))  # WM_SETTEXT
+            user32.SendMessageW(edit[0], 0x000C, 0, ctypes.c_wchar_p(script_path))
             time.sleep(0.5)
-            # 点打开
-            ob = im.find_child(dlg, "Button", "打开")
+            # 精确点击 "打开(&O)"(避免点到"以只读方式打开")
+            ob = im.find_child(dlg, "Button", "打开(&O)")
             if not ob:
-                ob = im.find_child(dlg, "Button", "Open")
+                ob = im.find_child(dlg, "Button", "打开")
+            print("打开按钮候选:", ob)
             if ob:
                 im.click_real(ob[0])
                 time.sleep(2)
     im.handle_popups()
     time.sleep(2)
     print("替换后标题:", im.get_text(h))
-
-    # 检查是否弹出"是否替换"确认框
-    im.handle_popups()
-    time.sleep(1)
+    # 列出主窗口的文件列表,看是否有 war3map.j
+    lbs = im.find_child(h, "TListBox")
+    if lbs:
+        cnt = user32.SendMessageW(lbs[0], 0x018B, 0, 0)
+        print("主列表项数:", cnt)
+        for i in range(min(cnt, 200)):
+            t = im.get_text_item(lbs[0], i) if hasattr(im, "get_text_item") else None
+            if t and "war3map.j" in t.lower():
+                print("   列表含:", i, t)
 
     # 重压缩保存
     b = im.find_child(h, "TButton", "重压缩")

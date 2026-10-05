@@ -469,8 +469,7 @@ function IB_RegisterChat takes nothing returns nothing
     call DisplayTextToPlayer(Player(0), 0, 0, "|cff00ff00[装备]|r RC-1 开始")
     loop
         exitwhen i > 11
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "search", false)
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "additem", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "test", false)
         set i = i + 1
     endloop
     call DisplayTextToPlayer(Player(0), 0, 0, "|cff00ff00[装备]|r RC-2 循环完成")

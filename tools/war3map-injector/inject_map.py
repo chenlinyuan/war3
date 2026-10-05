@@ -150,15 +150,54 @@ def handle_popups(verbose=True):
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
-def stage_scripts(script_dir):
-    """把 f.j/g.j/m.j 复制到 HkeData。
+def detect_map_encoding(map_path):
+    """检测地图脚本编码：先尝试从地图解压 war3map.j，判断是 GBK 还是 UTF-8。
 
-    重要：War3 1.27 以 GBK(ANSI) 解析地图脚本。若脚本以 UTF-8 保存，
-    中文字符的字节序列会被 GBK 误读（例如 UTF-8 尾字节落在 0x81-0xFE
-    区间时会吞掉后面的引号），导致字符串字面量损坏、脚本解析失败，
-    表现为「加载地图后回到选图界面」。因此这里统一转为 GBK 再复制。
+    不同地图的脚本编码不同（老图多为 GBK，新图/中文图可能为 UTF-8）。
+    注入脚本必须与地图脚本编码一致，否则中文字符串会损坏。
+    若无法解压，默认返回 gbk。
     """
-    print("[1] 复制脚本到 HkeData (UTF-8 -> GBK)")
+    try:
+        import tempfile
+        tmp = os.path.join(tempfile.gettempdir(), "ib_enc_probe.j")
+        # 复用 extract_script（同目录）
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import extract_script
+        # 临时替换 argv 调用
+        old = sys.argv
+        sys.argv = ["extract_script.py", map_path, tmp]
+        try:
+            extract_script.main()
+        finally:
+            sys.argv = old
+        if os.path.isfile(tmp):
+            data = open(tmp, "rb").read()
+            os.remove(tmp)
+            # 优先判断 UTF-8（严格）
+            try:
+                data.decode("utf-8")
+                return "utf-8"
+            except Exception:
+                pass
+            try:
+                data.decode("gbk")
+                return "gbk"
+            except Exception:
+                pass
+    except Exception as e:
+        print("    编码探测失败: %s" % e)
+    return "gbk"
+
+
+def stage_scripts(script_dir, encoding="gbk"):
+    """把 f.j/g.j/m.j 复制到 HkeData，并转换为指定编码。
+
+    重要：注入脚本必须与【地图脚本】编码一致，否则中文字符串会损坏：
+    - 老地图（如 Lost Temple）脚本为 GBK
+    - 部分新图/中文图脚本为 UTF-8
+    编码不一致会导致中文被截断/乱码，搜索永远匹配不上。
+    """
+    print("[1] 复制脚本到 HkeData (UTF-8 -> %s)" % encoding.upper())
     for f in ("f.j", "g.j", "m.j"):
         src = os.path.join(script_dir, f)
         if not os.path.isfile(src):
@@ -166,9 +205,9 @@ def stage_scripts(script_dir):
         with open(src, "r", encoding="utf-8") as fh:
             text = fh.read()
         dst = os.path.join(HKE_DATA, f)
-        with open(dst, "w", encoding="gbk", errors="replace", newline="") as fh:
+        with open(dst, "w", encoding=encoding, errors="replace", newline="") as fh:
             fh.write(text)
-        print("    %s -> %s (%d chars, GBK)" % (f, HKE_DATA, len(text)))
+        print("    %s -> %s (%d chars, %s)" % (f, HKE_DATA, len(text), encoding.upper()))
 
 
 def launch_tool():
@@ -274,7 +313,11 @@ def main():
 
     size_before = os.path.getsize(map_path)
 
-    stage_scripts(script_dir)
+    # 检测地图脚本编码，注入脚本须与之保持一致
+    encoding = detect_map_encoding(map_path)
+    print("地图脚本编码: %s" % encoding.upper())
+
+    stage_scripts(script_dir, encoding)
     main_wnd = launch_tool()
     open_map_via_drop(main_wnd, map_path)
     ok = inject(main_wnd)

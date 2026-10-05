@@ -417,7 +417,7 @@ function IB_OnChat takes nothing returns nothing
     local integer spacePos = -1
     local integer i = 0
 
-    call DisplayTimedTextToPlayer(p, 0, 0, 30.0, "|cff00ff00[装备]|r OnChat 触发: [" + s + "]")
+    call DisplayTextToPlayer(p, 0, 0, "|cff00ff00[装备]|r OnChat 触发: [" + s + "]")
 
     loop
         exitwhen i >= len
@@ -466,15 +466,16 @@ endfunction
 function IB_RegisterChat takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
-    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r RegisterChat 开始")
+    call DisplayTextToPlayer(Player(0), 0, 0, "|cff00ff00[装备]|r RC-1 开始")
     loop
         exitwhen i > 11
         call TriggerRegisterPlayerChatEvent(t, Player(i), "search", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "additem", false)
         set i = i + 1
     endloop
+    call DisplayTextToPlayer(Player(0), 0, 0, "|cff00ff00[装备]|r RC-2 循环完成")
     call TriggerAddAction(t, function IB_OnChat)
-    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r RegisterChat 完成")
+    call DisplayTextToPlayer(Player(0), 0, 0, "|cff00ff00[装备]|r RC-3 AddAction完成")
     set t = null
 endfunction
 

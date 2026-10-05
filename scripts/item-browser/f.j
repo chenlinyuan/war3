@@ -417,6 +417,8 @@ function IB_OnChat takes nothing returns nothing
     local integer spacePos = -1
     local integer i = 0
 
+    call DisplayTimedTextToPlayer(p, 0, 0, 30.0, "|cff00ff00[装备]|r OnChat 触发: [" + s + "]")
+
     loop
         exitwhen i >= len
         if SubString(s, i, i + 1) == " " then

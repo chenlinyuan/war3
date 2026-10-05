@@ -72,10 +72,81 @@ function IB_StripColorCodes takes string s returns string
 endfunction
 
 //---------------------------------------------------------------------------
-// [工具] 字符串不区分大小写比较
+// [工具] ASCII 转小写（仅处理 A-Z，不动中文等多字节字符）
+// 注意：不能用 StringCase，它会把 GBK 中文字节也改写导致乱码
+//---------------------------------------------------------------------------
+function IB_LowerAscii takes string s returns string
+    local integer len = StringLength(s)
+    local integer i = 0
+    local string result = ""
+    local string ch
+    loop
+        exitwhen i >= len
+        set ch = SubString(s, i, i + 1)
+        if ch == "A" then
+            set ch = "a"
+        elseif ch == "B" then
+            set ch = "b"
+        elseif ch == "C" then
+            set ch = "c"
+        elseif ch == "D" then
+            set ch = "d"
+        elseif ch == "E" then
+            set ch = "e"
+        elseif ch == "F" then
+            set ch = "f"
+        elseif ch == "G" then
+            set ch = "g"
+        elseif ch == "H" then
+            set ch = "h"
+        elseif ch == "I" then
+            set ch = "i"
+        elseif ch == "J" then
+            set ch = "j"
+        elseif ch == "K" then
+            set ch = "k"
+        elseif ch == "L" then
+            set ch = "l"
+        elseif ch == "M" then
+            set ch = "m"
+        elseif ch == "N" then
+            set ch = "n"
+        elseif ch == "O" then
+            set ch = "o"
+        elseif ch == "P" then
+            set ch = "p"
+        elseif ch == "Q" then
+            set ch = "q"
+        elseif ch == "R" then
+            set ch = "r"
+        elseif ch == "S" then
+            set ch = "s"
+        elseif ch == "T" then
+            set ch = "t"
+        elseif ch == "U" then
+            set ch = "u"
+        elseif ch == "V" then
+            set ch = "v"
+        elseif ch == "W" then
+            set ch = "w"
+        elseif ch == "X" then
+            set ch = "x"
+        elseif ch == "Y" then
+            set ch = "y"
+        elseif ch == "Z" then
+            set ch = "z"
+        endif
+        set result = result + ch
+        set i = i + 1
+    endloop
+    return result
+endfunction
+
+//---------------------------------------------------------------------------
+// [工具] 字符串不区分大小写比较（仅 ASCII 转小写，不动中文）
 //---------------------------------------------------------------------------
 function IB_StrEqCI takes string a, string b returns boolean
-    return StringCase(a, false) == StringCase(b, false)
+    return IB_LowerAscii(a) == IB_LowerAscii(b)
 endfunction
 
 //---------------------------------------------------------------------------
@@ -83,6 +154,16 @@ endfunction
 //---------------------------------------------------------------------------
 function IB_Message takes player p, string msg returns nothing
     call DisplayTimedTextToPlayer(p, 0, 0, 15.0, "|cff00ff00[装备]|r " + msg)
+endfunction
+
+//---------------------------------------------------------------------------
+// [工具] 布尔转字符串（诊断用）
+//---------------------------------------------------------------------------
+function IB_BoolStr takes boolean b returns string
+    if b then
+        return "true"
+    endif
+    return "false"
 endfunction
 
 //---------------------------------------------------------------------------
@@ -97,11 +178,11 @@ function IB_ItemName takes integer index returns string
 endfunction
 
 //---------------------------------------------------------------------------
-// [工具] 判断名称是否包含关键词（不区分大小写）
+// [工具] 判断名称是否包含关键词（ASCII 不区分大小写，中文按字节精确匹配）
 //---------------------------------------------------------------------------
 function IB_NameMatch takes string rawName, string keyword returns boolean
-    local string name = StringCase(IB_StripColorCodes(rawName), false)
-    local string key = StringCase(keyword, false)
+    local string name = IB_LowerAscii(IB_StripColorCodes(rawName))
+    local string key = IB_LowerAscii(keyword)
     local integer nameLen = StringLength(name)
     local integer keyLen = StringLength(key)
     local integer i = 0
@@ -190,7 +271,7 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
     local real x
     local real y
     local string name
-    local string target = StringCase(IB_StripColorCodes(itemName), false)
+    local string target = IB_LowerAscii(IB_StripColorCodes(itemName))
     local integer exactId = 0
     local integer partialId = 0
 
@@ -207,7 +288,7 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
     // 第一遍：精确匹配
     loop
         exitwhen i >= ib_itemCount or exactId != 0
-        set name = StringCase(IB_StripColorCodes(IB_ItemName(i)), false)
+        set name = IB_LowerAscii(IB_StripColorCodes(IB_ItemName(i)))
         if name == target then
             set exactId = ib_itemList[i]
         endif
@@ -347,6 +428,8 @@ function IB_OnChat takes nothing returns boolean
         call IB_Message(p, "name[0]=" + IB_ItemName(0))
         call IB_Message(p, "name[273]=" + IB_ItemName(273))
         call IB_Message(p, "len(arg)=" + I2S(StringLength(arg)) + " arg=" + arg)
+        call IB_Message(p, "match(arg,name273)=" + IB_BoolStr(IB_NameMatch(IB_ItemName(273), arg)))
+        call IB_Message(p, "match(arg,name0)=" + IB_BoolStr(IB_NameMatch(IB_ItemName(0), arg)))
     endif
     return false
 endfunction

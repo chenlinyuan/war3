@@ -252,87 +252,23 @@ function IB_Search takes player p, string keyword returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
-// 添加装备（不区分大小写精确匹配，找不到则取第一个包含关键词的）
+// 添加装备（分帧扫描：先精确/ID匹配，再包含匹配；避免超操作数上限）
 //---------------------------------------------------------------------------
-function IB_AddItem takes player p, string itemName, integer count returns nothing
-    local integer i = 0
-    local integer added = 0
-    local unit u
+function IB_AddGive takes player p, integer itemId, integer count returns nothing
+    local unit u = IB_GetSelectedUnit(p)
     local item it
     local real x
     local real y
-    local string name
-    local string target = IB_LowerAscii(itemName)
-    local integer exactId = 0
-    local integer partialId = 0
-    local integer foundIdx = -1
-
-    if count < 1 then
-        set count = 1
-    endif
-
-    set u = IB_GetSelectedUnit(p)
+    local integer added = 0
     if u == null then
         call IB_Message(p, "请先选中一个英雄/单位")
         return
     endif
-
-    // 第零遍：若输入是 4 字符 ID（如 I000），按 ID 匹配
-    if StringLength(itemName) == 4 then
-        set i = 0
-        loop
-            exitwhen i >= ib_itemCount or exactId != 0
-            if IB_IdStr(ib_itemList[i]) == itemName then
-                set exactId = ib_itemList[i]
-                set foundIdx = i
-            endif
-            set i = i + 1
-        endloop
-    endif
-
-    // 第一遍：精确匹配
-    if exactId == 0 then
-        set i = 0
-        loop
-            exitwhen i >= ib_itemCount or exactId != 0
-            set name = IB_ItemName(i)
-            if name == target then
-                set exactId = ib_itemList[i]
-                set foundIdx = i
-            endif
-            set i = i + 1
-        endloop
-    endif
-
-    // 第二遍：包含匹配（取第一个）
-    if exactId == 0 then
-        set i = 0
-        loop
-            exitwhen i >= ib_itemCount or partialId != 0
-            if IB_NameMatch(IB_ItemName(i), itemName) then
-                set partialId = ib_itemList[i]
-                set foundIdx = i
-            endif
-            set i = i + 1
-        endloop
-    endif
-
-    if exactId != 0 then
-        set partialId = exactId
-    endif
-
-    if partialId == 0 then
-        call IB_Message(p, "未找到装备 \"" + itemName + "\"")
-        set u = null
-        return
-    endif
-
     set x = GetUnitX(u)
     set y = GetUnitY(u)
-
     loop
         exitwhen added >= count
-        set it = CreateItem(partialId, x, y)
+        set it = CreateItem(itemId, x, y)
         if it != null then
             if not UnitAddItem(u, it) then
                 call SetItemPosition(it, x, y)
@@ -341,9 +277,61 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
         endif
         set it = null
     endloop
-
-    call IB_Message(p, "已添加 " + I2S(added) + " 个 \"" + IB_ItemName(foundIdx) + "\"")
+    call IB_Message(p, "已添加 " + I2S(added) + " 个 \"" + IB_ItemName(ib_addFoundIdx) + "\"")
     set u = null
+endfunction
+
+function IB_AddStep takes nothing returns nothing
+    local integer n = 0
+    local string name
+    loop
+        exitwhen ib_addIdx >= ib_itemCount or n >= 40
+        set name = IB_ItemName(ib_addIdx)
+        // 精确匹配 或 ID 匹配
+        if name == ib_addName or IB_IdStr(ib_itemList[ib_addIdx]) == ib_addName then
+            set ib_addFoundId = ib_itemList[ib_addIdx]
+            set ib_addFoundIdx = ib_addIdx
+            set ib_addIdx = ib_itemCount
+        elseif ib_addFoundId == 0 then
+            // 记录第一个包含匹配（继续扫描以优先找精确匹配）
+            if IB_NameMatch(name, ib_addName) then
+                set ib_addFoundId = ib_itemList[ib_addIdx]
+                set ib_addFoundIdx = ib_addIdx
+            endif
+        endif
+        set ib_addIdx = ib_addIdx + 1
+        set n = n + 1
+    endloop
+
+    if ib_addIdx >= ib_itemCount then
+        call PauseTimer(ib_addTimer)
+        call DestroyTimer(ib_addTimer)
+        set ib_addTimer = null
+        if ib_addFoundId == 0 then
+            call IB_Message(ib_addPlayer, "未找到装备 \"" + ib_addName + "\"")
+        else
+            call IB_AddGive(ib_addPlayer, ib_addFoundId, ib_addCount)
+        endif
+        set ib_addPlayer = null
+    endif
+endfunction
+
+function IB_AddItem takes player p, string itemName, integer count returns nothing
+    if count < 1 then
+        set count = 1
+    endif
+    set ib_addIdx = 0
+    set ib_addCount = count
+    set ib_addName = IB_LowerAscii(itemName)
+    set ib_addFoundId = 0
+    set ib_addFoundIdx = -1
+    set ib_addPlayer = p
+    if ib_addTimer != null then
+        call PauseTimer(ib_addTimer)
+        call DestroyTimer(ib_addTimer)
+    endif
+    set ib_addTimer = CreateTimer()
+    call TimerStart(ib_addTimer, 0.01, true, function IB_AddStep)
 endfunction
 
 //---------------------------------------------------------------------------

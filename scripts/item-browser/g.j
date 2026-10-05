@@ -20,3 +20,12 @@ integer ib_searchStdN = 0
 integer ib_searchCusN = 0
 player ib_searchPlayer = null
 timer ib_searchTimer = null
+
+// 添加状态（分帧扫描，避免单次执行超操作数上限）
+integer ib_addIdx = 0
+integer ib_addCount = 1
+string ib_addName = ""
+integer ib_addFoundId = 0
+integer ib_addFoundIdx = -1
+player ib_addPlayer = null
+timer ib_addTimer = null

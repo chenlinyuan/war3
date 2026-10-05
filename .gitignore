@@ -45,3 +45,21 @@ secrets.json
 # *.mpq
 # *.mp3
 # *.wav
+
+# ---- 地图工程临时文件 ----
+# 地图备份（保留原始备份，忽略自动备份）
+*.w3m.bak
+*.w3x.bak
+# 解包产物
+maps/*/extracted/
+maps/*/war3map.j
+maps/*/war3map.lua
+# Python 缓存
+__pycache__/
+*.pyc
+
+# ---- Python 缓存 ----
+__pycache__/
+*.pyc
+.venv/
+venv/

@@ -151,51 +151,26 @@ def handle_popups(verbose=True):
 # 主流程
 # ---------------------------------------------------------------------------
 def detect_map_encoding(map_path):
-    """检测地图脚本编码：先尝试从地图解压 war3map.j，判断是 GBK 还是 UTF-8。
+    """返回注入脚本应使用的编码。
 
-    不同地图的脚本编码不同（老图多为 GBK，新图/中文图可能为 UTF-8）。
-    注入脚本必须与地图脚本编码一致，否则中文字符串会损坏。
-    若无法解压，默认返回 gbk。
+    经验结论：War3 1.27 的 JASS 解析器按 UTF-8 读取脚本字符串字面量。
+    - 若注入 GBK 中文，游戏会把 GBK 字节当作非法 UTF-8，导致字符串被截断
+      （例如 "国王之冠 +5" 只剩 "+5"），搜索/添加全部失效。
+    - 注入 UTF-8 中文则正常（神界危机已验证）。
+    地图原脚本里的 GBK 字节通常只在注释中，注释会被跳过，不影响。
+    因此这里统一返回 utf-8。可用环境变量 IB_ENCODING 覆盖。
     """
-    try:
-        import tempfile
-        tmp = os.path.join(tempfile.gettempdir(), "ib_enc_probe.j")
-        # 复用 extract_script（同目录）
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        import extract_script
-        # 临时替换 argv 调用
-        old = sys.argv
-        sys.argv = ["extract_script.py", map_path, tmp]
-        try:
-            extract_script.main()
-        finally:
-            sys.argv = old
-        if os.path.isfile(tmp):
-            data = open(tmp, "rb").read()
-            os.remove(tmp)
-            # 优先判断 UTF-8（严格）
-            try:
-                data.decode("utf-8")
-                return "utf-8"
-            except Exception:
-                pass
-            try:
-                data.decode("gbk")
-                return "gbk"
-            except Exception:
-                pass
-    except Exception as e:
-        print("    编码探测失败: %s" % e)
-    return "gbk"
+    env = os.environ.get("IB_ENCODING", "").strip().lower()
+    if env in ("utf-8", "utf8", "gbk"):
+        return "utf-8" if env in ("utf-8", "utf8") else "gbk"
+    return "utf-8"
 
 
-def stage_scripts(script_dir, encoding="gbk"):
+def stage_scripts(script_dir, encoding="utf-8"):
     """把 f.j/g.j/m.j 复制到 HkeData，并转换为指定编码。
 
-    重要：注入脚本必须与【地图脚本】编码一致，否则中文字符串会损坏：
-    - 老地图（如 Lost Temple）脚本为 GBK
-    - 部分新图/中文图脚本为 UTF-8
-    编码不一致会导致中文被截断/乱码，搜索永远匹配不上。
+    War3 1.27 按 UTF-8 读取脚本字符串字面量。注入 GBK 中文会导致字符串
+    被截断（中文丢失），因此默认使用 UTF-8。
     """
     print("[1] 复制脚本到 HkeData (UTF-8 -> %s)" % encoding.upper())
     for f in ("f.j", "g.j", "m.j"):

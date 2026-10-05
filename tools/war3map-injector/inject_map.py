@@ -288,6 +288,18 @@ def recompress(main):
     print("    [OK] 已保存")
 
 
+def close_tool():
+    """关闭 HkeW3mModifier 工具（用完即关，避免占用地图文件）。"""
+    print("[6] 关闭工具")
+    try:
+        subprocess.run(["taskkill", "/IM", "HkeW3mModifier2.0.exe", "/F"],
+                       capture_output=True)
+        time.sleep(1)
+        print("    [OK] 已关闭")
+    except Exception as e:
+        print("    关闭失败: %s" % e)
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -322,6 +334,7 @@ def main():
     open_map_via_drop(main_wnd, map_path)
     ok = inject(main_wnd)
     recompress(main_wnd)
+    close_tool()
 
     size_after = os.path.getsize(map_path)
     print("")

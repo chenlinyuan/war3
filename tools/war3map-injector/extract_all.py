@@ -50,6 +50,9 @@ def main():
     im.handle_popups()
     time.sleep(3)
     user32.PostMessageW(mainw, WM_CLOSE, 0, 0)
+    time.sleep(1)
+    # 确保工具进程退出，避免占用地图文件
+    im.subprocess.run(["taskkill", "/IM", "HkeW3mModifier2.0.exe", "/F"], capture_output=True)
 
     # find extracted dir
     base = os.path.dirname(map_path)

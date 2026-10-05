@@ -417,8 +417,6 @@ function IB_OnChat takes nothing returns nothing
     local integer spacePos = -1
     local integer i = 0
 
-    call DisplayTextToPlayer(p, 0, 0, "|cff00ff00[装备]|r OnChat 触发: [" + s + "]")
-
     loop
         exitwhen i >= len
         if SubString(s, i, i + 1) == " " then
@@ -1768,7 +1766,6 @@ endfunction
 function IB_Init takes nothing returns nothing
     set ib_itemCount = 0
     call IB_RegisterChat()
-    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r IB_Init 已执行")
     set ib_fillIdx = 0
     set ib_fillTotal = 6
     set ib_fillTimer = CreateTimer()

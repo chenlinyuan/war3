@@ -471,10 +471,6 @@ function IB_RegisterChat takes nothing returns nothing
         exitwhen i > 11
         call TriggerRegisterPlayerChatEvent(t, Player(i), "search", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "additem", false)
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "itembrowser", false)
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "ibtest", false)
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "ibcount", false)
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "test", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)

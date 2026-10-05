@@ -336,6 +336,27 @@ function IB_ParseAddItem takes player p, string arg returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
+// 诊断：统计匹配数并显示前 5 个
+//---------------------------------------------------------------------------
+function IB_CountMatch takes player p, string keyword returns nothing
+    local integer i = 0
+    local integer found = 0
+    local string out = ""
+    loop
+        exitwhen i >= ib_itemCount
+        if IB_NameMatch(IB_ItemName(i), keyword) then
+            set found = found + 1
+            if found <= 5 then
+                set out = out + I2S(i) + ":" + IB_ItemName(i) + "  "
+            endif
+        endif
+        set i = i + 1
+    endloop
+    call IB_Message(p, "匹配数=" + I2S(found))
+    call IB_Message(p, "前5: " + out)
+endfunction
+
+//---------------------------------------------------------------------------
 // 解析聊天命令
 //---------------------------------------------------------------------------
 function IB_OnChat takes nothing returns boolean
@@ -379,6 +400,9 @@ function IB_OnChat takes nothing returns boolean
         call IB_Message(p, "len(arg)=" + I2S(StringLength(arg)) + " arg=" + arg)
         call IB_Message(p, "match(arg,name273)=" + IB_BoolStr(IB_NameMatch(IB_ItemName(273), arg)))
         call IB_Message(p, "match(arg,name0)=" + IB_BoolStr(IB_NameMatch(IB_ItemName(0), arg)))
+    elseif IB_StrEqCI(cmd, "ibcount") then
+        call IB_Message(p, "统计 \"" + arg + "\" 匹配数...")
+        call IB_CountMatch(p, arg)
     endif
     return false
 endfunction

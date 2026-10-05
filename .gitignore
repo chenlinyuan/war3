@@ -54,6 +54,8 @@ secrets.json
 maps/*/extracted/
 maps/*/war3map.j
 maps/*/war3map.lua
+maps/war3map.j
+maps/war3map.lua
 # 解包出来的地图文件夹（与地图同名的目录，含 units/ 等）
 maps/*.w3x/
 maps/*.w3m/

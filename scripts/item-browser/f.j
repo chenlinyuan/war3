@@ -13,65 +13,6 @@
 //============================================================================
 
 //---------------------------------------------------------------------------
-// [工具] 去除颜色代码 |cXXXXXXXX 和 |r，并去除首尾空格
-//---------------------------------------------------------------------------
-function IB_StripColorCodes takes string s returns string
-    local integer len = StringLength(s)
-    local integer i = 0
-    local string result = ""
-    local string ch
-    local integer start = 0
-    local integer stop = 0
-
-    loop
-        exitwhen i >= len
-        set ch = SubString(s, i, i + 1)
-        if ch == "|" then
-            if SubString(s, i + 1, i + 2) == "c" or SubString(s, i + 1, i + 2) == "C" then
-                set i = i + 9
-            elseif SubString(s, i + 1, i + 2) == "r" or SubString(s, i + 1, i + 2) == "R" then
-                set i = i + 1
-            else
-                set result = result + ch
-                set i = i + 1
-            endif
-        else
-            set result = result + ch
-            set i = i + 1
-        endif
-    endloop
-
-    // 去除首尾空格
-    set len = StringLength(result)
-    set i = 0
-    set start = 0
-    loop
-        exitwhen i >= len
-        if SubString(result, i, i + 1) == " " then
-            set i = i + 1
-        else
-            set start = i
-            set i = len
-        endif
-    endloop
-    set stop = len
-    set i = len - 1
-    loop
-        exitwhen i < 0
-        if SubString(result, i, i + 1) == " " then
-            set i = i - 1
-        else
-            set stop = i + 1
-            set i = -1
-        endif
-    endloop
-    if start >= stop then
-        return ""
-    endif
-    return SubString(result, start, stop)
-endfunction
-
-//---------------------------------------------------------------------------
 // [工具] ASCII 转小写（仅处理 A-Z，不动中文等多字节字符）
 // 注意：不能用 StringCase，它会把 GBK 中文字节也改写导致乱码
 //---------------------------------------------------------------------------
@@ -167,21 +108,17 @@ function IB_BoolStr takes boolean b returns string
 endfunction
 
 //---------------------------------------------------------------------------
-// [工具] 获取物品显示名：优先用预扫描名称，否则回退 GetObjectName
+// [工具] 获取物品显示名：直接返回预扫描名称（已去颜色码）
 //---------------------------------------------------------------------------
 function IB_ItemName takes integer index returns string
-    local string n = ib_itemName[index]
-    if n == "" then
-        set n = IB_StripColorCodes(GetObjectName(ib_itemList[index]))
-    endif
-    return n
+    return ib_itemName[index]
 endfunction
 
 //---------------------------------------------------------------------------
-// [工具] 判断名称是否包含关键词（ASCII 不区分大小写，中文按字节精确匹配）
+// [工具] 判断名称是否包含关键词（逐字节直接比较，不做任何字符串重建）
+// 预扫描时名称已去颜色码并转小写；此处只对 keyword 做 ASCII 转小写。
 //---------------------------------------------------------------------------
-function IB_NameMatch takes string rawName, string keyword returns boolean
-    local string name = IB_LowerAscii(IB_StripColorCodes(rawName))
+function IB_NameMatch takes string name, string keyword returns boolean
     local string key = IB_LowerAscii(keyword)
     local integer nameLen = StringLength(name)
     local integer keyLen = StringLength(key)
@@ -271,9 +208,10 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
     local real x
     local real y
     local string name
-    local string target = IB_LowerAscii(IB_StripColorCodes(itemName))
+    local string target = IB_LowerAscii(itemName)
     local integer exactId = 0
     local integer partialId = 0
+    local integer foundIdx = -1
 
     if count < 1 then
         set count = 1
@@ -288,9 +226,10 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
     // 第一遍：精确匹配
     loop
         exitwhen i >= ib_itemCount or exactId != 0
-        set name = IB_LowerAscii(IB_StripColorCodes(IB_ItemName(i)))
+        set name = IB_ItemName(i)
         if name == target then
             set exactId = ib_itemList[i]
+            set foundIdx = i
         endif
         set i = i + 1
     endloop
@@ -302,6 +241,7 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
             exitwhen i >= ib_itemCount or partialId != 0
             if IB_NameMatch(IB_ItemName(i), itemName) then
                 set partialId = ib_itemList[i]
+                set foundIdx = i
             endif
             set i = i + 1
         endloop
@@ -332,7 +272,7 @@ function IB_AddItem takes player p, string itemName, integer count returns nothi
         set it = null
     endloop
 
-    call IB_Message(p, "已添加 " + I2S(added) + " 个 \"" + IB_StripColorCodes(GetObjectName(partialId)) + "\"")
+    call IB_Message(p, "已添加 " + I2S(added) + " 个 \"" + IB_ItemName(foundIdx) + "\"")
     set u = null
 endfunction
 
@@ -528,7 +468,7 @@ function IB_Fill0 takes nothing returns nothing
     set ib_itemList[36] = 'ankh'
     set ib_itemName[36] = "重生十字章"
     set ib_itemList[37] = 'whwd'
-    set ib_itemName[37] = "风少爷(QQ171246484)"
+    set ib_itemName[37] = "风少爷(qq171246484)"
     set ib_itemList[38] = 'fgsk'
     set ib_itemName[38] = "死亡之书"
     set ib_itemList[39] = 'wcyc'
@@ -1006,17 +946,17 @@ function IB_Fill3 takes nothing returns nothing
     set ib_itemList[272] = 'tcas'
     set ib_itemName[272] = "小城堡"
     set ib_itemList[273] = 'I000'
-    set ib_itemName[273] = "|cff8080FF风痕之刃"
+    set ib_itemName[273] = "风痕之刃"
     set ib_itemList[274] = 'I010'
     set ib_itemName[274] = "攻击之爪(一级)"
     set ib_itemList[275] = 'I030'
-    set ib_itemName[275] = "|cffFF0000飞哥圣神甲<GM>"
+    set ib_itemName[275] = "飞哥圣神甲<gm>"
     set ib_itemList[276] = 'I001'
     set ib_itemName[276] = "知识之书+10000"
     set ib_itemList[277] = 'I011'
     set ib_itemName[277] = "攻击之爪(三级)"
     set ib_itemList[278] = 'I021'
-    set ib_itemName[278] = "|cff00FF00落叶魂盔"
+    set ib_itemName[278] = "落叶魂盔"
     set ib_itemList[279] = 'I031'
     set ib_itemName[279] = "三转证明"
     set ib_itemList[280] = 'TWN1'
@@ -1024,9 +964,9 @@ function IB_Fill3 takes nothing returns nothing
     set ib_itemList[281] = 'I002'
     set ib_itemName[281] = "1点木材换10000金币"
     set ib_itemList[282] = 'I012'
-    set ib_itemName[282] = "|cffFF0000四兽之盾"
+    set ib_itemName[282] = "四兽之盾"
     set ib_itemList[283] = 'I022'
-    set ib_itemName[283] = "|cff00FF00落叶魂爪"
+    set ib_itemName[283] = "落叶魂爪"
     set ib_itemList[284] = 'I032'
     set ib_itemName[284] = "魔界通道通行证"
     set ib_itemList[285] = 'TWN2'
@@ -1034,11 +974,11 @@ function IB_Fill3 takes nothing returns nothing
     set ib_itemList[286] = 'I003'
     set ib_itemName[286] = "10000金币换1点木材"
     set ib_itemList[287] = 'I013'
-    set ib_itemName[287] = "|cffFF8000疯魔之爪(一级)"
+    set ib_itemName[287] = "疯魔之爪(一级)"
     set ib_itemList[288] = 'I023'
-    set ib_itemName[288] = "|cff00FF00落叶魂斧"
+    set ib_itemName[288] = "落叶魂斧"
     set ib_itemList[289] = 'I033'
-    set ib_itemName[289] = "|cffFF0000鬼龙之戒"
+    set ib_itemName[289] = "鬼龙之戒"
     set ib_itemList[290] = 'TWN3'
     set ib_itemName[290] = "城堡或者堡垒或者永恒之树或者黑色城堡"
     set ib_itemList[291] = 'I004'
@@ -1046,173 +986,173 @@ function IB_Fill3 takes nothing returns nothing
     set ib_itemList[292] = 'I014'
     set ib_itemName[292] = "合成宝石"
     set ib_itemList[293] = 'I024'
-    set ib_itemName[293] = "|cffFF0000红魔龙刀"
+    set ib_itemName[293] = "红魔龙刀"
     set ib_itemList[294] = 'I034'
     set ib_itemName[294] = "鬼龙封印"
     set ib_itemList[295] = 'I005'
     set ib_itemName[295] = "火焰手套(一级)"
     set ib_itemList[296] = 'I015'
-    set ib_itemName[296] = "|cff8080FF风痕之甲"
+    set ib_itemName[296] = "风痕之甲"
     set ib_itemList[297] = 'I006'
     set ib_itemName[297] = "远古战斧(四级)"
     set ib_itemList[298] = 'I016'
-    set ib_itemName[298] = "|cffFF8000霹雳手套(二级)"
+    set ib_itemName[298] = "霹雳手套(二级)"
     set ib_itemList[299] = 'I026'
-    set ib_itemName[299] = "|cffFF0000红魔龙盔"
+    set ib_itemName[299] = "红魔龙盔"
     set ib_itemList[300] = 'I007'
     set ib_itemName[300] = "国王之冠(二级)"
     set ib_itemList[301] = 'I017'
-    set ib_itemName[301] = "|cffFF8000霹雳手套(三级)"
+    set ib_itemName[301] = "霹雳手套(三级)"
     set ib_itemList[302] = 'I027'
-    set ib_itemName[302] = "|cffFF0000红魔龙手"
+    set ib_itemName[302] = "红魔龙手"
     set ib_itemList[303] = 'I008'
     set ib_itemName[303] = "二转证明"
     set ib_itemList[304] = 'I018'
-    set ib_itemName[304] = "|cffFF8000霹雳手套(四级)"
+    set ib_itemName[304] = "霹雳手套(四级)"
     set ib_itemList[305] = 'I028'
-    set ib_itemName[305] = "|cffFF0000红魔龙爪"
+    set ib_itemName[305] = "红魔龙爪"
     set ib_itemList[306] = 'I009'
-    set ib_itemName[306] = "|cffFF0000青龙盾"
+    set ib_itemName[306] = "青龙盾"
     set ib_itemList[307] = 'I019'
-    set ib_itemName[307] = "|cffFF8000邪神战斧(三级)"
+    set ib_itemName[307] = "邪神战斧(三级)"
     set ib_itemList[308] = 'I029'
-    set ib_itemName[308] = "|cffFF0000红魔龙斧"
+    set ib_itemName[308] = "红魔龙斧"
     set ib_itemList[309] = 'I00A'
     set ib_itemName[309] = "攻击之爪(二级)"
     set ib_itemList[310] = 'I01A'
-    set ib_itemName[310] = "|cffFF8000邪神战斧(四级)"
+    set ib_itemName[310] = "邪神战斧(四级)"
     set ib_itemList[311] = 'I02A'
     set ib_itemName[311] = "生命手册(真)10000"
     set ib_itemList[312] = 'I00B'
-    set ib_itemName[312] = "|cffFF8000霹雳手套(一级)"
+    set ib_itemName[312] = "霹雳手套(一级)"
     set ib_itemList[313] = 'I01B'
-    set ib_itemName[313] = "|cffFF8000烈火战刀(二级)"
+    set ib_itemName[313] = "烈火战刀(二级)"
     set ib_itemList[314] = 'I02B'
     set ib_itemName[314] = "知识之书+1000"
     set ib_itemList[315] = 'mdpb'
     set ib_itemName[315] = "美杜莎之石"
     set ib_itemList[316] = 'I00C'
-    set ib_itemName[316] = "|cffFF0000重生十字章(极品)"
+    set ib_itemName[316] = "重生十字章(极品)"
     set ib_itemList[317] = 'I01C'
-    set ib_itemName[317] = "|cffFF8000烈火战刀(三级)"
+    set ib_itemName[317] = "烈火战刀(三级)"
     set ib_itemList[318] = 'I02C'
     set ib_itemName[318] = "力量之书+1000"
     set ib_itemList[319] = 'I00D'
-    set ib_itemName[319] = "|cffFF8000邪神战斧(二级)"
+    set ib_itemName[319] = "邪神战斧(二级)"
 endfunction
 function IB_Fill4 takes nothing returns nothing
     set ib_itemList[320] = 'I01D'
-    set ib_itemName[320] = "|cffFF8000烈火战刀(四级)"
+    set ib_itemName[320] = "烈火战刀(四级)"
     set ib_itemList[321] = 'I02D'
     set ib_itemName[321] = "敏捷之书+1000"
     set ib_itemList[322] = 'I00E'
     set ib_itemName[322] = "火焰手套(三级)"
     set ib_itemList[323] = 'I01E'
-    set ib_itemName[323] = "|cffFF8000疯魔之爪(二级)"
+    set ib_itemName[323] = "疯魔之爪(二级)"
     set ib_itemList[324] = 'I02E'
     set ib_itemName[324] = "智力之书+1000"
     set ib_itemList[325] = 'I00F'
     set ib_itemName[325] = "火焰手套(二级)"
     set ib_itemList[326] = 'I01F'
-    set ib_itemName[326] = "|cffFF8000疯魔之爪(三级)"
+    set ib_itemName[326] = "疯魔之爪(三级)"
     set ib_itemList[327] = 'I02F'
     set ib_itemName[327] = "生命手册(真)100000"
     set ib_itemList[328] = 'I00G'
-    set ib_itemName[328] = "|cffFF0000重生十字章(终极)"
+    set ib_itemName[328] = "重生十字章(终极)"
     set ib_itemList[329] = 'I01G'
-    set ib_itemName[329] = "|cffFF8000疯魔之爪(四级)"
+    set ib_itemName[329] = "疯魔之爪(四级)"
     set ib_itemList[330] = 'I02G'
     set ib_itemName[330] = "极品生命手册"
     set ib_itemList[331] = 'I00H'
     set ib_itemName[331] = "火焰手套(四级)"
     set ib_itemList[332] = 'I01H'
-    set ib_itemName[332] = "|cffFF8000神圣之冠(二级)"
+    set ib_itemName[332] = "神圣之冠(二级)"
     set ib_itemList[333] = 'I02H'
-    set ib_itemName[333] = "|cff8080FF蓝风月刃"
+    set ib_itemName[333] = "蓝风月刃"
     set ib_itemList[334] = 'I00I'
-    set ib_itemName[334] = "|cffFF8000神圣之冠(一级)"
+    set ib_itemName[334] = "神圣之冠(一级)"
     set ib_itemList[335] = 'I01I'
-    set ib_itemName[335] = "|cffFF8000神圣之冠(三级)"
+    set ib_itemName[335] = "神圣之冠(三级)"
     set ib_itemList[336] = 'I02I'
     set ib_itemName[336] = "终极经验之书"
     set ib_itemList[337] = 'I00J'
-    set ib_itemName[337] = "|cffFF8000烈火战刀(一级)"
+    set ib_itemName[337] = "烈火战刀(一级)"
     set ib_itemList[338] = 'I01J'
-    set ib_itemName[338] = "|cffFF8000神圣之冠(四级)"
+    set ib_itemName[338] = "神圣之冠(四级)"
     set ib_itemList[339] = 'I02J'
     set ib_itemName[339] = "终极生命手册"
     set ib_itemList[340] = 'I00K'
-    set ib_itemName[340] = "|cffFF00FF超级神器"
+    set ib_itemName[340] = "超级神器"
     set ib_itemList[341] = 'I01K'
-    set ib_itemName[341] = "力量之书+10W"
+    set ib_itemName[341] = "力量之书+10w"
     set ib_itemList[342] = 'I02K'
-    set ib_itemName[342] = "生命手册(真)1000W"
+    set ib_itemName[342] = "生命手册(真)1000w"
     set ib_itemList[343] = 'I00L'
     set ib_itemName[343] = "灼热之刀(三级)"
     set ib_itemList[344] = 'I01L'
-    set ib_itemName[344] = "敏捷之书+10W"
+    set ib_itemName[344] = "敏捷之书+10w"
     set ib_itemList[345] = 'I02L'
     set ib_itemName[345] = "转生证明"
     set ib_itemList[346] = 'I00M'
     set ib_itemName[346] = "灼热之刀(四级)"
     set ib_itemList[347] = 'I02M'
-    set ib_itemName[347] = "|cffFF00FF超级神甲"
+    set ib_itemName[347] = "超级神甲"
     set ib_itemList[348] = 'I00N'
     set ib_itemName[348] = "经验之书"
     set ib_itemList[349] = 'I01N'
     set ib_itemName[349] = "10点木材换100000金币"
     set ib_itemList[350] = 'I02N'
-    set ib_itemName[350] = "生命手册(真)100W"
+    set ib_itemName[350] = "生命手册(真)100w"
     set ib_itemList[351] = 'I00O'
     set ib_itemName[351] = "灼热之刀(一级)"
     set ib_itemList[352] = 'I01O'
     set ib_itemName[352] = "100000金币换10点木材"
     set ib_itemList[353] = 'I02O'
-    set ib_itemName[353] = "|cffFF0000飞哥龙神斩"
+    set ib_itemName[353] = "飞哥龙神斩"
     set ib_itemList[354] = 'I00P'
-    set ib_itemName[354] = "|cffFF0000朱雀盾"
+    set ib_itemName[354] = "朱雀盾"
     set ib_itemList[355] = 'I01P'
-    set ib_itemName[355] = "|cff00FFFF秋霜战刀"
+    set ib_itemName[355] = "秋霜战刀"
     set ib_itemList[356] = 'I02P'
-    set ib_itemName[356] = "知识之书+50W"
+    set ib_itemName[356] = "知识之书+50w"
     set ib_itemList[357] = 'I00Q'
-    set ib_itemName[357] = "|cffFF0000白虎盾"
+    set ib_itemName[357] = "白虎盾"
     set ib_itemList[358] = 'I01Q'
-    set ib_itemName[358] = "|cff00FFFF秋霜战斧"
+    set ib_itemName[358] = "秋霜战斧"
     set ib_itemList[359] = 'I02Q'
-    set ib_itemName[359] = "|cffFF0000飞哥圣神甲"
+    set ib_itemName[359] = "飞哥圣神甲"
     set ib_itemList[360] = 'I00R'
-    set ib_itemName[360] = "|cffFF0000玄武盾"
+    set ib_itemName[360] = "玄武盾"
     set ib_itemList[361] = 'I01R'
-    set ib_itemName[361] = "|cff00FFFF秋霜战手"
+    set ib_itemName[361] = "秋霜战手"
     set ib_itemList[362] = 'I02R'
-    set ib_itemName[362] = "|cffFF0000飞飞世界"
+    set ib_itemName[362] = "飞飞世界"
     set ib_itemList[363] = 'I00S'
     set ib_itemName[363] = "远古战斧(一级)"
     set ib_itemList[364] = 'I01S'
-    set ib_itemName[364] = "|cff00FFFF秋霜战盔"
+    set ib_itemName[364] = "秋霜战盔"
     set ib_itemList[365] = 'I02S'
-    set ib_itemName[365] = "|cffFF0000飞哥龙神斩<GM>"
+    set ib_itemName[365] = "飞哥龙神斩<gm>"
     set ib_itemList[366] = 'I00T'
     set ib_itemName[366] = "远古战斧(二级)"
     set ib_itemList[367] = 'I01T'
     set ib_itemName[367] = "神秘宝石"
     set ib_itemList[368] = 'I02T'
-    set ib_itemName[368] = "<飞哥刀GM证明书>"
+    set ib_itemName[368] = "<飞哥刀gm证明书>"
     set ib_itemList[369] = 'TALT'
     set ib_itemName[369] = "一个祭坛"
     set ib_itemList[370] = 'I00U'
     set ib_itemName[370] = "远古战斧(三级)"
     set ib_itemList[371] = 'I01U'
-    set ib_itemName[371] = "|cff00FFFF秋霜战爪"
+    set ib_itemName[371] = "秋霜战爪"
     set ib_itemList[372] = 'I02U'
-    set ib_itemName[372] = "力量之书+100W"
+    set ib_itemName[372] = "力量之书+100w"
     set ib_itemList[373] = 'I00V'
     set ib_itemName[373] = "国王之冠(三级)"
     set ib_itemList[374] = 'I01V'
     set ib_itemName[374] = "秋霜宝石"
     set ib_itemList[375] = 'I02V'
-    set ib_itemName[375] = "敏捷之书+100W"
+    set ib_itemName[375] = "敏捷之书+100w"
     set ib_itemList[376] = 'I00W'
     set ib_itemName[376] = "国王之冠(一级)"
     set ib_itemList[377] = 'I01W'
@@ -1224,19 +1164,19 @@ function IB_Fill4 takes nothing returns nothing
     set ib_itemList[380] = 'I01X'
     set ib_itemName[380] = "红魔宝石"
     set ib_itemList[381] = 'I02X'
-    set ib_itemName[381] = "智力之书+100W"
+    set ib_itemName[381] = "智力之书+100w"
     set ib_itemList[382] = 'I00Y'
-    set ib_itemName[382] = "|cffFF8000邪神战斧(一级)"
+    set ib_itemName[382] = "邪神战斧(一级)"
     set ib_itemList[383] = 'I01Y'
-    set ib_itemName[383] = "|cff00FF00落叶魂刀"
+    set ib_itemName[383] = "落叶魂刀"
     set ib_itemList[384] = 'I02Y'
-    set ib_itemName[384] = "知识之书+100W"
+    set ib_itemName[384] = "知识之书+100w"
     set ib_itemList[385] = 'I00Z'
     set ib_itemName[385] = "攻击之爪(四级)"
     set ib_itemList[386] = 'I01Z'
-    set ib_itemName[386] = "|cff00FF00落叶魂手"
+    set ib_itemName[386] = "落叶魂手"
     set ib_itemList[387] = 'I02Z'
-    set ib_itemName[387] = "<飞哥甲GM证明书>"
+    set ib_itemName[387] = "<飞哥甲gm证明书>"
 endfunction
 
 function IB_Init takes nothing returns nothing

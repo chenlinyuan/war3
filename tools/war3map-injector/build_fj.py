@@ -61,8 +61,8 @@ for ci, chunk in enumerate(chunks):
 # (否则 IB_Init 会中途静默失败,导致 IB_RegisterChat 不执行、search 无反应)。
 init_body = ["function IB_Init takes nothing returns nothing",
              "    set ib_itemCount = 0",
-             "    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, \"|cff00ff00[装备]|r IB_Init 已执行\")",
              "    call IB_RegisterChat()",
+             "    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, \"|cff00ff00[装备]|r IB_Init 已执行\")",
              "    set ib_fillIdx = 0",
              "    set ib_fillTotal = %d" % len(chunks),
              "    set ib_fillTimer = CreateTimer()",

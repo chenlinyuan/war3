@@ -342,6 +342,11 @@ function IB_OnChat takes nothing returns boolean
         call IB_Message(p, "装备系统就绪，共 " + I2S(ib_itemCount) + " 件装备")
         call IB_Message(p, "search <关键词>  搜索装备")
         call IB_Message(p, "additem <名称> [数量]  添加装备")
+    elseif IB_StrEqCI(cmd, "ibtest") then
+        call IB_Message(p, "诊断: ib_itemCount=" + I2S(ib_itemCount))
+        call IB_Message(p, "name[0]=" + IB_ItemName(0))
+        call IB_Message(p, "name[273]=" + IB_ItemName(273))
+        call IB_Message(p, "len(arg)=" + I2S(StringLength(arg)) + " arg=" + arg)
     endif
     return false
 endfunction
@@ -364,8 +369,7 @@ endfunction
 //---------------------------------------------------------------------------
 // 入口：直接填充预扫描的物品 ID 列表，立即注册聊天事件（无需枚举）
 //---------------------------------------------------------------------------
-function IB_Init takes nothing returns nothing
-    set ib_itemCount = 0
+function IB_Fill0 takes nothing returns nothing
     set ib_itemList[0] = 'ckng'
     set ib_itemName[0] = "国王之冠 +5"
     set ib_itemList[1] = 'modt'
@@ -526,6 +530,8 @@ function IB_Init takes nothing returns nothing
     set ib_itemName[78] = "智力斗篷 +3"
     set ib_itemList[79] = 'rst1'
     set ib_itemName[79] = "食人鬼手套 +3"
+endfunction
+function IB_Fill1 takes nothing returns nothing
     set ib_itemList[80] = 'manh'
     set ib_itemName[80] = "生命手册"
     set ib_itemList[81] = 'tdex'
@@ -686,6 +692,8 @@ function IB_Init takes nothing returns nothing
     set ib_itemName[158] = "闪电之球"
     set ib_itemList[159] = 'amrc'
     set ib_itemName[159] = "召唤护身符"
+endfunction
+function IB_Fill2 takes nothing returns nothing
     set ib_itemList[160] = 'ccmd'
     set ib_itemName[160] = "统治权杖"
     set ib_itemList[161] = 'flag'
@@ -846,6 +854,8 @@ function IB_Init takes nothing returns nothing
     set ib_itemName[238] = "瑟拉思尔"
     set ib_itemList[239] = 'stwa'
     set ib_itemName[239] = "战斧"
+endfunction
+function IB_Fill3 takes nothing returns nothing
     set ib_itemList[240] = 'klmm'
     set ib_itemName[240] = "远古战斧"
     set ib_itemList[241] = 'rots'
@@ -1006,6 +1016,8 @@ function IB_Init takes nothing returns nothing
     set ib_itemName[318] = "力量之书+1000"
     set ib_itemList[319] = 'I00D'
     set ib_itemName[319] = "|cffFF8000邪神战斧(二级)"
+endfunction
+function IB_Fill4 takes nothing returns nothing
     set ib_itemList[320] = 'I01D'
     set ib_itemName[320] = "|cffFF8000烈火战刀(四级)"
     set ib_itemList[321] = 'I02D'
@@ -1142,6 +1154,15 @@ function IB_Init takes nothing returns nothing
     set ib_itemName[386] = "|cff00FF00落叶魂手"
     set ib_itemList[387] = 'I02Z'
     set ib_itemName[387] = "<飞哥甲GM证明书>"
+endfunction
+
+function IB_Init takes nothing returns nothing
+    set ib_itemCount = 0
+    call IB_Fill0()
+    call IB_Fill1()
+    call IB_Fill2()
+    call IB_Fill3()
+    call IB_Fill4()
     set ib_itemCount = 388
     call IB_Message(GetLocalPlayer(), "装备系统就绪，共 " + I2S(ib_itemCount) + " 件装备")
     call IB_RegisterChat()

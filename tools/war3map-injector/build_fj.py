@@ -26,14 +26,28 @@ def jass_escape(s):
     return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
-# Build the list lines
-list_lines = ["    set ib_itemCount = 0"]
-for i, (iid, nm) in enumerate(items):
-    list_lines.append("    set ib_itemList[%d] = '%s'" % (i, iid))
-    list_lines.append('    set ib_itemName[%d] = "%s"' % (i, jass_escape(nm)))
-list_lines.append("    set ib_itemCount = %d" % len(items))
-item_block = "\n".join(list_lines)
+# Split into chunks to avoid War3's per-function statement limit.
+CHUNK = 80
+chunks = [items[i:i + CHUNK] for i in range(0, len(items), CHUNK)]
 
+chunk_funcs = []
+for ci, chunk in enumerate(chunks):
+    lines = ["function IB_Fill%d takes nothing returns nothing" % ci]
+    for k, (iid, nm) in enumerate(chunk):
+        idx = ci * CHUNK + k
+        lines.append("    set ib_itemList[%d] = '%s'" % (idx, iid))
+        lines.append('    set ib_itemName[%d] = "%s"' % (idx, jass_escape(nm)))
+    lines.append("endfunction")
+    chunk_funcs.append("\n".join(lines))
+
+# IB_Init calls each chunk function
+init_body = ["function IB_Init takes nothing returns nothing", "    set ib_itemCount = 0"]
+for ci in range(len(chunks)):
+    init_body.append("    call IB_Fill%d()" % ci)
+init_body.append("    set ib_itemCount = %d" % len(items))
+init_block = "\n".join(init_body)
+
+# Insert chunk functions right before IB_Init, and replace IB_Init body.
 with open(FJ, encoding="utf-8") as fh:
     txt = fh.read()
 
@@ -43,9 +57,14 @@ pattern = re.compile(
 if not pattern.search(txt):
     raise SystemExit("IB_Init block not found in f.j")
 
-txt = pattern.sub(lambda m: m.group(1) + item_block + "\n" + m.group(3), txt)
+new_init = init_block + "\n" + pattern.search(txt).group(3)
+txt = pattern.sub(lambda m: new_init, txt)
+
+# Insert chunk functions before IB_Init
+marker = "function IB_Init takes nothing returns nothing"
+txt = txt.replace(marker, "\n".join(chunk_funcs) + "\n\n" + marker, 1)
 
 with open(FJ, "w", encoding="utf-8") as fh:
     fh.write(txt)
 
-print("embedded %d items (id+name) into %s" % (len(items), FJ))
+print("embedded %d items (id+name) in %d chunks into %s" % (len(items), len(chunks), FJ))

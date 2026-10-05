@@ -463,19 +463,34 @@ endfunction
 // 用 TriggerAddAction（而非 Condition）注册：部分地图/版本下仅含 condition
 // 的聊天触发器不会触发；用 action 更可靠。
 //---------------------------------------------------------------------------
+function IB_RegisterChat2 takes nothing returns nothing
+    local integer i = 0
+    local trigger t = CreateTrigger()
+    loop
+        exitwhen i > 11
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "additem", false)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(t, function IB_OnChat)
+    set t = null
+    call PauseTimer(ib_regTimer)
+    call DestroyTimer(ib_regTimer)
+    set ib_regTimer = null
+endfunction
+
 function IB_RegisterChat takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
-    call DisplayTextToPlayer(Player(0), 0, 0, "|cff00ff00[装备]|r RC-1 开始")
     loop
         exitwhen i > 11
         call TriggerRegisterPlayerChatEvent(t, Player(i), "search", false)
         set i = i + 1
     endloop
-    call DisplayTextToPlayer(Player(0), 0, 0, "|cff00ff00[装备]|r RC-2 循环完成")
     call TriggerAddAction(t, function IB_OnChat)
-    call DisplayTextToPlayer(Player(0), 0, 0, "|cff00ff00[装备]|r RC-3 AddAction完成")
     set t = null
+    // 第二组命令用 timer 分帧注册,避免一次注册过多聊天事件而超限
+    set ib_regTimer = CreateTimer()
+    call TimerStart(ib_regTimer, 0.02, false, function IB_RegisterChat2)
 endfunction
 
 //---------------------------------------------------------------------------

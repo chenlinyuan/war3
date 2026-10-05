@@ -15,6 +15,9 @@ integer ib_fillIdx = 0
 integer ib_fillTotal = 0
 timer ib_fillTimer = null
 
+// 聊天注册分帧（避免一次注册过多聊天事件而失败）
+timer ib_regTimer = null
+
 // 搜索状态（分帧扫描，避免单次执行超操作数上限）
 integer ib_searchIdx = 0
 integer ib_searchFound = 0

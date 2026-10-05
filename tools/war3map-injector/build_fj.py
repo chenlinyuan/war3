@@ -1,10 +1,12 @@
 """Rebuild scripts/item-browser/f.j by embedding the item ID + cleaned name list.
 
-Reads _itemids.txt (id<TAB>name). Names are PRE-CLEANED here (strip |cXXXXXXXX / |r
-colour codes, trim, ASCII-lowercase) so the runtime script does NO string
-transformation — this avoids corrupting multibyte UTF-8/GBK Chinese.
+Reads _itemids.txt (flag<TAB>id<TAB>name, flag = S standard / C custom).
+Names are PRE-CLEANED here (strip |cXXXXXXXX / |r colour codes, trim,
+ASCII-lowercase) so the runtime script does NO string transformation — this
+avoids corrupting multibyte UTF-8/GBK Chinese.
 
-Embeds ib_itemList[i] (ID) and ib_itemName[i] (cleaned name).
+Embeds ib_itemList[i] (ID), ib_itemName[i] (cleaned name) and
+ib_itemCustom[i] (1 = custom item, 0 = standard).
 """
 import os, re
 
@@ -20,15 +22,19 @@ def clean_name(s):
     return "".join(chr(ord(c) + 32) if "A" <= c <= "Z" else c for c in s)
 
 
-# Read item IDs + names
+# Read flag + id + name
 items = []
 with open(os.path.join(HERE, "_itemids.txt"), encoding="utf-8") as fh:
     for line in fh:
         parts = line.rstrip("\n").split("\t")
-        iid = parts[0].strip()
-        nm = parts[1].strip() if len(parts) > 1 else ""
+        if len(parts) >= 3:
+            flag, iid, nm = parts[0].strip(), parts[1].strip(), parts[2].strip()
+        elif len(parts) == 2:
+            flag, iid, nm = "S", parts[0].strip(), parts[1].strip()
+        else:
+            continue
         if len(iid) == 4:
-            items.append((iid, clean_name(nm)))
+            items.append((flag, iid, clean_name(nm)))
 
 
 def jass_escape(s):
@@ -42,10 +48,11 @@ chunks = [items[i:i + CHUNK] for i in range(0, len(items), CHUNK)]
 chunk_funcs = []
 for ci, chunk in enumerate(chunks):
     lines = ["function IB_Fill%d takes nothing returns nothing" % ci]
-    for k, (iid, nm) in enumerate(chunk):
+    for k, (flag, iid, nm) in enumerate(chunk):
         idx = ci * CHUNK + k
         lines.append("    set ib_itemList[%d] = '%s'" % (idx, iid))
         lines.append('    set ib_itemName[%d] = "%s"' % (idx, jass_escape(nm)))
+        lines.append("    set ib_itemCustom[%d] = %d" % (idx, 1 if flag == "C" else 0))
     lines.append("endfunction")
     chunk_funcs.append("\n".join(lines))
 

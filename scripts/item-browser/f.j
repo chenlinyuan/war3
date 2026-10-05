@@ -287,8 +287,8 @@ function IB_AddStep takes nothing returns nothing
     loop
         exitwhen ib_addIdx >= ib_itemCount or n >= 40
         set name = IB_ItemName(ib_addIdx)
-        // 精确匹配 或 ID 匹配
-        if name == ib_addName or IB_IdStr(ib_itemList[ib_addIdx]) == ib_addName then
+        // 精确匹配 或 ID 匹配（ID 需不区分大小写，因为 ib_addName 已被转小写）
+        if name == ib_addName or IB_StrEqCI(IB_IdStr(ib_itemList[ib_addIdx]), ib_addName) then
             set ib_addFoundId = ib_itemList[ib_addIdx]
             set ib_addFoundIdx = ib_addIdx
             set ib_addIdx = ib_itemCount

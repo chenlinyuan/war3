@@ -24,6 +24,7 @@ timer ib_timerC
 
 // 拼音首字母映射表（索引 0-22 对应 a-z 分组）
 string array py_map
+boolean py_ready = false
 
 // 最近一次搜索结果（用于序号选择）
 integer array ib_lastResult

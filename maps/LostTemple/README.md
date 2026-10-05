@@ -27,11 +27,22 @@
 **脚本**：`scripts/item-browser`（装备搜索与添加）
 
 **新增功能**：
-- `search <关键词>` — 搜索装备
-- `additem <名称> [数量]` — 添加装备给选中英雄
+- `search <关键词>` — 搜索装备（支持中文）
+- `search <拼音首字母>` — 拼音搜索，如 `search xxmz`
+- `additem <序号> [数量]` — 添加搜索结果中的装备（无需中文）
+- `additem <拼音> [数量]` — 按拼音首字母添加
 - `itembrowser` — 显示帮助
 
-**注入后大小**：249,123 字节（+4,036）
+**注入后大小**：256,713 字节（+11,626）
+
+> 拼音表采用**延迟初始化**（首次使用搜索/添加时才加载），避免地图加载时执行
+> 大字符串赋值，降低加载卡顿与崩溃风险。
+
+## 部署位置
+
+已复制到游戏目录：`H:\Games\War3\Maps\mod\LostTemple_item.w3m`
+
+游戏内「创建自定义游戏 → mod 文件夹」即可看到。
 
 ## 复现步骤
 
@@ -56,6 +67,12 @@ function IB_Search takes player p, string keyword returns boolean
 
 // ITEM BROWSER - 入口
 call IB_Init()
+```
+
+可用自动化脚本验证：
+
+```powershell
+python tools/war3map-injector/verify_map.py "maps/LostTemple/LostTemple.w3m"
 ```
 
 ## 游戏内测试

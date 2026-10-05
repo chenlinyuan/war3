@@ -106,13 +106,24 @@ endfunction
 // 判断名称的拼音首字母是否包含关键词
 //---------------------------------------------------------------------------
 function PY_Matches takes string name, string keyword returns boolean
-    local string py = PY_Convert(name)
-    local string kw = StringCase(keyword, false)
-    local integer pyLen = StringLength(py)
-    local integer kwLen = StringLength(kw)
+    local string py
+    local string kw
+    local integer pyLen
+    local integer kwLen
     local integer i = 0
     local integer j
     local boolean matched
+
+    // 延迟初始化拼音表（避免地图加载时执行大字符串赋值）
+    if not py_ready then
+        call PY_InitTable()
+        set py_ready = true
+    endif
+
+    set py = PY_Convert(name)
+    set kw = StringCase(keyword, false)
+    set pyLen = StringLength(py)
+    set kwLen = StringLength(kw)
 
     if kwLen == 0 then
         return true
@@ -605,7 +616,6 @@ endfunction
 //---------------------------------------------------------------------------
 function IB_Init takes nothing returns nothing
     call IB_InitItemCharMap()
-    call PY_InitTable()
     set ib_iA = 0
     set ib_iB = 0
     set ib_iC = 0

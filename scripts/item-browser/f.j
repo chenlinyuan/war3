@@ -167,34 +167,50 @@ function IB_GetSelectedUnit takes player p returns unit
 endfunction
 
 //---------------------------------------------------------------------------
-// 搜索装备
+// 搜索装备（分帧扫描：每帧处理 40 项，避免单次执行超操作数上限）
 //---------------------------------------------------------------------------
-function IB_Search takes player p, string keyword returns nothing
-    local integer i = 0
-    local integer found = 0
+function IB_SearchStep takes nothing returns nothing
+    local integer n = 0
     local string name
-    local string out = ""
-
-    call IB_Message(p, "搜索 \"" + keyword + "\" ...")
-
     loop
-        exitwhen i >= ib_itemCount
-        if IB_NameMatch(IB_ItemName(i), keyword) then
-            set name = IB_ItemName(i)
-            set found = found + 1
-            if found <= 15 then
-                set out = out + "|cffffcc00" + I2S(found) + ".|r" + name + "  "
+        exitwhen ib_searchIdx >= ib_itemCount or n >= 40
+        if IB_NameMatch(IB_ItemName(ib_searchIdx), ib_searchKey) then
+            set ib_searchFound = ib_searchFound + 1
+            if ib_searchFound <= 15 then
+                set ib_searchOut = ib_searchOut + "|cffffcc00" + I2S(ib_searchFound) + ".|r" + IB_ItemName(ib_searchIdx) + "  "
             endif
         endif
-        set i = i + 1
+        set ib_searchIdx = ib_searchIdx + 1
+        set n = n + 1
     endloop
 
-    if found == 0 then
-        call IB_Message(p, "未找到包含 \"" + keyword + "\" 的装备")
-    else
-        // 用 DisplayTextToPlayer（无超时）避免被地图的定时消息覆盖
-        call DisplayTextToPlayer(p, 0, 0, "|cff00ff00[装备]|r 共找到 " + I2S(found) + " 件: " + out)
+    if ib_searchIdx >= ib_itemCount then
+        // 扫描完成
+        call PauseTimer(ib_searchTimer)
+        call DestroyTimer(ib_searchTimer)
+        set ib_searchTimer = null
+        if ib_searchFound == 0 then
+            call IB_Message(ib_searchPlayer, "未找到包含 \"" + ib_searchKey + "\" 的装备")
+        else
+            call DisplayTextToPlayer(ib_searchPlayer, 0, 0, "|cff00ff00[装备]|r 共找到 " + I2S(ib_searchFound) + " 件: " + ib_searchOut)
+        endif
+        set ib_searchPlayer = null
     endif
+endfunction
+
+function IB_Search takes player p, string keyword returns nothing
+    call IB_Message(p, "搜索 \"" + keyword + "\" ...")
+    set ib_searchIdx = 0
+    set ib_searchFound = 0
+    set ib_searchKey = keyword
+    set ib_searchOut = ""
+    set ib_searchPlayer = p
+    if ib_searchTimer != null then
+        call PauseTimer(ib_searchTimer)
+        call DestroyTimer(ib_searchTimer)
+    endif
+    set ib_searchTimer = CreateTimer()
+    call TimerStart(ib_searchTimer, 0.01, true, function IB_SearchStep)
 endfunction
 
 //---------------------------------------------------------------------------
@@ -327,14 +343,15 @@ function IB_ParseAddItem takes player p, string arg returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
-// 诊断：统计匹配数并显示前 5 个（合并为一条消息，避免被地图消息覆盖）
+// 诊断：统计匹配数（限制扫描数量，测试是否触发操作数上限）
 //---------------------------------------------------------------------------
 function IB_CountMatch takes player p, string keyword returns nothing
     local integer i = 0
     local integer found = 0
+    local integer limit = 50
     local string out = ""
     loop
-        exitwhen i >= ib_itemCount
+        exitwhen i >= ib_itemCount or i >= limit
         if IB_NameMatch(IB_ItemName(i), keyword) then
             set found = found + 1
             if found <= 5 then
@@ -343,7 +360,7 @@ function IB_CountMatch takes player p, string keyword returns nothing
         endif
         set i = i + 1
     endloop
-    call DisplayTextToPlayer(p, 0, 0, "|cff00ff00[诊断]|r 匹配数=" + I2S(found) + " 前5: " + out)
+    call DisplayTextToPlayer(p, 0, 0, "|cff00ff00[诊断]|r 扫描前" + I2S(limit) + "项 匹配数=" + I2S(found) + " 前5: " + out)
 endfunction
 
 //---------------------------------------------------------------------------

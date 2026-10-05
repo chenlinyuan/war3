@@ -459,13 +459,19 @@ endfunction
 
 //---------------------------------------------------------------------------
 // 注册聊天事件
+// 用具体命令前缀注册（与地图自带命令同样方式），提高兼容性：
+// 有些地图会拦截/限制通配聊天事件，但具体字符串匹配的命令仍可用。
 //---------------------------------------------------------------------------
 function IB_RegisterChat takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
     loop
         exitwhen i > 11
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "search", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "additem", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "itembrowser", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "ibtest", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "ibcount", false)
         set i = i + 1
     endloop
     call TriggerAddCondition(t, Condition(function IB_OnChat))

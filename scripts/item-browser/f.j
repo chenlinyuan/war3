@@ -1726,15 +1726,39 @@ function IB_Fill5 takes nothing returns nothing
     set ib_itemCustom[410] = 1
 endfunction
 
+function IB_FillStep takes nothing returns nothing
+    if ib_fillIdx == 0 then
+        call IB_Fill0()
+    elseif ib_fillIdx == 1 then
+        call IB_Fill1()
+    elseif ib_fillIdx == 2 then
+        call IB_Fill2()
+    elseif ib_fillIdx == 3 then
+        call IB_Fill3()
+    elseif ib_fillIdx == 4 then
+        call IB_Fill4()
+    elseif ib_fillIdx == 5 then
+        call IB_Fill5()
+    endif
+    set ib_fillIdx = ib_fillIdx + 1
+    if ib_fillIdx >= ib_fillTotal then
+        set ib_itemCount = 411
+        call PauseTimer(ib_fillTimer)
+        call DestroyTimer(ib_fillTimer)
+        set ib_fillTimer = null
+    endif
+endfunction
+
 function IB_Init takes nothing returns nothing
     set ib_itemCount = 0
-    call IB_Fill0()
-    call IB_Fill1()
-    call IB_Fill2()
-    call IB_Fill3()
-    call IB_Fill4()
-    call IB_Fill5()
-    set ib_itemCount = 411
-    call IB_Message(GetLocalPlayer(), "装备系统就绪，共 " + I2S(ib_itemCount) + " 件装备")
+    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, "|cff00ff00[装备]|r IB_Init 已执行")
     call IB_RegisterChat()
+    set ib_fillIdx = 0
+    set ib_fillTotal = 6
+    set ib_fillTimer = CreateTimer()
+    call TimerStart(ib_fillTimer, 0.01, true, function IB_FillStep)
 endfunction
+
+//---------------------------------------------------------------------------
+// 分帧填充:每帧调用一个 IB_FillN,全部完成后设置 ib_itemCount
+//---------------------------------------------------------------------------

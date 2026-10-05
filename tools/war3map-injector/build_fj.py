@@ -56,33 +56,54 @@ for ci, chunk in enumerate(chunks):
     lines.append("endfunction")
     chunk_funcs.append("\n".join(lines))
 
-# IB_Init calls each chunk function
-init_body = ["function IB_Init takes nothing returns nothing", "    set ib_itemCount = 0"]
-for ci in range(len(chunks)):
-    init_body.append("    call IB_Fill%d()" % ci)
-init_body.append("    set ib_itemCount = %d" % len(items))
+# IB_Init: 先注册聊天事件,再用 timer 分帧调用各 IB_FillN。
+# 这样避免在 main 阶段一次性执行所有填充语句而超操作数上限
+# (否则 IB_Init 会中途静默失败,导致 IB_RegisterChat 不执行、search 无反应)。
+init_body = ["function IB_Init takes nothing returns nothing",
+             "    set ib_itemCount = 0",
+             "    call DisplayTimedTextToPlayer(Player(0), 0, 0, 60.0, \"|cff00ff00[装备]|r IB_Init 已执行\")",
+             "    call IB_RegisterChat()",
+             "    set ib_fillIdx = 0",
+             "    set ib_fillTotal = %d" % len(chunks),
+             "    set ib_fillTimer = CreateTimer()",
+             "    call TimerStart(ib_fillTimer, 0.01, true, function IB_FillStep)",
+             "endfunction"]
 init_block = "\n".join(init_body)
+
+# 分帧填充函数:每帧调用一个 IB_FillN
+fill_step = ["function IB_FillStep takes nothing returns nothing"]
+for ci in range(len(chunks)):
+    kw = "if" if ci == 0 else "elseif"
+    fill_step.append("    %s ib_fillIdx == %d then" % (kw, ci))
+    fill_step.append("        call IB_Fill%d()" % ci)
+fill_step.append("    endif")
+fill_step.append("    set ib_fillIdx = ib_fillIdx + 1")
+fill_step.append("    if ib_fillIdx >= ib_fillTotal then")
+fill_step.append("        set ib_itemCount = %d" % len(items))
+fill_step.append("        call PauseTimer(ib_fillTimer)")
+fill_step.append("        call DestroyTimer(ib_fillTimer)")
+fill_step.append("        set ib_fillTimer = null")
+fill_step.append("    endif")
+fill_step.append("endfunction")
+fill_step_block = "\n".join(fill_step)
 
 # Insert chunk functions right before IB_Init, and replace IB_Init body.
 with open(FJ, encoding="utf-8") as fh:
     txt = fh.read()
 
-# 1) Remove any previously generated IB_Fill* functions (idempotent rebuild)
+# 1) Remove any previously generated IB_Fill* / IB_FillStep functions (idempotent rebuild)
+txt = re.sub(r"function IB_FillStep takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
 txt = re.sub(r"function IB_Fill\d+ takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
 
-# 2) Replace IB_Init body
+# 2) Replace IB_Init body (整块替换到 endfunction)
 pattern = re.compile(
-    r"(function IB_Init takes nothing returns nothing\n)(.*?)(    call IB_Message\(GetLocalPlayer\(\))",
+    r"function IB_Init takes nothing returns nothing\n.*?\nendfunction",
     re.S)
 if not pattern.search(txt):
     raise SystemExit("IB_Init block not found in f.j")
-
-new_init = init_block + "\n" + pattern.search(txt).group(3)
-txt = pattern.sub(lambda m: new_init, txt)
-
-# 3) Insert chunk functions before IB_Init
-marker = "function IB_Init takes nothing returns nothing"
-txt = txt.replace(marker, "\n".join(chunk_funcs) + "\n\n" + marker, 1)
+# 顺序: chunk 函数 -> IB_FillStep -> IB_Init (JASS 要求先定义后引用)
+combined = "\n".join(chunk_funcs) + "\n\n" + fill_step_block + "\n\n" + init_block
+txt = pattern.sub(lambda m: combined, txt, count=1)
 
 with open(FJ, "w", encoding="utf-8") as fh:
     fh.write(txt)

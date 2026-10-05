@@ -2,23 +2,63 @@
 
 在任意 War3 地图中通过**聊天输入框**搜索和添加装备。
 
+> ⚠️ **War3 1.27 无法输入中文**（游戏内聊天框不支持输入法）。
+> 因此本系统支持 **拼音首字母搜索** 和 **序号选择**，无需输入中文即可操作。
+
 ## 功能
 
 | 命令 | 说明 |
 | --- | --- |
-| `search <关键词>` | 搜索名称包含关键词的装备（最多显示 20 条） |
-| `additem <名称>` | 给**当前选中的英雄**添加 1 个装备（背包满则掉地上） |
-| `additem <名称> <数量>` | 添加指定数量 |
+| `search <关键词>` | 搜索名称包含关键词的装备（支持中文） |
+| `search <拼音首字母>` | 用拼音首字母搜索，如 `search xxmz` = 吸血面罩 |
+| `additem <序号>` | 添加**上次搜索结果**中第 N 件（推荐，无需中文） |
+| `additem <序号> <数量>` | 添加第 N 件共 m 个 |
+| `additem <拼音>` | 按拼音首字母添加，如 `additem xxmz` |
+| `additem <名称>` | 按完整名称添加（需中文输入） |
 | `itembrowser` | 显示帮助与已加载装备数量 |
 
 ## 使用示例
 
+**方式一：拼音首字母（推荐）**
+
+```
+search xxmz          → 搜索拼音含 xxmz 的装备，结果显示编号与拼音
+additem 1            → 添加结果中第 1 件
+additem 1 3          → 添加第 1 件共 3 个
+```
+
+**方式二：直接按拼音添加**
+
+```
+additem xxmz         → 直接添加「吸血面罩」
+additem xxmz 3       → 添加 3 个
+```
+
+**方式三：中文（需能输入中文的环境）**
+
 ```
 search 吸血          → 列出所有名称含"吸血"的装备
 additem 吸血面罩      → 给选中英雄添加「吸血面罩」
-additem 吸血面罩 3    → 添加 3 个
+```
+
+**其他**
+
+```
 itembrowser          → 显示帮助
 ```
+
+## 拼音首字母说明
+
+拼音表覆盖常用汉字，按字母分组存储于 `py_map[0..22]`。
+`PY_Convert` 将中文名转为拼音首字母串，例如：
+
+| 中文名 | 拼音首字母 |
+| --- | --- |
+| 吸血面罩 | `xxmz` |
+| 力量之戒 | `llzj` |
+| 速度之靴 | `sdzx` |
+
+搜索结果会同时显示中文名与拼音，方便对照。
 
 ## 工作原理
 
@@ -67,7 +107,7 @@ War3 物品 ID 是 4 字符码（FourCC）。脚本通过**四层嵌套**枚举�
 
 ```
 scripts/item-browser/
-├── f.j    # 函数定义（约 12KB）
+├── f.j    # 函数定义（含拼音表，约 27KB）
 ├── g.j    # 全局变量
 ├── m.j    # 入口调用
 └── README.md
@@ -92,6 +132,9 @@ integer array ib_charMap       // 字符映射 (0-9, A-Z, a-z)
 integer ib_iA, ib_iB, ib_iC    // 枚举索引
 integer ib_idA, ib_idB, ib_idC // ID 前缀
 timer ib_timerA, ib_timerB, ib_timerC
+string array py_map            // 拼音首字母表（0-22 对应 a-w）
+integer array ib_lastResult    // 上次搜索结果
+integer ib_lastResultCount = 0 // 上次搜索结果数量
 ```
 
 ### 主要函数（f.j）
@@ -101,16 +144,22 @@ timer ib_timerA, ib_timerB, ib_timerC
 | `IB_StripColorCodes` | 去除颜色代码 |
 | `IB_StrEqCI` | 不区分大小写比较 |
 | `IB_Message` | 发送消息给玩家 |
-| `IB_IsItemMatch` | 名称子串匹配 |
+| `IB_IsItemMatch` | 名称子串 / 拼音匹配 |
 | `IB_GetSelectedUnit` | 获取选中单位 |
-| `IB_Search` | 搜索装备 |
-| `IB_AddItem` | 添加装备 |
+| `IB_Search` | 搜索装备（记录结果供序号选择） |
+| `IB_AddItem` | 按名称/拼音添加装备 |
+| `IB_AddByIndex` | 按搜索结果序号添加 |
+| `IB_IsAllDigits` | 判断字符串是否全为数字 |
 | `IB_ParseAddItem` | 解析 additem 参数 |
 | `IB_OnChat` | 聊天命令分发 |
 | `IB_RegisterChat` | 注册聊天事件 |
 | `IB_InitItemCharMap` | 初始化字符映射 |
 | `IB_EnumA/B/C/D` | 四层 ID 枚举 |
 | `IB_Init` | 入口 |
+| `PY_InitTable` | 初始化拼音表 |
+| `PY_GetInitial` | 查单字拼音首字母 |
+| `PY_Convert` | 中文名转拼音首字母串 |
+| `PY_Matches` | 拼音首字母匹配 |
 
 ## 自定义
 

@@ -1,4 +1,4 @@
-"""一键注入 War3 地图脚本（使用 HkeW3mModifier2.0）。
+﻿"""一键注入 War3 地图脚本（使用 HkeW3mModifier2.0）。
 
 完整流程：
   1. 复制 f.j/g.j/m.j 到 HkeData
@@ -216,7 +216,7 @@ def inject(main):
                 ok = True
         handle_popups()
     if ok:
-        print("    ✓ 注入成功")
+        print("    [OK] 注入成功")
     else:
         print("    ? 未检测到注入成功提示")
         handle_popups()
@@ -235,7 +235,7 @@ def recompress(main):
     click_real(b[0])
     time.sleep(6)
     handle_popups()
-    print("    ✓ 已保存")
+    print("    [OK] 已保存")
 
 
 def main():
@@ -280,3 +280,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+

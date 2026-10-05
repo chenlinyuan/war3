@@ -69,6 +69,37 @@ def parse_itemfunc(path):
     return items
 
 
+def parse_wts(path):
+    """Return dict TRIGSTR_N -> string value from war3map.wts."""
+    txt, _ = detect_decode(path)
+    trig = {}
+    for m in re.finditer(r"STRING (\d+)\s*\r?\n\{\r?\n(.*?)\r?\n\}", txt, re.S):
+        trig["TRIGSTR_" + m.group(1)] = m.group(2).strip()
+    return trig
+
+
+def parse_w3t(path, wts_path=None):
+    """Return list of (id, name) custom items from war3map.w3t.
+
+    The w3t modification table is not reliably walkable byte-by-byte (the
+    writer emits stray object-id fields between mods), so we anchor on the
+    `unam` (name) modification: every custom item id is followed within a
+    short window by `unam\\x03\\x00\\x00\\x00TRIGSTR_N\\x00`.
+    """
+    data = open(path, "rb").read()
+    trig = parse_wts(wts_path) if wts_path and os.path.isfile(wts_path) else {}
+    items = {}
+    for m in re.finditer(rb"I[0-9A-Za-z]{3}", data):
+        start = m.start()
+        iid = m.group(0).decode("latin-1")
+        seg = data[start:start + 120]
+        um = re.search(rb"unam\x03\x00\x00\x00(TRIGSTR_\d+)\x00", seg)
+        if um:
+            key = um.group(1).decode("latin-1")
+            items[iid] = trig.get(key, "")
+    return list(items.items())
+
+
 def main():
     map_dir = sys.argv[1] if len(sys.argv) > 1 else None
 
@@ -78,11 +109,22 @@ def main():
     # listed there have been removed by the map author.
     map_slk_path = os.path.join(map_dir, "units", "itemdata.slk") if map_dir else None
     map_func_path = os.path.join(map_dir, "units", "itemfunc.txt") if map_dir else None
+    map_w3t_path = os.path.join(map_dir, "war3map.w3t") if map_dir else None
+    map_wts_path = os.path.join(map_dir, "war3map.wts") if map_dir else None
 
     names = {}  # id -> name (from itemfunc.txt)
     if map_func_path and os.path.isfile(map_func_path):
         for iid, nm in parse_itemfunc(map_func_path):
             names[iid] = nm
+
+    # Custom items defined via the object editor (war3map.w3t) + war3map.wts.
+    w3t_items = []
+    if map_w3t_path and os.path.isfile(map_w3t_path):
+        w3t_items = parse_w3t(map_w3t_path, map_wts_path)
+        for iid, nm in w3t_items:
+            if nm and (iid not in names or names[iid].strip() == ""):
+                names[iid] = nm
+        print("map war3map.w3t custom items:", len(w3t_items))
 
     # Fallback names from the game's localized itemstrings.txt (official maps
     # have no map itemfunc.txt, so names must come from the game data).
@@ -96,9 +138,14 @@ def main():
         creatable = parse_slk(map_slk_path)
         print("map itemdata.slk (creatable):", len(creatable))
     else:
-        # No map slk -> use the game's standard list
+        # No map slk -> use the game's standard list, plus any custom items
+        # defined through the object editor (war3map.w3t).
         creatable = parse_slk(GAME_SLK) if os.path.isfile(GAME_SLK) else []
         print("no map slk; using game standard:", len(creatable))
+        for iid, _ in w3t_items:
+            if iid not in creatable:
+                creatable.append(iid)
+        print("after adding w3t custom:", len(creatable))
 
     game = set(parse_slk(GAME_SLK)) if os.path.isfile(GAME_SLK) else set()
 

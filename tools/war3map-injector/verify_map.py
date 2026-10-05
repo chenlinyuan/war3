@@ -131,8 +131,8 @@ def main():
     with open(found, "r", encoding="utf-8", errors="replace") as fh:
         txt = fh.read()
     ok = True
-    for marker in ("IB_Init", "IB_Search", "IB_AddItem", "IB_AddByIndex",
-                   "PY_Convert", "PY_Matches", "PY_InitTable", "ib_lastResult"):
+    for marker in ("IB_Init", "IB_Search", "IB_AddItem", "IB_RegisterChat",
+                   "IB_OnChat", "IB_LowerAscii", "ib_itemList", "ib_itemName"):
         present = marker in txt
         ok = ok and present
         print("  marker %-16s -> %s" % (marker, present))

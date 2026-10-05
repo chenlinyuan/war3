@@ -1,42 +1,119 @@
-S	ckng	金币
-S	modt	发臭了的章鱼尸体
-S	tkno	修炼之书
-S	shar	破箱子
-S	sres	变异卷轴
-S	rde3	|CFF00FFFF风影勋章|r
+S	ckng	国王之冠 +5
+S	modt	死亡面罩
+S	tkno	能量之书
+S	ratf	攻击之爪 +15
+S	rde4	守护指环 +5
+S	ofro	霜冻之球
+S	desc	科勒恩的逃脱匕首
+S	fgdg	恶魔雕像
+S	infs	恶魔岩石
+S	shar	冰冻碎片
+S	sand	操作死尸卷轴
+S	wild	野性护身符
+S	srrc	复活卷轴
+S	odef	黑暗之球
+S	rde3	守护指环 +4
 S	pmna	魔法垂饰
-S	rhth	生命宝石
-S	ankh	替身术
+S	rhth	卡嘉医疗宝石
+S	ssil	沉默权杖
+S	spsh	魔法护盾护身符
+S	sres	恢复卷轴
+S	pdiv	神圣药水
+S	pres	恢复药水
+S	totw	野性护符
+S	fgfh	长钉衣领
+S	fgrd	红龙之卵
+S	fgrg	岩石印记
+S	hcun	灵巧头巾
+S	hval	英勇面具
+S	mcou	勇气勋章
+S	ajen	古之忍耐姜歌
+S	clfm	火焰风衣
+S	ratc	攻击之爪 +12
+S	ward	战歌之鼓
+S	kpin	卡嘉长萧
+S	crys	水晶球
+S	lgdh	毁灭之角
+S	ankh	重生十字章
 S	whwd	治疗守卫
-S	mcou	[未开封]|cffff0000开天斧|r
-S	ciri	|cff99b4d1水晶球碎片|r
-S	ratc	|cffa0522d藏宝图|r
-S	kpin	[未开封]|cffff0000太虚神甲|r
-S	hlst	白色的鱼
-S	brac	|CFF00FFFF主宰|r
-S	ofir	火焰之球
-S	ocor	腐蚀之球
-S	oli2	闪电之球
-S	oven	毒液之球
-S	rde2	|CFF00FFFF水影勋章|r
-S	tgrh	小型的大厅
-S	wswd	岗哨守卫
-S	stel	传送权杖
-S	cnob	幸运护身符
-S	gcel	|CFF00FFFF王者之戒|r
-S	rde1	|CFF00FFFF火影勋章|r
+S	fgsk	死亡之书
+S	wcyc	飓风权杖
+S	hlst	医疗石
+S	mnst	魔法石
+S	belv	奎尔萨拉斯之靴 +6
+S	bgst	巨人力量腰带+6
+S	ciri	法师长袍 +6
+S	lhst	风暴狮角
+S	afac	阿利亚之笛
+S	sbch	天灾骨钟
+S	brac	神秘腰带
+S	rwiz	艺人面罩
+S	pghe	大生命药水
+S	pgma	大魔法药水
+S	pnvu	无敌药水
+S	sror	野兽卷轴
+S	woms	魔法盗取权杖
+S	evtl	闪避护符
+S	penr	能量垂饰
+S	prvt	生命护身符
+S	rat9	攻击之爪 +9
+S	rde2	守护指环 +3
+S	rlif	恢复指环
 S	bspd	速度之靴
+S	rej3	恢复药水
+S	will	幻象权杖
+S	wlsd	闪电护盾权杖
+S	wswd	岗哨守卫
+S	cnob	贵族圆环
+S	gcel	加速手套
+S	rat6	攻击之爪 +6
+S	rde1	守护指环 +2
+S	tdx2	敏捷之书 +2
 S	texp	经验之书
-S	stwp	回城卷轴
-S	shea	医疗卷轴
-S	dust	尘土之影
-S	rin1	|cffff0000仙人之魂|r
+S	tin2	智力之书 +2
+S	tpow	知识之书
+S	tst2	力量之书 +2
+S	pnvl	较小的无敌药水
+S	clsd	影子风衣
+S	rag1	敏捷便鞋  +3
+S	rin1	智力斗篷 +3
+S	rst1	食人鬼手套 +3
 S	manh	生命手册
 S	tdex	敏捷之书
 S	tint	智力之书
 S	tstr	力量之书
+S	pomn	全知药水
+S	wshs	影子权杖
+S	rej6	大型恢复卷轴
+S	rej5	小型恢复卷轴
+S	rej4	大型恢复药水
+S	ram4	大魔法师指环
+S	dsum	召唤钻石
+S	ofir	火焰之球
+S	ocor	腐蚀之球
+S	oli2	闪电之球
+S	oven	毒液之球
+S	ram3	大魔法师指环
+S	tret	再训练之书
+S	tgrh	小型的大厅
+S	rej2	小型恢复药水
+S	gemt	显形宝石
+S	ram2	大魔法师指环
+S	stel	传送权杖
+S	stwp	回城卷轴
+S	wneg	否决权杖
+S	sneg	否决权杖
+S	wneu	中和权杖
+S	shea	医疗卷轴
+S	sman	魔法卷轴
+S	rej1	小型恢复药水
+S	pspd	速度药水
+S	dust	尘土之影
+S	ram1	大魔法师指环
+S	pinv	隐形药水
 S	phea	生命药水
 S	pman	魔法药水
+S	spro	守护卷轴
 S	hslv	医疗剂
 S	moon	月亮石
 S	shas	速度卷轴
@@ -44,19 +121,168 @@ S	skul	献祭头骨
 S	mcri	机械类的小玩艺
 S	rnec	巫术妖棍
 S	tsct	象牙塔
+S	azhr	埃苏尼之心
 S	bzbe	空瓶
 S	bzbf	盛满泉水的瓶子
-S	pomn	白鱼
+S	ches	奶酪
+S	cnhn	赛纳留斯的号角
+S	glsk	古尔丹之颅
+S	gopr	净化浮雕
+S	k3m1	月亮水晶
+S	k3m2	三月之钥的另外一个部分
+S	k3m3	三月之钥
+S	ktrm	泰瑞纳斯国王的骨灰瓮
+S	kybl	鲜血钥匙
+S	kygh	魔鬼钥匙
+S	kymn	月之钥匙
+S	kysn	太阳钥匙
+S	ledg	吉拉德的帐本
+S	phlt	李维特
+S	sehr	赛瑞诺克斯之心
+S	engs	魔法宝石
+S	sorf	影子之球碎片
+S	gmfr	宝石碎片
+S	jpnt	给吉安娜?普罗德摩尔的便条
+S	shwd	荧光草
+S	skrt	骸骨宝物
+S	thle	雷霆蜥蜴之蛋
+S	sclp	秘密关卡激活
+S	wtlg	怀特之腿
+S	wolg	怀特的另一条腿
+S	mgtk	魔法钥匙串
+S	mort	莫哥林的报告
+S	dphe	雷霆凤凰蛋
+S	dkfw	雷霆水桶
+S	dthb	雷电花芯
+S	fgun	信号枪
+S	lure	怪兽诱捕守卫
+S	olig	闪电之球
+S	amrc	召唤护身符
+S	ccmd	统治权杖
+S	flag	人族旗帜
+S	gobm	地精地雷
+S	gsou	灵魂宝石
+S	nflg	暗夜精灵族旗帜
+S	nspi	魔法免疫项链
+S	oflg	兽族旗帜
 S	pams	抗体药水
+S	pgin	大隐形药水
+S	rat3	攻击之爪 +3
+S	rde0	守护指环 +1
+S	rnsp	优越之戒
+S	soul	灵魂
+S	tels	地精夜视镜
+S	tgxp	超级经验之书
+S	uflg	不死族旗帜
+S	anfg	远古雕像
+S	brag	敏捷腰带
+S	drph	德鲁伊布袋
+S	iwbr	铁树枝干
+S	jdrn	灵巧指环
+S	lnrn	雄狮之戒
+S	mlst	力量之锤
+S	oslo	减速之球
+S	sbok	魔法书
+S	sksh	防护面具
+S	sprn	蜘蛛戒指
+S	tmmt	力量图腾
+S	vddl	巫毒玩偶
 S	spre	保存权杖
+S	sfog	乌云号角
+S	sor1	影子之球 +1
+S	sor2	影子之球 +2
+S	sor3	影子之球 +3
+S	sor4	影子之球 +4
+S	sor5	影子之球 +5
+S	sor6	影子之球 +6
+S	sor7	影子之球 +7
+S	sor8	影子之球 +8
+S	sor9	影子之球 +9
+S	sora	影子之球 +10
+S	fwss	冰霜巨龙头骨护盾
+S	shtm	萨满图腾
+S	esaz	埃苏尼之精髓
+S	btst	战斗标准
+S	tbsm	微型铁匠铺
+S	tfar	微型农场
+S	tlum	微型伐木场
+S	tbar	微型兵营
+S	tbak	微型国王祭坛
+S	gldo	基尔加丹之球
+S	stre	鼓舞权杖
+S	horl	稀有神器
+S	hbth	战舰之舵
+S	blba	剑刃护甲
+S	rugt	神秘手套
+S	frhg	火焰手套
+S	gvsm	法术大师手套
+S	crdt	死亡领主皇冠
+S	arsc	神秘卷轴
+S	scul	邪恶军团卷轴
+S	tmsc	牺牲之书
+S	dtsb	德雷克萨尔魔法书
+S	grsl	灵魂宝物
+S	arsh	芒硝护盾
+S	shdt	死亡领主护盾
+S	shhn	荣誉护盾
+S	shen	施魔护盾
+S	thdm	雷霆蜥蜴钻石
+S	stpg	时钟企鹅
+S	shrs	烤肉
+S	bfhr	血羽之心
+S	cosl	灵魂之球
+S	shcw	萨满利爪
+S	srbd	灼热之刀
+S	frgd	霜冻守卫
+S	envl	魔法小瓶
+S	rump	生锈的矿铲
+S	srtl	瑟拉思尔
+S	stwa	战斧
+S	klmm	远古战斧
+S	rots	海之权杖
+S	axas	先祖权杖
+S	mnsf	心灵权杖
+S	schl	医疗权杖
+S	asbl	刺客佩刀
+S	kgal	麦酒桶
 S	gold	金币
 S	lmbr	木材堆
-S	gomn	进入钓鱼场
+S	gfor	防御浮雕
+S	guvi	夜视浮雕
+S	rspl	灵魂锁链神符
+S	rre1	小型复活神符
+S	rre2	大型复活神符
+S	gomn	全知浮雕
+S	rsps	护盾神符
+S	rspd	速度神符
+S	rman	魔法神符
+S	rma2	大型魔法神符
+S	rres	恢复神符
+S	rreb	重生神符
+S	rhe1	小型治疗神符
+S	rhe2	治疗神符
+S	rhe3	大型治疗神符
+S	rdis	驱魔神符
+S	rwat	岗哨神符
+S	pclr	净化药水
 S	plcl	小净化药水
+S	silk	蜘蛛丝饰针
+S	vamp	吸血药水
 S	sreg	恢复卷轴
 S	ssan	避难权杖
-C	I001	金创药水
-C	I005	查克拉药水
+S	tcas	小城堡
+C	IGST	申请天下第一敏捷
+C	Impo	有奖问答
+C	I000	
+C	I001	
+C	I002	
+C	I003	
+C	I004	
+C	I005	
+C	I006	
+C	I007	
+C	I008	
+C	I009	
 C	I00A	邀请决斗
 C	I00C	[中忍]护靴
 C	I00D	[上忍]护靴
@@ -73,15 +299,17 @@ C	I00M	[中忍]护额
 C	I00N	[上忍]护额
 C	I00O	[暗部]护额
 C	I00P	[下忍]护额
-C	I00Q	影之玉 +0
+C	I00Q	象征[|cffff0000影之玉|r]
 C	I00R	忍者铠甲
-C	I00S	忍者铠甲-Lv|cff00ff002|r
-C	I00T	忍者铠甲-Lv|cff00ff003|r
-C	I00U	忍者铠甲-Lv|cff00ff004|r
-C	I00V	|cffffcc00龙鳞铠甲|r
-C	I00W	忍者铠甲-Lv|cff00ff001|r
+C	I00S	忍者铠甲-[等级|c00FF8080 2|r]
+C	I00T	忍者铠甲-[等级|c00FF8080 3|r]
+C	I00U	忍者铠甲-[等级|c00FF8080 4|r]
+C	I00V	|cffff0000龙鳞铠甲|r
+C	I00W	忍者铠甲-[等级|c00FF8080 1|r]
 C	I00X	不动冥王宝石
-C	I00Y	|cff00ff00命运宝石|r
+C	Inve	|cff00ff00圣灵-四圣兽-青龙|r
+C	Item	|cff00ff00圣灵-四圣兽-青龙|r
+C	I00Y	命运宝石
 C	I00Z	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I010	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I011	|cff00ff00象征|r[|cffff0000影之玉|r]
@@ -95,18 +323,18 @@ C	I018	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I019	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I01A	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I01B	雷神之剑
-C	I01C	雷神之剑-Lv|cff00ff003|r
-C	I01D	雷神之剑-Lv|cff00ff001|r
-C	I01E	雷神之剑-Lv|cff00ff002|r
-C	I01F	|cffffcc00真.雷神剑|r
-C	I01G	|cffffcc00疾风履|r
+C	I01C	雷神之剑-[等级|c00FF8080 3|r]
+C	I01D	雷神之剑-[等级|c00FF8080 1|r]
+C	I01E	雷神之剑-[等级|c00FF8080 2|r]
+C	I01F	|cffff0000真.雷神之剑|r
+C	I01G	|cffff0000疾风履|r
 C	I01H	升级护腕
 C	I01I	升级护靴
 C	I01J	升级护额
 C	I01K	升级忍者铠甲
 C	I01L	升级雷神之剑
 C	I01M	[命运]打造
-C	I01N	[合成]影之玉
+C	I01N	[合成]象征[影之玉]
 C	I01O	替身术(大)
 C	I01P	分解[命运象征影之玉]
 C	I01Q	|cff00ff00象征|r[|cffff0000影之玉|r]
@@ -114,7 +342,9 @@ C	I01R	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I01S	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I01T	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I01U	建筑升级
-C	I01V	练功房001
+C	I01V	进入练功房
+C	I01W	练功房2
+C	I01X	三尾封印
 C	I01Y	幻影宝石
 C	I01Z	天怒宝石
 C	I020	混元宝石
@@ -122,7 +352,7 @@ C	I021	天幻宝石
 C	I022	神武宝石
 C	I023	火之意志
 C	I024	力量宝石
-C	I025	|cff00ff00不动冥王甲|r
+C	I025	|cff00ff00不动冥王神甲|r
 C	I026	|cff00ff00火影铠甲|r
 C	I027	|cff00ff00天幻宝甲|r
 C	I028	|cff00ff00天怒宝甲|r
@@ -142,7 +372,8 @@ C	I02L	|cff00ff00幻影战靴|r
 C	I02M	|cff00ff00天怒战靴|r
 C	I02N	|cff00ff00天幻战靴|r
 C	I02O	|cff00ff00勇者战靴|r
-C	I02P	|cff00ff00不动冥王靴|r
+C	I02P	|cff00ff00不动冥王战靴|r
+C	Impr	|cff00ff00混元战靴|r
 C	I02Q	|cff00ff00混元战靴|r
 C	I02R	|cff00ff00火影战靴|r
 C	I02S	|cff00ff00神武战靴|r
@@ -155,6 +386,7 @@ C	I02Y	挑战二代目火影
 C	I02Z	挑战三代目火影
 C	I030	挑战四代目火影
 C	I032	[打造套装]不动冥王套装
+C	Icon	有奖问答
 C	I033	[打造套装]天怒套装
 C	I034	[打造套装]混元套装
 C	I035	[打造套装]天幻套装
@@ -162,16 +394,35 @@ C	I036	[打造套装]幻影套装
 C	I037	[打造套装]神武套装
 C	I038	[打造套装]勇者套装
 C	I039	[打造套装]火影套装
+C	I03A	九尾封印
+C	I03B	八尾封印
+C	I03C	七尾封印
+C	I03D	六尾封印
+C	I03E	五尾封印
+C	I03F	四尾封印
+C	I03G	二尾封印
+C	I03H	一尾封印
+C	I03I	1-5尾封印
+C	I03J	6-9尾封印
+C	I03K	尾兽封印
+C	I03L	尾兽封印
+C	I03M	封印九尾
 C	I03N	开启神器-神力
 C	I03O	女娲石
-C	I03P	|c00FFFF00十|c00D5FF2B拳|c00AAFF55灵|c0080FF80剑|r
-C	I03Q	|c00FFFF00八|c00D5FF2B尺|c00AAFF55镜|r
+C	I03P	[上古神器]|cffff0000开天斧|r
+C	I03Q	[上古神器]|cffff0000太虚神甲|r
 C	I03R	A级情报
 C	I03S	B级情报
 C	I03T	情报收集
-C	I03W	治疗神水
-C	I03Y	接受/提交|cff00ff00寻找水源|r任务
+C	I03U	军粮丸
+C	I03V	灵芝
+C	I03W	天山雪莲
+C	I03X	潜入雨忍村
+C	I03Y	提交任务
 C	I03Z	幻境通行证
+C	I040	挑战镜像-1
+C	Invi	木材换金币
+C	I041	木材换金币
 C	I042	|cffff0000遗物项链|r
 C	I043	基地无敌50秒
 C	I031	|cff00ff00象征|r[|cffff0000影之玉|r]
@@ -199,11 +450,12 @@ C	I04O	|cff00ff00白虎战甲|r
 C	I04P	|cff00ff00朱雀羽衣|r
 C	I04Q	|cff00ff00青龙战甲|r
 C	I04R	|cff00ff00玄武战甲|r
+C	I04S	宝石合成
 C	I04T	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I04U	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I04V	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I04W	|cff00ff00象征|r[|cffff0000影之玉|r]
-C	I04X	2015年礼包
+C	I04X	神秘大礼包
 C	I04Y	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I04Z	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I050	|cff00ff00象征|r[|cffff0000影之玉|r]
@@ -212,265 +464,43 @@ C	I052	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I053	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I054	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I055	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I056	挑战镜像-2
+C	I057	查克拉药水
+C	I058	大型查克拉药水
 C	I059	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I05A	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I05B	宝石兑换
 C	I05C	|cffff0000再不斩的大刀|r
+C	I05E	再不斩的大刀-[等级 |cffffcc001|r]
 C	I05G	|cffff0000鲛肌|r
+C	I05H	鲛肌-[等级 |cffffcc00 1|r]
 C	I05K	|cffff0000最强之矛|r
-C	I05L	|cffff0000戒指.零|r
-C	I05M	飞雷神.苦无-[需升级]
-C	I05P	|cffff0000飞雷神.苦无|r
-C	I05Q	提交|cff00ff00寻找水源|r
+C	I05L	|cffff0000戒指-零|r
+C	I05M	术式.苦无-[等级 |cffffcc00 1|r]
+C	I05P	|cffff0000术式.苦无|r
+C	I05Q	提交送水任务的
 C	I05R	|cffff0000龙鳞雷神剑|r
-C	I05S	|cffff0000面具|r
-C	I05T	治疗药水
+C	I05S	|cffff0000白-面具|r
+C	I05T	深海灵礁
 C	I05U	|cffff0000金刚棒|r
-C	I05V	|cffff0000水影斗篷|r
+C	I05V	|cffff0000手鞠的扇子|r
+C	I05W	破碎的面具
 C	I05D	|cffff0000草雉剑|r
-C	I05F	|cffff0000万花筒写轮眼|r
+C	I05F	|cffff0000亲热天堂|r
+C	I05I	亲热天堂[未阅]
+C	I05J	砂葫芦[未装满砂子的葫芦]
 C	I05N	|cffff0000砂葫芦|r
 C	I05O	|cffff0000火影斗篷|r
-C	I05X	|cffff0000忍具.双截棍|r
-C	I05Y	|cff00ff00圣灵精华|r
-C	I05Z	圣灵-|cff00ff00孟章|r
-C	I060	圣灵-|cff00ff00监兵|r
-C	I061	圣灵-|cff00ff00执明|r
-C	I062	圣灵-|cff00ff00凌光|r
+C	I05X	|cffff0000双截棍|r
+C	I05Y	|cffff0000圣灵精华|r
+C	I05Z	|cff00ff00圣灵-四圣兽-青龙|r
+C	I060	|cff00ff00圣灵-四圣兽-白虎|r
+C	I061	|cff00ff00圣灵-四圣兽-玄武|r
+C	I062	|cff00ff00圣灵-四圣兽-朱雀|r
 C	I063	[打造圣灵套装]圣兽套装
 C	I064	有奖问答
-C	I065	|cffff0000戒指.朱|r
-C	I066	领取 |c00FFFF00七|c00D5FF2B星|c00AAFF55剑|r
-C	I067	领取 |c00FFFF00八|c00D5FF2B尺|c00AAFF55镜|r
-C	I068	领取 |c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I069	领取 |c00FFFF00幌|c00D5FF2B金|c00AAFF55绳|r
-C	I06A	|cff00ff00象征|r[|cffff0000影之玉|r]
-C	I06B	|cff00ff00象征|r[|cffff0000影之玉|r]
-C	I06C	|cffff0000拳套|r
-C	I06D	|cff00ff00象征|r[|cffff0000影之玉|r]
-C	I06E	|cff00ff00象征|r[|cffff0000影之玉|r]
-C	I06F	|cffff0000戒指.玉|r
-C	I06G	|cffff0000暗部配刀|r
-C	I06H	|cff00ff00象征|r[|cffff0000影之玉|r]
-C	I06I	|cff00ff00象征|r[|cffff0000影之玉|r]
-C	I06J	|cffff0000粘土口袋|r
-C	I06K	|cffff0000零食|r
-C	I06L	进入 |cff00ff00羁绊专区|r
-C	I06M	赌钱 1赔2
-C	I06N	赌钱 1赔5
-C	I06O	神器有木有
-C	I06Q	鸡蛋
-C	I06R	|c00FFFF00七|c00D5FF2B星|c00AAFF55剑|r
-C	I06S	千年精华
-C	I06T	金鸡蛋
-C	I06U	|cffff0000山茶花|r
-C	I002	[打造套装]六道套装
-C	I004	|cff00ff00仙人遗物|r
-C	I007	[六道] - |cffff0000镇海|r
-C	I009	[六道] - |cffff0000九幽|r
-C	I01W	[六道] - |cffff0000幻雷|r
-C	I01X	|cffff0000雷犁刃|r
-C	I03A	|cffff0000戒指.白|r
-C	I03B	|cffff0000拐杖|r
-C	I03C	振奋手套
-C	I03D	前往 |cff00ff00秒木山|r
-C	I03E	妙木山修炼
-C	I03F	修炼仙人
-C	I03G	接受/提交|cff00ff00捕食|r
-C	I03H	重新预言
-C	I03I	前往 |cff00ff00神秘森林|r
-C	I03J	冬冬的考验
-C	I03K	|c00FFFF00幌|c00D5FF2B金|c00AAFF55绳|r
-C	I03L	|c00FFFF00勾|c00D5FF2B玉|c00AAFF55项|c0080FF80链|r
-C	I03M	（|cffffcc00仙|r)镇海伏魔刀
-C	I03X	（|cffffcc00仙|r)镇海伏魔甲
-C	I040	（|cffffcc00仙|r)镇海伏魔靴
-C	I04S	（|cffffcc00仙|r)镇海伏魔刀
-C	I056	（|cffffcc00仙|r)镇海伏魔刀
-C	I057	（|cffffcc00仙|r)镇海伏魔甲
-C	I058	（|cffffcc00仙|r)镇海伏魔甲
-C	I05E	（|cffffcc00仙|r)镇海伏魔靴
-C	I05H	（|cffffcc00仙|r)镇海伏魔靴
-C	I05I	（|cffffcc00仙|r)九幽伏魔枪
-C	I05J	（|cffffcc00仙|r)九幽伏魔甲
-C	I05W	（|cffffcc00仙|r)九幽伏魔靴
-C	I06P	（|cffffcc00仙|r)九幽伏魔枪
-C	I06V	（|cffffcc00仙|r)九幽伏魔枪
-C	I06W	（|cffffcc00仙|r)九幽伏魔甲
-C	I06X	（|cffffcc00仙|r)九幽伏魔甲
-C	I06Y	（|cffffcc00仙|r)九幽伏魔靴
-C	I06Z	（|cffffcc00仙|r)九幽伏魔靴
-C	I070	（|cffffcc00仙|r)幻雷伏魔杖
-C	I071	（|cffffcc00仙|r)幻雷伏魔甲
-C	I072	（|cffffcc00仙|r)幻雷伏魔靴
-C	I073	（|cffffcc00仙|r)幻雷伏魔杖
-C	I074	（|cffffcc00仙|r)幻雷伏魔杖
-C	I075	（|cffffcc00仙|r)幻雷伏魔甲
-C	I076	（|cffffcc00仙|r)幻雷伏魔甲
-C	I077	（|cffffcc00仙|r)幻雷伏魔靴
-C	I078	（|cffffcc00仙|r)幻雷伏魔靴
-C	I079	（|cffffcc00仙|r)炽焰伏魔刃
-C	I07A	（|cffffcc00仙|r)炽焰伏魔甲
-C	I07B	（|cffffcc00仙|r)炽焰伏魔靴
-C	I07C	（|cffffcc00仙|r)炽焰伏魔刃
-C	I07D	（|cffffcc00仙|r)炽焰伏魔刃
-C	I07E	（|cffffcc00仙|r)炽焰伏魔甲
-C	I07F	（|cffffcc00仙|r)炽焰伏魔甲
-C	I07G	（|cffffcc00仙|r)炽焰伏魔靴
-C	I07H	（|cffffcc00仙|r)炽焰伏魔靴
-C	I07I	|cffff0000修炼石|r
-C	I07J	|c00FF8040强化之石|r
-C	I07K	[打造]仙人套装
-C	I07L	（|cffffcc00仙|r)九幽
-C	I07M	（|cffffcc00仙|r)炽焰
-C	I07N	（|cffffcc00仙|r)镇海
-C	I07O	（|cffffcc00仙|r)幻雷
-C	I07P	|c000080FF融合石|r
-C	I07Q	仙人卷轴
-C	I07R	仙人凭证
-C	I07S	|cffff0000打火机|r
-C	I07T	|cffff0000神秘面具|r
-C	I07U	|cffff0000宇智波团扇|r
-C	I07V	极限挑战
-C	I07W	|cffff0000尾兽之力|r
-C	I07X	兑换|c00FF8040强化之石|r
-C	I07Y	兑换|c000080FF融合石|r
-C	I07Z	合成|c00FF8040尾兽之力|r
-C	I080	尾兽精华
-C	I081	[上古] - |cffff0000盘古白虎刃|r
-C	I082	[上古] -|cffff0000炎帝青龙戬|r
-C	I083	[上古]-|cffff0000伏羲朱雀杖|r
-C	I084	[上古] -|cffff0000轩辕玄武剑|r
-C	I085	|c00FFFF00尾|c00D5FF2B兽|c00AAFF55结|c0080FF80晶|r
-C	I086	仙人最终试练
-C	I087	领取 |cffff0000上古魂石|r
-C	I088	|cffff0000遗书|r
-C	I089	|cffff0000土影披风|r
-C	I08A	建筑强化
-C	I08B	[六道] - |cffff0000炽焰|r
-C	I08C	禁术卷轴
-C	I08D	兑换 |c00FFFF00勾|c00D5FF2B玉|c00AAFF55项|c0080FF80链|r
-C	I08E	兑换|c000080FF仙人遗物|r
-C	I08F	挑战龙兜
-C	I08G	积分宝石兑换
-C	I08H	任务 - 追捕逃忍
-C	I08I	|cffff0000亲热暴力|r
-C	I08J	鱼竿
-C	I08K	红色的鱼
-C	I08L	蓝色的鱼
-C	I08M	黑色的鱼
-C	I08N	变异的鱼
-C	I08O	捕鱼者的请求
-C	I08P	挑战自我 x |cffff00005|r
-C	I08Q	挑战自我 x |cffff000010|r
-C	I08R	查克拉守卫
-C	I08S	|cffff0000雷影披风|r
-C	I08T	|c007EBFF1创世仙甲|r
-C	I08U	|c007EBFF1创世仙杖|r
-C	I08V	|c007EBFF1创世仙靴|r
-C	I08W	|c007EBFF1创世仙玉|r
-C	I08X	领取奖励
-C	I08Y	兑换|c000080FF尾兽精华|r
-C	I08Z	合成|c000080FF创世仙魂|r
-C	I090	|cffff0000创世仙魂|r
-C	I091	|cffff0000创世仙魂|r
-C	I092	|cffff0000羞涩的爱|r
-C	I093	挑战自我 x |cffff00005|r秒木
-C	I094	挑战自我 x |cffff000020|r苗木
-C	I095	|c00FFFF00祥|c00D5FF2B云|c00AAFF55坠|c0080FF80饰|r
-C	I096	前往 |cff00ff00龙地洞|r
-C	I097	金币2
-C	I098	木材堆2
-C	I041	勇者宝藏
-C	I099	仙人宝箱
-C	I09A	|c00FFFF00血|c00D5FF2B雾|c00AAFF55之|c0080FF80乡|r
-C	I09B	|c00FFFF00恐|c00D5FF2B惧与|c00AAFF55信|c0080FF80念|r
-C	I09C	|c00D5FF2B琼|c00AAFF55曲|c0080FF80玉|r
-C	I09D	合成 |c00D5FF2B琼|c00AAFF55曲|c0080FF80玉|r
-C	I09E	|cffff0000火影披风|r
-C	I09F	修行卷轴
-C	I09G	战魂白虎令
-C	I09H	镇魂苍龙鞭
-C	I09I	星魂朱雀杖
-C	I09J	御魂玄武印
-C	I09K	|cffff0000草雉剑|r
-C	I09L	影之玉 |c00FF00FF+13|r
-C	I09M	影之玉 |c005617E8+6|r
-C	I09N	影之玉 |cff00ff00+2|r
-C	I09O	影之玉 |c00FF00FF+14|r
-C	I09P	影之玉 |cff00ff00+4|r
-C	I09Q	影之玉 |cff00ff00+5|r
-C	I09R	影之玉 |c005617E8+7|r
-C	I09S	影之玉 |c005617E8+8|r
-C	I09T	影之玉 |c005617E8+9|r
-C	I09U	影之玉 |c005617E8+10|r
-C	I09V	影之玉 |c00FF00FF+11|r
-C	I09W	影之玉 |cff00ff00+1|r
-C	I09X	影之玉 |cff00ff00+3|r
-C	I09Y	影之玉 |c00FF00FF+12|r
-C	I09Z	影之玉 |c00FF00FF+15|r
-C	I0A0	|c00FFFF00创|c00D5FF2B世|c00AAFF55仙|c0080FF80魂|r
-C	I0A1	|c00FFFF00创|c00D5FF2B世|c00AAFF55仙|c0080FF80魂|r
-C	I0A2	|c000080FF封印卷轴|r
-C	I0A3	兑换|c000080FF封印卷轴|r
-C	I0A4	兑换|c00FF8040影之玉 +15|r
-C	I0A5	|c00FFFF00始|c00D5FF2B祖|c00AAFF55之|c0080FF80吻|r
-C	I0A6	仙人宝藏
-C	I0A7	惊呆小伙伴礼包
-C	I0A8	[强化]影之玉
-C	I0A9	[兑换]始祖之吻
-C	I0AA	|cffff0000心之剑|r
-C	I0AB	超级修炼之书
-C	I0AC	兑换|c00FF8040幸运护身符|r
-C	I0AD	购买幸运护身符
-C	I0AE	|cffff0000血腥三月镰|r
-C	I0AF	|cffff0000戒指.北|r
-C	I0AG	|cffff0000六道锡杖|r
-C	I0AH	瞬身苦无
-C	I0AI	小黄
-C	I0AJ	|c007EBFF1食人魔的锁甲|r
-C	I0AK	潜入 |cff00ff00雨忍村|r
-C	I0AL	125级团队任务 - |cff00ff00秽土转生|r
-C	I0AM	25级团队任务 - |cff00ff00死之森林|r
-C	I0AN	50级团队任务 - |cff00ff00等了好久！A级任务|r
-C	I0AO	75级团队任务 - |cff00ff00晓之神秘组织|r
-C	I0AP	100级团队任务 - |cff00ff00第四次忍界大战|r
-C	I0AQ	150级团队任务 - |cff00ff00幕后操纵者|r
-C	I0AR	传承 |cffff0000六道阳之力|r
-C	I0AS	传承 |cffff0000六道阴之力|r
-C	I0AT	进入 |cff00ff00精神世界|r
-C	I0AU	六道仙人箴言
-C	I0AV	进入 |cff00ff00宝藏洞|r
-C	I0AW	|c00FFFF00琥|c00D5FF2B珀|c00AAFF55净|c0080FF80瓶|r
-C	I0AX	|c00FFFF00红|c00D5FF2B葫|c00AAFF55芦|r
-C	I0AY	|c00FFFF00芭|c00D5FF2B蕉|c00AAFF55扇|r
-C	I0AZ	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B0	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B1	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B2	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B3	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B4	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B5	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B6	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B7	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B8	|c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
-C	I0B9	领取 |c00FFFF00琥|c00D5FF2B珀|c00AAFF55净|c0080FF80瓶|r
-C	I0BA	传达 - |cff00ff00|r(轻语)
-C	I0BB	传达 - |cff00ff00信息|r(冬冬)
-C	I0BC	传达 - |cff00ff00信息|r(唯恋)
-C	I0BD	进入 |cff00ff00野外训练场|r
-C	I0BE	开启隐藏BOSS
-C	I0BF	挑战自我 x |cffff00005|r大水
-C	I0BG	挑战自我 x |cffff000010|r大水
-C	I0BH	觉醒 |cff00ff00转世力量|r
-C	I0BI	|c00FFFF00神|c00D5FF2B之|c00AAFF55语|r
-C	I0BJ	|cffff0000探索.眼镜|r
-C	I0BK	合成 |c00D5FF2B神|c00AAFF55之|c0080FF80语|r
-C	I000	[兑换]祥云坠饰
-C	I003	神之宝藏
-C	I006	|c00FF8040神之强化石|r
-C	I008	|cffff0000绷带|r
-C	I03U	|cffff0000戒指.玄|r
-C	I03V	换取-|cff00ff00祥云坠饰|r
-C	I0BL	换取-|cff00ff00恐惧与信念|r
-C	I0BM	换取-|cff00ff00血雾之乡|r
+C	I065	|cffff0000戒指-朱|r
+C	I066	申请天下第一智力
+C	I067	申请天下第一力量
+C	I068	申请天下第一等级
+C	I069	申请天下第一敏捷

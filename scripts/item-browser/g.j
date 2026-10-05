@@ -10,6 +10,11 @@ string array ib_itemName
 integer array ib_itemCustom
 integer ib_itemCount = 0
 
+// 初始化填充状态（分帧调用 IB_FillN，避免 main 阶段单次执行超操作数上限）
+integer ib_fillIdx = 0
+integer ib_fillTotal = 0
+timer ib_fillTimer = null
+
 // 搜索状态（分帧扫描，避免单次执行超操作数上限）
 integer ib_searchIdx = 0
 integer ib_searchFound = 0

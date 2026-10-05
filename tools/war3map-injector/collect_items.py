@@ -10,6 +10,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 
 GAME_SLK = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemdata.slk"
+# 游戏自带的物品名称（本地化中文），用于没有地图 itemfunc.txt 的官方地图
+GAME_ITEMSTRINGS = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemstrings.txt"
+GAME_ITEMFUNC = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemfunc.txt"
 
 
 def detect_decode(path):
@@ -80,6 +83,14 @@ def main():
     if map_func_path and os.path.isfile(map_func_path):
         for iid, nm in parse_itemfunc(map_func_path):
             names[iid] = nm
+
+    # Fallback names from the game's localized itemstrings.txt (official maps
+    # have no map itemfunc.txt, so names must come from the game data).
+    if os.path.isfile(GAME_ITEMSTRINGS):
+        for iid, nm in parse_itemfunc(GAME_ITEMSTRINGS):
+            if iid not in names or names[iid].strip() == "":
+                names[iid] = nm
+        print("game itemstrings.txt names:", len(names))
 
     if map_slk_path and os.path.isfile(map_slk_path):
         creatable = parse_slk(map_slk_path)

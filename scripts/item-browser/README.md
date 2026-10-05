@@ -29,16 +29,28 @@ itembrowser          → 显示帮助
 物品 ID 列表在**注入时预先扫描并硬编码**到脚本中，因此：
 
 - **进游戏立即可用**（无需等待枚举，之前 2-3 分钟的枚举已移除）
-- 物品 ID 来自游戏 `Units\ItemData.slk`（273 个标准物品）
 - 搜索时用 `GetObjectName` 获取运行时中文名进行匹配
 
-### 重新生成物品列表
+### 物品来源（标准 + 自定义）
 
-若游戏版本不同或需要自定义物品：
+`tools/war3map-injector/collect_items.py` 会合并以下来源：
+
+1. **游戏标准物品**：`H:\Games\War3\...\units\itemdata.slk`（273 项）
+2. **地图自定义物品**：地图内 `units\itemfunc.txt`（含名称，如 `I000`=风痕之刃）
+3. **地图物品表**：地图内 `units\itemdata.slk`（补充）
+
+> ⚠️ 不同地图的自定义物品不同，**每张地图都要重新运行 `collect_items.py`**。
+
+### 为某张地图生成物品列表
 
 ```powershell
-# 1. 解析 itemdata.slk 生成 _itemids.txt（见 tools/war3map-injector/_slk 脚本逻辑）
-# 2. 把列表嵌入 f.j
+# 1. 解压地图全部文件
+python tools/war3map-injector/extract_all.py "maps/你的地图.w3x"
+
+# 2. 收集标准 + 自定义物品 ID
+python tools/war3map-injector/collect_items.py "maps/你的地图"
+
+# 3. 把列表嵌入 f.j
 python tools/war3map-injector/build_fj.py
 ```
 

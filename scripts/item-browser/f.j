@@ -174,6 +174,7 @@ function IB_Search takes player p, string keyword returns nothing
     local integer found = 0
     local string name
     local string out = ""
+    local integer inBatch = 0
 
     call IB_Message(p, "搜索 \"" + keyword + "\" ...")
 
@@ -183,7 +184,14 @@ function IB_Search takes player p, string keyword returns nothing
             set name = IB_ItemName(i)
             set found = found + 1
             if found <= 20 then
-                set out = out + "  |cffffcc00" + I2S(found) + ".|r " + name + "\n"
+                set out = out + "|cffffcc00" + I2S(found) + ".|r " + name + "  "
+                set inBatch = inBatch + 1
+                // 每 4 条发一条消息，避免单条消息过长被截断
+                if inBatch >= 4 then
+                    call DisplayTimedTextToPlayer(p, 0, 0, 25.0, out)
+                    set out = ""
+                    set inBatch = 0
+                endif
             endif
         endif
         set i = i + 1
@@ -192,8 +200,10 @@ function IB_Search takes player p, string keyword returns nothing
     if found == 0 then
         call IB_Message(p, "未找到包含 \"" + keyword + "\" 的装备")
     else
-        call IB_Message(p, "共找到 " + I2S(found) + " 件装备:")
-        call DisplayTimedTextToPlayer(p, 0, 0, 25.0, out)
+        if inBatch > 0 then
+            call DisplayTimedTextToPlayer(p, 0, 0, 25.0, out)
+        endif
+        call IB_Message(p, "共找到 " + I2S(found) + " 件装备")
     endif
 endfunction
 

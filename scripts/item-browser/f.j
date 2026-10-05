@@ -173,37 +173,28 @@ function IB_Search takes player p, string keyword returns nothing
     local integer i = 0
     local integer found = 0
     local string name
-    local integer pass = 0
+    local string out = ""
 
     call IB_Message(p, "搜索 \"" + keyword + "\" ...")
 
-    // 第一遍：统计总数
     loop
         exitwhen i >= ib_itemCount
         if IB_NameMatch(IB_ItemName(i), keyword) then
+            set name = IB_ItemName(i)
             set found = found + 1
+            if found <= 15 then
+                set out = out + "|cffffcc00" + I2S(found) + ".|r" + name + "  "
+            endif
         endif
         set i = i + 1
     endloop
 
     if found == 0 then
         call IB_Message(p, "未找到包含 \"" + keyword + "\" 的装备")
-        return
+    else
+        // 用 DisplayTextToPlayer（无超时）避免被地图的定时消息覆盖
+        call DisplayTextToPlayer(p, 0, 0, "|cff00ff00[装备]|r 共找到 " + I2S(found) + " 件: " + out)
     endif
-
-    call IB_Message(p, "共找到 " + I2S(found) + " 件装备:")
-
-    // 第二遍：逐条显示（最多 20 条，每条独立一行）
-    set i = 0
-    loop
-        exitwhen i >= ib_itemCount or pass >= 20
-        if IB_NameMatch(IB_ItemName(i), keyword) then
-            set name = IB_ItemName(i)
-            set pass = pass + 1
-            call DisplayTimedTextToPlayer(p, 0, 0, 30.0, "  |cffffcc00" + I2S(pass) + ".|r " + name)
-        endif
-        set i = i + 1
-    endloop
 endfunction
 
 //---------------------------------------------------------------------------
@@ -336,7 +327,7 @@ function IB_ParseAddItem takes player p, string arg returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
-// 诊断：统计匹配数并显示前 5 个
+// 诊断：统计匹配数并显示前 5 个（合并为一条消息，避免被地图消息覆盖）
 //---------------------------------------------------------------------------
 function IB_CountMatch takes player p, string keyword returns nothing
     local integer i = 0
@@ -352,8 +343,7 @@ function IB_CountMatch takes player p, string keyword returns nothing
         endif
         set i = i + 1
     endloop
-    call IB_Message(p, "匹配数=" + I2S(found))
-    call IB_Message(p, "前5: " + out)
+    call DisplayTextToPlayer(p, 0, 0, "|cff00ff00[诊断]|r 匹配数=" + I2S(found) + " 前5: " + out)
 endfunction
 
 //---------------------------------------------------------------------------

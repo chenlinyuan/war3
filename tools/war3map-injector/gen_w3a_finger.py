@@ -38,24 +38,30 @@ def write_mod(m):
 
 
 def build(out_path):
-    # 字符串字段用 A=0（全局）；数值字段用 A=1（等级1）
+    # 字段类型: 0=int, 1=real, 2=unreal, 3=string
+    # A = 等级(0=全局), B = 数据列索引
+    # 参考真实自定义主动技能(ANcl->A00O)的字段结构
     mods = [
         # 名称 / 提示 / 图标
         mod("anam", 3, 0, 0, "死亡之指"),
-        mod("atp1", 3, 0, 0, "死亡之指(|cffffcc00D|r)"),
-        mod("aub1", 3, 0, 0, "秒杀目标单位（对魔法免疫也生效）。"),
+        mod("atp1", 3, 1, 0, "死亡之指(|cffffcc00D|r)"),
+        mod("aub1", 3, 1, 0, "秒杀目标单位（对魔法免疫也生效）。"),
         mod("aart", 3, 0, 0, ICON),
         mod("arar", 3, 0, 0, ICON),
         mod("arac", 3, 0, 0, "creeps"),
-        mod("aord", 3, 0, 0, "chainlightning"),
-        # 目标：敌方单位（含建筑/中立）
-        mod("atar", 3, 0, 0, "air,ground,structure,enemy,neutral"),
-        mod("Ncl2", 3, 0, 0, ""),
+        mod("aord", 3, 0, 0, ""),
+        # 目标类型（关键: Ncl2 是 int，不是字符串！）
+        mod("Ncl2", 0, 1, 2, 1),          # 目标类型 = 单位
+        mod("Ncl1", 2, 1, 1, 0.0),        # 数据列1
+        mod("Ncl3", 0, 1, 3, 1),          # 数据列3
+        mod("Ncl4", 2, 1, 4, 1.0),        # 数据列4
+        mod("Ncl6", 3, 1, 6, ""),         # 目标允许(空=用 atar)
+        mod("atar", 3, 1, 0, "air,ground,structure,enemy,neutral"),
         # 等级 1
         mod("alev", 0, 0, 0, 1),
-        # 按钮位置（放在技能栏空位，避免与已有技能重叠）
+        # 按钮位置
         mod("abpx", 0, 0, 0, 0),
-        mod("abpy", 0, 0, 0, 0),
+        mod("abpy", 0, 0, 0, 2),
         # 冷却 / 魔法 / 距离
         mod("acdn", 2, 1, 0, 1.0),
         mod("amcs", 0, 1, 0, 0),

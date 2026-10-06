@@ -1,19 +1,30 @@
-# item-browser · 装备搜索与添加系统
+# item-browser · 装备与技能系统
 
-在任意 War3 地图中通过**聊天输入框**搜索和添加装备。
+在任意 War3 地图中通过**聊天输入框**搜索/添加装备、搜索/添加/移除/设置技能。
 
 > ⚠️ **War3 1.27 无法输入中文**（游戏内聊天框不支持输入法）。
-> 本版本按用户要求**仅保留中文搜索**（`search 吸血` / `additem 吸血面罩`），
-> 需要能输入中文的环境（如粘贴、第三方输入工具）。
+> 中文命令参数需要能输入中文的环境（如粘贴、第三方输入工具）。
 
-## 功能
+## 功能（已验证）
+
+### 装备
 
 | 命令 | 说明 |
 | --- | --- |
-| `search <关键词>` | 搜索名称包含关键词的装备（支持中文，最多显示 20 条） |
+| `search <关键词>` / `listitem <关键词>` | 搜索名称包含关键词的装备（最多 20 条） |
 | `additem <名称>` | 给**当前选中的英雄**添加 1 个装备（背包满则掉地上） |
 | `additem <名称> <数量>` | 添加指定数量 |
+| `additem <物品ID>` | 按 ID 添加（区分同名，如 `additem I000`） |
 | `itembrowser` | 显示帮助与已加载装备数量 |
+
+### 技能
+
+| 命令 | 说明 |
+| --- | --- |
+| `listskill <关键词>` | 搜索名称包含关键词的技能（最多 30 条） |
+| `addskill <名称> [等级]` | 给选中英雄添加技能（默认 1 级） |
+| `removeskill <名称>` | 移除选中英雄的指定技能 |
+| `setskill <名称> <等级>` | 设置选中英雄指定技能的等级 |
 
 ## 使用示例
 
@@ -21,35 +32,42 @@
 search 吸血          → 列出所有名称含"吸血"的装备
 additem 吸血面罩      → 给选中英雄添加「吸血面罩」
 additem 吸血面罩 3    → 添加 3 个
-itembrowser          → 显示帮助
+additem I000         → 按 ID 添加
+listskill 火         → 列出所有名称含"火"的技能
+addskill 火球术 5     → 给选中英雄添加 5 级「火球术」
+removeskill 火球术    → 移除「火球术」
+setskill 火球术 10    → 把「火球术」设为 10 级
 ```
 
 ## 工作原理（进游戏立即可用）
 
-物品 **ID + 名称** 在**注入时预先扫描并硬编码**到脚本中，因此：
+物品/技能的 **ID + 名称** 在**注入时预先扫描并硬编码**到脚本中，因此：
 
-- **进游戏立即可用**（无需等待枚举，之前 2-3 分钟的枚举已移除）
+- **进游戏立即可用**（无需等待枚举）
 - 搜索直接匹配**预扫描的名称**，不依赖 `GetObjectName`
-  （自定义物品的 `GetObjectName` 可能返回空，故必须内嵌名称）
+  （自定义对象名称可能返回空，故必须内嵌名称）
+- 数量大时分帧填充（`IB_FillStep` / `IB_SkillFillStep`），避免单帧操作数超限
 
-### 物品来源（标准 + 自定义）
+### 数据来源
 
-`tools/war3map-injector/collect_items.py` 会合并以下来源：
+- **装备**：`tools/war3map-injector/collect_items.py`
+  1. 游戏标准物品：`units\itemdata.slk`
+  2. 地图自定义物品：地图内 `units\itemfunc.txt` / `itemdata.slk`
+- **技能**：`tools/war3map-injector/collect_skills.py`
+  1. 地图 `war3map.w3a`（自定义技能，锚定 `anam` + 名称，ID 在名称前 16 字节）
+  2. 游戏 `AbilityStrings`（8 个种族文件）
 
-1. **游戏标准物品**：`H:\Games\War3\...\units\itemdata.slk`（273 项）
-2. **地图自定义物品**：地图内 `units\itemfunc.txt`（含名称，如 `I000`=风痕之刃）
-3. **地图物品表**：地图内 `units\itemdata.slk`（含自定义物品 ID + 名称）
+> ⚠️ 不同地图的自定义对象不同，**每张地图都要重新运行收集脚本**。
 
-> ⚠️ 不同地图的自定义物品不同，**每张地图都要重新运行 `collect_items.py`**。
-
-### 为某张地图生成物品列表
+### 为某张地图生成列表
 
 ```powershell
 # 1. 解压地图全部文件
 python tools/war3map-injector/extract_all.py "maps/你的地图.w3x"
 
-# 2. 收集标准 + 自定义物品 ID 与名称
+# 2. 收集装备 / 技能 ID 与名称
 python tools/war3map-injector/collect_items.py "maps/你的地图"
+python tools/war3map-injector/collect_skills.py "maps/你的地图"
 
 # 3. 把列表嵌入 f.j（ID + 名称）
 python tools/war3map-injector/build_fj.py
@@ -57,70 +75,30 @@ python tools/war3map-injector/build_fj.py
 
 ## 编码要求（重要）
 
-War3 1.27 以 **GBK(ANSI)** 解析地图脚本。本目录的 `.j` 文件以 **UTF-8** 保存，
-注入前由 `inject_map.py` **自动转为 GBK**。若手工复制到 `HkeData`，请务必先转 GBK，
-否则中文字符串会破坏脚本解析，导致**加载地图后回到选图界面**。
-
-搜索结果会同时显示中文名与拼音，方便对照。
-
-## 工作原理
-
-```mermaid
-graph TD
-    A[地图启动] --> B[枚举所有物品 ID]
-    B --> C[存入 ib_itemList]
-    C --> D[提示"装备列表加载完成"]
-    D --> E[注册聊天事件]
-    E --> F{玩家输入}
-    F -->|search| G[遍历列表匹配名称]
-    F -->|additem| H[精确匹配名称 → 创建物品]
-    G --> I[显示结果]
-    H --> J[放入选中单位背包/地上]
-```
-
-### 1. 物品枚举
-
-War3 物品 ID 是 4 字符码（FourCC）。脚本通过**四层嵌套**枚举所有可能的 ID：
-
-```
-第一层 (ib_idA): 62 种字符 × 256³
-第二层 (ib_idB): 62 种字符 × 256²
-第三层 (ib_idC): 62 种字符 × 256
-第四层 (ib_charMap): 62 种字符
-```
-
-对每个候选 ID 调用 `CreateItem`，成功则记录 `GetItemTypeId`，然后 `RemoveItem`。
-
-> ⚠️ 完整枚举约需 2-3 分钟（62⁴ ≈ 1477 万次尝试），期间略有卡顿。
-> 完成后屏幕提示「装备列表加载完成」。
-
-### 2. 名称匹配
-
-- 用 `GetObjectName(itemId)` 获取物品显示名
-- `IB_StripColorCodes` 去除 `|cXXXXXXXX` / `|r` 颜色代码
-- `IB_IsItemMatch` 做子串匹配（支持中文）
-
-### 3. 添加物品
-
-- `IB_GetSelectedUnit` 通过 `GroupEnumUnitsSelected` 获取玩家当前选中单位
-- `CreateItem` 在单位位置创建
-- `UnitAddItem` 尝试放入背包，失败则 `SetItemPosition` 留在地上
+War3 1.27 的 JASS 解析器按 **UTF-8** 读取脚本字符串字面量。
+本目录的 `.j` 文件以 **UTF-8** 保存，`inject_map.py` 默认按 UTF-8 注入。
+若注入 GBK 中文，游戏会把 GBK 字节当作非法 UTF-8，导致字符串被截断，搜索/添加全部失效。
 
 ## 文件结构
 
 ```
 scripts/item-browser/
-├── f.j    # 函数定义（约 12KB）
+├── f.j    # 函数定义（构建后约 210KB，含内嵌 ID/名称）
 ├── g.j    # 全局变量
-├── m.j    # 入口调用
+├── m.j    # 入口调用（IB_Init）
 └── README.md
 ```
 
 ## 注入方法
 
 ```powershell
-python tools/war3map-injector/inject_map.py "maps/你的地图.w3m" scripts/item-browser
+python tools/war3map-injector/inject_map.py "maps/你的地图.w3x"
 ```
+
+> 若地图 globals 以 `constant` 开头（如 6.9），注入后还需运行：
+> ```powershell
+> python tools/war3map-injector/fix_globals_order.py "maps/你的地图.w3x"
+> ```
 
 详见 [`../../tools/war3map-injector/README.md`](../../tools/war3map-injector/README.md)。
 
@@ -128,68 +106,29 @@ python tools/war3map-injector/inject_map.py "maps/你的地图.w3m" scripts/item
 
 ### 全局变量（g.j）
 
-```jass
-integer array ib_itemList      // 物品 ID 列表
-integer ib_itemCount = 0       // 物品数量
-integer array ib_charMap       // 字符映射 (0-9, A-Z, a-z)
-integer ib_iA, ib_iB, ib_iC    // 枚举索引
-integer ib_idA, ib_idB, ib_idC // ID 前缀
-timer ib_timerA, ib_timerB, ib_timerC
-```
+- 装备：`ib_itemList[]`、`ib_itemName[]`、`ib_itemCustom[]`、`ib_itemCount`、搜索/添加状态
+- 技能：`ib_skillList[]`、`ib_skillName[]`、`ib_skillCustom[]`、`ib_skillCount`、填充/搜索/添加/移除/设置状态
+- 注册：`ib_regTimer`
 
 ### 主要函数（f.j）
 
-| 函数 | 说明 |
+| 类别 | 函数 |
 | --- | --- |
-| `IB_StripColorCodes` | 去除颜色代码 |
-| `IB_StrEqCI` | 不区分大小写比较 |
-| `IB_Message` | 发送消息给玩家 |
-| `IB_IsItemMatch` | 名称子串匹配 |
-| `IB_GetSelectedUnit` | 获取选中单位 |
-| `IB_Search` | 搜索装备 |
-| `IB_AddItem` | 添加装备 |
-| `IB_ParseAddItem` | 解析 additem 参数 |
-| `IB_OnChat` | 聊天命令分发 |
-| `IB_RegisterChat` | 注册聊天事件 |
-| `IB_InitItemCharMap` | 初始化字符映射 |
-| `IB_EnumA/B/C/D` | 四层 ID 枚举 |
-| `IB_Init` | 入口 |
-
-## 自定义
-
-### 修改命令名
-
-编辑 `IB_OnChat` 中的字符串比较：
-
-```jass
-if IB_StrEqCI(cmd, "search") then      // 改成你想要的关键词
-```
-
-### 修改显示数量
-
-编辑 `IB_Search` 中的 `if found <= 20 then`。
-
-### 不枚举全部物品（加速）
-
-若只需特定物品，可跳过枚举直接硬编码 ID 列表：
-
-```jass
-function IB_Init takes nothing returns nothing
-    set ib_itemList[0] = 'ratf'   // 攻击之爪
-    set ib_itemList[1] = 'ratc'   // 吸血面罩
-    set ib_itemCount = 2
-    call IB_RegisterChat()
-endfunction
-```
+| 通用 | `IB_LowerAscii`、`IB_StrEqCI`、`IB_Message`、`IB_SkillMessage`、`IB_Char`、`IB_IdStr`、`IB_NameMatch`、`IB_GetSelectedUnit`、`IB_BoolStr` |
+| 装备 | `IB_Search`/`IB_SearchStep`、`IB_AddItem`/`IB_AddStep`/`IB_AddGive`、`IB_ParseAddItem`、`IB_CountMatch`、`IB_ItemName` |
+| 技能 | `IB_SkillName`、`IB_SkillGive`、`IB_SkillAddStep`、`IB_AddSkill`、`IB_SkillRemove`/`IB_SkillRemStep`、`IB_RemoveSkill`、`IB_SkillSearchStep`、`IB_SkillSearch`、`IB_ParseAddSkill`、`IB_ParseRemoveSkill`、`IB_SkillSetLevel`/`IB_SkillSetStep`、`IB_SetSkill`、`IB_ParseSetSkill` |
+| 分发/注册 | `IB_OnChat`、`IB_RegisterChat`..`IB_RegisterChat6` |
+| 入口 | `IB_Init` + `IB_FillStep` + `IB_SkillFillStep`（由 `build_fj.py` 生成） |
 
 ## 注意事项
 
-1. **首次加载耗时**：完整枚举约 2-3 分钟，建议在加载期间不要操作。
-2. **多人游戏**：枚举使用同步计时器，不会 desync；但 `additem` 只对输入者生效。
-3. **地图兼容性**：部分地图有反作弊机制，可能阻止脚本运行。
-4. **物品名称**：需使用游戏内显示的名称（中文/英文取决于地图语言）。
+1. **多人游戏**：填充使用同步计时器，不会 desync；但命令只对输入者生效。
+2. **地图兼容性**：部分地图有反作弊机制，可能阻止脚本运行。
+3. **聊天注册上限**：部分地图（如 6.9）聊天事件数量接近上限，需分帧注册
+   （`IB_RegisterChat` 链式 TimerStart）。
+4. **名称**：需使用游戏内显示的名称（中文/英文取决于地图语言），或直接用 ID。
 
 ## 参考
 
-- 参考脚本：`151个常用脚本\输入名字创建物品`、`聊天输入获得所有装备-作者飘飞之影`
 - 注入工具：[`../../tools/war3map-injector/`](../../tools/war3map-injector/)
+- HKE 作弊激活：[`../../docs/HKE作弊激活说明.md`](../../docs/HKE作弊激活说明.md)

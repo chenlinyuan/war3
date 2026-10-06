@@ -1,0 +1,36 @@
+> 命令CMD脚本
+
+玩家输入【飞飞世界】或是按↓+ESC建开启
+
+说明：
+-dt            地图全亮
+-wd            无敌                    
+wd=            取消无敌
+-cd            开启自动清CD                        
+cd=            关闭自动清CD
+-djXXXXX       设置单位等级为XXXXX 
+-jbXXXXX       金币增加XXXXX                       
+-mcXXXXX       木材增加XXXXX  
+-llXXXXX       力量增加XXXXX                       
+ll=XXXXX       力量减少XXXXX 
+-mjXXXXX       敏捷增加XXXXX                       
+mj=XXXXX       敏捷减少XXXXX 
+-zlXXXXX       智力增加XXXXX                       
+zl=XXXXX       智力减少XXXXX 
+-sxXXXXX       三围增加XXXXX                       
+sx=XXXXX       三围减少XXXXX 
+-smbsXXXXX     实际生命值的上限倍数
+-jybsXXXXX     正常经验获得率的X倍
+-sdXXX         移动速度为XXX       
+ 
+-RPG           自动清CD、回血、回魔、速度最大化、金币增加100000、木材1000        
+RPG=           关闭
+-my            魔法免疫                    
+my=            取消免疫
+-ss            杀死选取单位                        
+-dl            掉落选取单位的背包物品   
+-yc            移除选中单位                    
+-fz            复制选中单位        
+-wpXX          创建XX数量的随机物品
+-wpyjXX        创建XX数量的永久类物品 【一般武器和神器都会放永久类里面】
+-ql            清理可见地图的地面物品

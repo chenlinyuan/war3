@@ -1,0 +1,1 @@
+gamecache fy_gc=InitGameCache("FYGC")

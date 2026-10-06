@@ -1,0 +1,4 @@
+set gg_trg_refasd=CreateTrigger()
+call TriggerRegisterAnyUnitEventBJ(gg_trg_refasd,EVENT_PLAYER_UNIT_ATTACKED)
+call TriggerAddCondition(gg_trg_refasd,Condition(function Trig_refasd_Conditions))
+call TriggerAddAction(gg_trg_refasd,function Trig_refasd_Actions)

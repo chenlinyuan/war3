@@ -1,0 +1,9 @@
+> 利息脚本-TT版
+
+输入TT开启
+再次输入TT就是关闭
+谁开启谁加利息
+非常公平合理
+
+call TimerStart(tm,10.00,true,function ljlx)   这是每秒加利息的时间
+

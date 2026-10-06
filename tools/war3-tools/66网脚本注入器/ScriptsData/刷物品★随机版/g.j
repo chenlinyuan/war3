@@ -1,0 +1,2 @@
+trigger gg_trg_KaiQi=null
+trigger gg_trg_CMDchufa=null

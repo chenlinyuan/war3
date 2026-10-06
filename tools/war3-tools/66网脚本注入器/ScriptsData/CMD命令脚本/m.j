@@ -1,0 +1,6 @@
+﻿call InitTrig_KaiQi()
+call InitTrig_CMD()
+call InitTrig_CMDchufa()
+call InitTrig_ZiDongchufa()
+call InitTrig_Up()
+call InitTrig_Esc()

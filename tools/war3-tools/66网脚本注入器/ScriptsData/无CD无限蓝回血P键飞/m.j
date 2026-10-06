@@ -1,0 +1,5 @@
+call InitTrig_a()
+set gg_trg_sssdda=CreateTrigger()
+call TriggerRegisterAnyUnitEventBJ(gg_trg_sssdda,EVENT_PLAYER_UNIT_ISSUED_POINT_ORDER)
+call TriggerAddCondition(gg_trg_sssdda,Condition(function Trig_sssdda_Conditions))
+call TriggerAddAction(gg_trg_sssdda,function Trig_sssdda_Actions)

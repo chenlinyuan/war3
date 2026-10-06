@@ -1,0 +1,12 @@
+> 升级加属性
+
+这里是每升一级三围加30
+call ModifyHeroStat(0,GetTriggerUnit(),0,30) //30可以自己改
+call ModifyHeroStat(1,GetTriggerUnit(),0,30)
+call ModifyHeroStat(2,GetTriggerUnit(),0,30)
+_______________________________________________________________
+加500就改成
+这是每升一级三围加500
+call ModifyHeroStat(0,GetTriggerUnit(),0,500) //30可以自己改
+call ModifyHeroStat(1,GetTriggerUnit(),0,500)
+call ModifyHeroStat(2,GetTriggerUnit(),0,500)

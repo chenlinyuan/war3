@@ -1,0 +1,1 @@
+trigger gg_trg_refasd=null

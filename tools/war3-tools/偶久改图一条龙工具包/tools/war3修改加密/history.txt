@@ -1,0 +1,92 @@
+2004-11-10 0.3.1 build 82
+=========================
+[!] Fixed Ability Editor with level change/max level > 4
+[!] Fixed case sensitive determinaion in Editors
+[!] Fixed some display
+
+2004-11-9 0.3.0 build 79
+========================
+[+] Added plugin Ability Editor
+[!] Fixed problem that unit/item name would change in treelist when modify them
+[+] Added a TODO.txt to show what's left to do in next versions
+[ObjData 1.4.0 build 41]
+ [+] Added ability data
+ [!] Fixed some bugs
+
+2004-11-5 0.2.5 build 60
+========================
+[+] Added plugin Unit Editor
+[ObjData 1.2.0 build 18]
+ [!] Fixed some Unit data
+ [+] Added Item data
+ [+] Added some types
+[MapArchive 1.0.3 build 17]
+ [+] Added script\war3map.j to search list
+ [!] Create files when not exists now
+
+2004-11-2 0.2.3 build 54
+========================
+[+] Add "Create Custom Unit As Hero" item in popup menu of Unit Editor
+[+] Plugin "Trigger Strings" could modify strings now
+[!] Fixed bugs in plugin "Trigger Strings"
+[ObjData 1.0.2 build 12]
+ [!] Fixed some fields
+
+2004-10-21 0.2.2 build 49
+=========================
+[+] Unit Editor could Add/Duplicate/Remove Units now
+[!] Fixed category bug in Unit Editor
+[+] Added ObjData.dll of language Chinese(Simp)
+[w3u.dll 1.0.2 build 9]
+ [+] Unit Duplicate/Remove functions
+[ObjData.dll 1.0.2 build 11]
+ [!] Fixed some type modifications
+ [+] Added uberSplat data list
+
+
+2004-10-21 0.2.1 build 40
+=========================
+[+] Unit Editor could modify data now
+[!] Fixed some bugs
+[MapArchive.dll 1.0.3 build 17]
+ [!] Modified map could be opened in WE now
+[ObjData.dll 1.0.1 build 7]
+ [+] Added data type structrues
+[w3u.dll 1.0.1 build 6]
+ [+] Added write function
+ [!] Fixed some bugs
+
+2004-10-19 w3u.dll 1.0.0 build 3
+================================
+[!] Fixed crash for most maps
+
+2004-10-18 0.2.0 build 25
+=========================
+[+] w3u.dll and ObjData.dll for Unit Editor
+[+] Initial part of Unit Editor, readonly now
+[!] Changed fonts
+[MapArchive.dll 1.0.2 build 15]
+ [!] Fixed description for some files
+[w3i.dll 1.0.1 build 10]
+ [!] Fixed some data parsing
+
+2004-6-18 0.1.1 build 19
+========================
+[+] Added UTF-8 String convert for localized Maps
+
+2004-6-17
+=========
+[+] Added W3MMasterCN.exe and MapArchiveCN.dll for Simplified Chinese Language
+[!] Map Protector removes war3map.w3s now
+
+2004-5-13 MapArchive.dll 1.0.1 build 13
+=======================================
+[!] Map Protector removes war3mapUnits.doo now
+
+2004-5-5 0.1.0 build 15
+=======================
+[+] First public release
+[+] Map archive list
+[+] Map protector
+[+] Plugin: Trigger String List(unable to edit now)
+[+] Plugin: Map Information(Can modify basic info, players/forces are in progress)

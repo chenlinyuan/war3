@@ -1,0 +1,10 @@
+> 无CD有限蓝通用版
+
+function k_A takes nothing returns nothing
+local boolean hl=true        //此处设置决定是否回蓝，true为回蓝，false为不回蓝
+call TriggerSleepAction(0.1) //清CD回蓝的时间。
+call UnitResetCooldown(GetTriggerUnit())
+if hl then
+call SetUnitState(GetTriggerUnit(),UNIT_STATE_MANA,GetUnitState(GetTriggerUnit(),UNIT_STATE_MAX_MANA))
+endif
+endfunction

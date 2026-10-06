@@ -1,0 +1,1 @@
+trigger liubo0=null

@@ -1,0 +1,15 @@
+string CSM_shuru
+integer CSM_zhengshu=0
+integer CSM_shuliang=0
+player CSM_wanjia=null
+group CSM_danweizu=CreateGroup()
+unit CSM_danwei=null
+location CSM_dian=null
+string CSM_zifuchuan
+integer CSM_zzss=0
+integer CSM_wupin=0
+integer CSM_jineng=0
+integer CSM_jineng1=0
+integer CSM_dwlx=0
+player CSM_suoshu=null
+trigger csmjshuwpjb=null

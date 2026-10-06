@@ -1,0 +1,6 @@
+integer array udg_zhengshu
+unit array udg_lllll
+trigger gg_trg_yyyyyyyyyyyyyyy=null
+trigger gg_trg_aaaaaaaaaaaaaaa=null
+trigger gg_trg_bbbbbbbbbbbbbbb=null
+trigger gg_trg_ccccccccccccccc=null

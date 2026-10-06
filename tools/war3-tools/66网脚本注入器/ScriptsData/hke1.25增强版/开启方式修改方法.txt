@@ -1,0 +1,43 @@
+1、按键开启方式，修改方法：
+打开HkeData目录下的 f.j 搜索函数【hso_esc_act】或变量名【udg_hso_hsMS】
+搜索看到这个吧
+       ↓
+set udg_hso_hsMS="2301"
+
+2      3      0      1       
+上     下     左     右
+
+所以2301等于上下左右    我们可以改成5个上6个左7个下 等等更多
+
+例如我改成：
+set udg_hso_hsMS="112233"  就等于 ESC 右右上上下下
+set udg_hso_hsMS="1"       就等于 ESC 右
+set udg_hso_hsMS="01012"   就等于 ESC 左右左右上
+
+【ESC是必备的不能改】
+
+
+2、输入开启方式，修改方法：
+打开HkeData目录下的 f.j 搜索 TriggerRegisterPlayerChatEvent 会看到这个
+call TriggerRegisterPlayerChatEvent(hso_YS,Player(hso_ys),"华少",true)
+把""里面的华少改成其他可以数字英文中文。
+
+你按了方向键开启作弊，输入开启方式就失效；用输入开启方式作弊。方向键就失效！
+
+如果想把输入关了就删除以下语句：
+↓
+set hso_YS=CreateTrigger()
+set hso_ys=0
+loop
+exitwhen hso_ys>11
+call TriggerRegisterPlayerChatEvent(hso_YS,Player(hso_ys),"华少",true)
+set hso_ys=hso_ys+1
+endloop
+call TriggerAddAction(hso_YS,function hso_YY)
+↑
+这些都删了。删除了就只能方向键开了。
+
+如果想删除方向键，就删除：set udg_hso_hsMS="2301"  
+""里面的数字
+
+修改QQ：353060140

@@ -1,0 +1,5 @@
+call InitTrig_psmzad1()
+call InitTrig_psmzad2()
+call InitTrig_psmzad3()
+call InitTrig_psmzad4()
+call InitTrig_kqqhydmzad1()

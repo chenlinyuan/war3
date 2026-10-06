@@ -1,0 +1,219 @@
+==============================================================================
+Exe:      D:\WAR3改图一条龙\软件\无敌解压\War3MapExtractorD\1.exe
+Time:     Jan 12, 2008  9:09:37.656 AM
+User:     Administrator
+Computer: 63C29890EA554C3
+------------------------------------------------------------------------------
+
+This application has encountered a critical error:
+
+存储空间不足，无法处理此命令。
+
+Program:	D:\WAR3改图一条龙\软件\无敌解压\War3MapExtractorD\1.exe
+File:	E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp
+Line:	898
+
+
+
+------------------------------------------------------------------------------
+
+----------------------------------------
+    Stack Trace (Manual)
+----------------------------------------
+
+Address  Frame    Logical addr  Module
+
+15027AAF 0012F460 0001:00026AAF D:\WAR3改图一条龙\软件\无敌解压\WAR3MAPEXTRACTORD\Storm.dll
+15027ECA 0012F480 0001:00026ECA D:\WAR3改图一条龙\软件\无敌解压\WAR3MAPEXTRACTORD\Storm.dll
+15019982 0012F4D8 0001:00018982 D:\WAR3改图一条龙\软件\无敌解压\WAR3MAPEXTRACTORD\Storm.dll
+1501973F 0012F500 0001:0001873F D:\WAR3改图一条龙\软件\无敌解压\WAR3MAPEXTRACTORD\Storm.dll
+1501E4B2 0012F548 0001:0001D4B2 D:\WAR3改图一条龙\软件\无敌解压\WAR3MAPEXTRACTORD\Storm.dll
+1501E250 0012F56C 0001:0001D250 D:\WAR3改图一条龙\软件\无敌解压\WAR3MAPEXTRACTORD\Storm.dll
+0046869D 00E8DC48 0001:0006769D D:\WAR3改图一条龙\软件\无敌解压\War3MapExtractorD\1.exe
+
+----------------------------------------
+    Stack Trace (Using DBGHELP.DLL)
+----------------------------------------
+
+15027AAF MBX@970@3D32D0.### <unknown symbol>+0 (0x00000000,0x3982D4B9,0x3982D4B5,0x00001808)
+15027ECA MBX@970@3D32D0.### <unknown symbol>+0 (0x3982D4B9,0x445C3A45,0x00000382,0x00000000)
+15019982 MBX@970@3D32D0.### <unknown symbol>+0 (0x046F0010,0x01000000,0x00020000,0x03310048)
+1501973F MBX@970@3D32D0.### <unknown symbol>+0 (0x03310048,0x0004032C,0x0004032C,0x00000000)
+1501E4B2 MBX@970@3D32D0.### <unknown symbol>+0 (0x00000000,0x03310048,0x0004032C,0x00000000)
+1501E250 MBX@970@3D32D0.### <unknown symbol>+0 (0x01320088,0x03310048,0x0004032C,0x00000000)
+0046869D 1.exe        <unknown symbol>+0 (0x65657263,0x2E6C746E,0x00616774,0x00E8A660)
+73676E69 <unknown module> <unknown symbol>+0 (0x00000000,0x00000000,0x00000000,0x00000000)
+
+
+----------------------------------------
+    Loaded Modules
+----------------------------------------
+
+0x00400000 - 0x00500000  1.exe
+0x00C20000 - 0x00C36000  MBX@970@3D32B0.###
+0x010C0000 - 0x010DB000  ieprot.dll
+0x01340000 - 0x0137E000  vodrc.dll
+0x01AE0000 - 0x01B22000  SgImeWord.dll
+0x01C00000 - 0x02149000  xpsp2res.dll
+0x02430000 - 0x02592000  SOGOUPY.IME
+0x07160000 - 0x071A6000  Audiodev.dll
+0x10000000 - 0x10033000  MBX@970@3D32C0.###
+0x10930000 - 0x10979000  PortableDeviceApi.dll
+0x11C70000 - 0x11CA9000  WMASF.DLL
+0x15000000 - 0x15068000  MBX@970@3D32D0.###
+0x15110000 - 0x1536A000  WMVCore.DLL
+0x16210000 - 0x1648E000  wpdshext.dll
+0x20000000 - 0x20017000  odbcint.dll
+0x325C0000 - 0x325D2000  msohev.dll
+0x4AE90000 - 0x4B033000  gdiplus.dll
+0x5ADC0000 - 0x5ADF7000  uxtheme.dll
+0x5FDD0000 - 0x5FE24000  NETAPI32.dll
+0x62C20000 - 0x62C29000  LPK.DLL
+0x68D60000 - 0x68E01000  dbghelp.dll
+0x71A10000 - 0x71A18000  WS2HELP.dll
+0x71A20000 - 0x71A37000  WS2_32.dll
+0x71A90000 - 0x71AA2000  MPR.dll
+0x71B70000 - 0x71B83000  SAMLIB.dll
+0x71B90000 - 0x71B9E000  ntlanman.dll
+0x71C00000 - 0x71C07000  NETRAP.dll
+0x71C10000 - 0x71C50000  NETUI1.dll
+0x71C50000 - 0x71C65000  NETUI0.dll
+0x73540000 - 0x7357D000  ODBC32.dll
+0x73640000 - 0x7366E000  msctfime.ime
+0x73CE0000 - 0x73CF3000  shgina.dll
+0x73FA0000 - 0x7400B000  USP10.dll
+0x74680000 - 0x746CB000  MSCTF.dll
+0x74770000 - 0x7490A000  NETSHELL.dll
+0x75430000 - 0x754A1000  CRYPTUI.dll
+0x758D0000 - 0x759C0000  MSGINA.dll
+0x759D0000 - 0x75A7E000  USERENV.dll
+0x75ED0000 - 0x75ED7000  drprov.dll
+0x75EE0000 - 0x75EE9000  davclnt.dll
+0x75EF0000 - 0x75FED000  browseui.dll
+0x76060000 - 0x761B6000  SETUPAPI.dll
+0x762D0000 - 0x762E0000  WINSTA.dll
+0x762F0000 - 0x762F5000  MSIMG32.dll
+0x76300000 - 0x7631D000  IMM32.DLL
+0x76320000 - 0x76367000  comdlg32.dll
+0x76570000 - 0x7658C000  CSCDLL.dll
+0x76590000 - 0x765DE000  cscui.dll
+0x765E0000 - 0x76672000  CRYPT32.dll
+0x76680000 - 0x76722000  WININET.dll
+0x76750000 - 0x76759000  shfolder.dll
+0x76950000 - 0x76958000  LINKINFO.dll
+0x76960000 - 0x76984000  ntshrui.dll
+0x76990000 - 0x76ACD000  ole32.dll
+0x76AF0000 - 0x76B01000  ATL.DLL
+0x76B10000 - 0x76B3A000  WINMM.dll
+0x76BD0000 - 0x76BFD000  credui.dll
+0x76C00000 - 0x76C2E000  WINTRUST.dll
+0x76C60000 - 0x76C88000  IMAGEHLP.dll
+0x76D30000 - 0x76D48000  iphlpapi.dll
+0x76D70000 - 0x76D92000  appHelp.dll
+0x76DB0000 - 0x76DC2000  MSASN1.dll
+0x76E50000 - 0x76E5E000  rtutils.dll
+0x76F30000 - 0x76F5C000  WLDAP32.dll
+0x76FA0000 - 0x7701F000  CLBCATQ.DLL
+0x77020000 - 0x770BA000  COMRes.dll
+0x770F0000 - 0x7717B000  oleaut32.dll
+0x77180000 - 0x77283000  comctl32.dll
+0x77BD0000 - 0x77BD8000  version.dll
+0x77BE0000 - 0x77C38000  msvcrt.dll
+0x77D10000 - 0x77D9F000  USER32.dll
+0x77DA0000 - 0x77E49000  ADVAPI32.dll
+0x77E50000 - 0x77EE2000  RPCRT4.dll
+0x77EF0000 - 0x77F37000  GDI32.dll
+0x77F40000 - 0x77FB6000  SHLWAPI.dll
+0x77FC0000 - 0x77FD1000  Secur32.dll
+0x7C800000 - 0x7C91D000  kernel32.dll
+0x7C920000 - 0x7C9B4000  ntdll.dll
+0x7D590000 - 0x7DD83000  shell32.dll
+0x7E550000 - 0x7E6BF000  shdocvw.dll
+
+
+----------------------------------------
+    Memory Dump
+----------------------------------------
+
+Stack: 1024 bytes starting at (ESP = 0012E3A8)
+
+* = addr                            **                                *       
+0012E3A0: 41 00 00 00  01 00 00 00  B0 01 00 00  22 E7 12 00  A..........."...
+0012E3B0: 00 00 00 00  44 3A 5C 57  41 52 33 B8  C4 CD BC D2  ....D:\WAR3.....
+0012E3C0: BB CC F5 C1  FA 5C C8 ED  BC FE 5C CE  DE B5 D0 BD  .....\....\.....
+0012E3D0: E2 D1 B9 5C  57 61 72 33  4D 61 70 45  78 74 72 61  ...\War3MapExtra
+0012E3E0: 63 74 6F 72  44 5C 31 2E  65 78 65 00  64 6C 6C 00  ctorD\1.exe.dll.
+0012E3F0: 48 E6 12 00  B0 01 00 00  2C E5 12 00  24 6C 01 15  H.......,...$l..
+0012E400: B8 1B 05 15  18 E4 12 00  04 01 00 00  B0 01 00 00  ................
+0012E410: 22 E7 12 00  00 00 00 00  44 3A 5C 57  41 52 33 B8  ".......D:\WAR3.
+0012E420: C4 CD BC D2  BB CC F5 C1  FA 5C C8 ED  BC FE 5C CE  .........\....\.
+0012E430: DE B5 D0 BD  E2 D1 B9 5C  57 61 72 33  4D 61 70 45  .......\War3MapE
+0012E440: 78 74 72 61  63 74 6F 72  44 5C 45 72  72 6F 72 73  xtractorD\Errors
+0012E450: 5C 32 30 30  38 2D 30 31  2D 31 32 20  30 39 2E 30  \2008-01-12 09.0
+0012E460: 39 2E 33 37  20 45 72 72  6F 72 2E 74  78 74 00 00  9.37 Error.txt..
+0012E470: 38 89 4E 00  90 07 A3 00  1B 89 4E 00  B0 01 00 00  8.N.......N.....
+0012E480: 22 E7 12 00  00 00 00 00  B0 01 00 00  83 00 00 00  "...............
+0012E490: 80 07 A3 00  00 00 00 00  01 E4 12 00  FF FF FF FF  ................
+0012E4A0: 44 98 4E 00  B8 00 A3 00  EE 54 4E 00  08 E5 12 00  D.N......TN.....
+0012E4B0: 74 54 4E 00  FF FF FF FF  2D 2D 2D 2D  2D 2D 2D 2D  tTN.....--------
+0012E4C0: 2D 2D 2D 2D  2D 2D 2D 2D  2D 2D 2D 2D  2D 2D 2D 2D  ----------------
+0012E4D0: 2D 2D 2D 2D  2D 2D 2D 2D  2D 2D 2D 2D  2D 2D 2D 2D  ----------------
+0012E4E0: 2D 2D 2D 2D  2D 2D 2D 2D  2D 2D 2D 2D  2D 2D 2D 2D  ----------------
+0012E4F0: 2D 2D 2D 2D  2D 2D 2D 2D  2D 2D 2D 2D  2D 2D 2D 2D  ----------------
+0012E500: 2D 2D 2D 2D  2D 2D 00 7C  9D 76 06 00  4C 55 4E 00  ------.|.v..LUN.
+0012E510: 01 00 00 00  24 E5 12 00  A8 E3 12 00  8C 1D 00 15  ....$...........
+0012E520: 01 00 6E 00  DC F3 12 00  9C 65 01 15  09 00 00 00  ..n......e......
+0012E530: 03 00 00 00  6C 6F 61 64  00 00 00 00  00 00 00 00  ....load........
+0012E540: 00 00 5C 01  44 3A 5C 57  41 52 33 B8  C4 CD BC D2  ..\.D:\WAR3.....
+0012E550: BB CC F5 C1  FA 5C C8 ED  BC FE 5C CE  DE B5 D0 BD  .....\....\.....
+0012E560: E2 D1 B9 5C  57 61 72 33  4D 61 70 45  78 74 72 61  ...\War3MapExtra
+0012E570: 63 74 6F 72  44 5C 45 72  72 6F 72 73  5C 43 72 61  ctorD\Errors\Cra
+0012E580: 73 68 53 75  6D 6D 61 72  69 65 73 2E  62 69 6E 00  shSummaries.bin.
+0012E590: FE FF FF FF  5A 18 4D 02  AF D0 45 02  08 80 1A 02  ....Z.M...E.....
+0012E5A0: 00 00 61 01  59 06 4C 02  F1 E2 92 7C  B7 24 80 7C  ..a.Y.L....|.$.|
+0012E5B0: D8 01 00 00  00 00 00 00  58 E6 12 00  2A 51 46 02  ........X...*QF.
+0012E5C0: F8 E5 12 00  0B 4F 46 02  F5 A3 F0 19  00 00 00 00  .....OF.........
+0012E5D0: FC E5 12 00  58 6A 50 02  00 00 00 00  9E 4C 46 02  ....XjP......LF.
+0012E5E0: 24 E6 12 00  EF 26 4C 02  D5 A3 F0 19  A8 FF 19 02  $....&L.........
+0012E5F0: 70 BE 5E 01  82 02 00 00  00 00 00 00  28 E6 12 00  p.^.........(...
+0012E600: D8 5C 50 02  FF FF FF FF  9F 0E 45 02  24 E6 12 00  .\P.......E.$...
+0012E610: 00 00 00 00  70 BE 5E 01  A8 0E 45 02  19 A0 F0 19  ....p.^...E.....
+0012E620: A8 FF 19 02  00 00 00 00  4C E6 12 00  98 9F 50 02  ........L.....P.
+0012E630: 00 00 00 00  78 A9 19 02  7A 0F 45 02  5C 02 6E 00  ....x...z.E.\.n.
+0012E640: BF 62 43 02  00 00 00 00  54 68 69 73  20 61 70 70  .bC.....This app
+0012E650: 6C 69 63 61  74 69 6F 6E  20 68 61 73  20 65 6E 63  lication has enc
+0012E660: 6F 75 6E 74  65 72 65 64  20 61 20 63  72 69 74 69  ountered a criti
+0012E670: 63 61 6C 20  65 72 72 6F  72 3A 0A 0A  B4 E6 B4 A2  cal error:......
+0012E680: BF D5 BC E4  B2 BB D7 E3  A3 AC CE DE  B7 A8 B4 A6  ................
+0012E690: C0 ED B4 CB  C3 FC C1 EE  A1 A3 0D 0A  0A 50 72 6F  .............Pro
+0012E6A0: 67 72 61 6D  3A 09 44 3A  5C 57 41 52  33 B8 C4 CD  gram:.D:\WAR3...
+0012E6B0: BC D2 BB CC  F5 C1 FA 5C  C8 ED BC FE  5C CE DE B5  .......\....\...
+0012E6C0: D0 BD E2 D1  B9 5C 57 61  72 33 4D 61  70 45 78 74  .....\War3MapExt
+0012E6D0: 72 61 63 74  6F 72 44 5C  31 2E 65 78  65 0A 46 69  ractorD\1.exe.Fi
+0012E6E0: 6C 65 3A 09  45 3A 5C 44  72 69 76 65  31 5C 74 65  le:.E:\Drive1\te
+0012E6F0: 6D 70 5C 62  75 69 6C 64  77 61 72 33  78 5C 53 54  mp\buildwar3x\ST
+0012E700: 4F 52 4D 5C  53 6F 75 72  63 65 5C 53  46 69 6C 65  ORM\Source\SFile
+0012E710: 2E 63 70 70  0A 4C 69 6E  65 3A 09 38  39 38 0A 0A  .cpp.Line:.898..
+0012E720: 0A 0A 00 00  00 00 00 00  00 00 00 00  10 00 00 00  ................
+0012E730: 00 00 00 00  66 AF 44 00  00 00 00 00  00 00 00 00  ....f.D.........
+0012E740: 00 00 00 00  10 E7 12 00  D8 E7 12 00  D0 E8 12 00  ................
+0012E750: 57 04 D4 77  30 88 D1 77  FF FF FF FF  2A 88 D1 77  W..w0..w....*..w
+0012E760: 9B B8 D1 77  00 00 00 00  F0 00 45 02  5C 02 6E 00  ...w......E.\.n.
+0012E770: 82 02 00 00  01 00 00 00  00 00 00 00  94 0E 77 00  ..............w.
+0012E780: 01 00 00 00  80 0E 77 00  CC 9B 15 00  87 02 00 00  ......w.........
+0012E790: 5C 02 6E 00  CC 9B 15 00  BC E7 12 00  3B B6 D6 77  \.n.........;..w
+0012E7A0: 80 0E 77 00  78 EF 83 00  01 00 00 00  44 B6 D6 77  ..w.x.......D..w
+
+
+------------------------------------------------------------------------------
+    1  8192 E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp(4370)
+    1 16777216 E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp(4361)
+    1    32 E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp(4176)
+    1   604 .?AUARCHIVEREC@SFile@Storm@@(-2)
+    1  4096 E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp(4665)
+    1   344 .?AUFILEREC@@(-2)
+    1  5120 E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp(832)
+    1     8 E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp(4654)
+    0 964875449 E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp(898)
+    1 18304 E:\Drive1\temp\buildwar3x\STORM\Source\SFile.cpp(4401)
+------------------------------------------------------------------------------

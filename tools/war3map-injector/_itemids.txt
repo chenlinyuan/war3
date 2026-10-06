@@ -82,6 +82,18 @@ C	I00V	|cffffcc00龙鳞铠甲|r
 C	I00W	忍者铠甲-Lv|cff00ff001|r
 C	I00X	不动冥王宝石
 C	I00Y	|cff00ff00命运宝石|r
+C	I00Z	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I010	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I011	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I012	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I013	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I014	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I015	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I016	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I017	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I018	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I019	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I01A	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I01B	雷神之剑
 C	I01C	雷神之剑-Lv|cff00ff003|r
 C	I01D	雷神之剑-Lv|cff00ff001|r
@@ -97,6 +109,10 @@ C	I01M	[命运]打造
 C	I01N	[合成]影之玉
 C	I01O	替身术(大)
 C	I01P	分解[命运象征影之玉]
+C	I01Q	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I01R	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I01S	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I01T	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I01U	建筑升级
 C	I01V	练功房001
 C	I01Y	幻影宝石
@@ -158,6 +174,11 @@ C	I03Y	接受/提交|cff00ff00寻找水源|r任务
 C	I03Z	幻境通行证
 C	I042	|cffff0000遗物项链|r
 C	I043	基地无敌50秒
+C	I031	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I044	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I045	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I046	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I047	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I048	[打造套装]白虎套装
 C	I049	[打造套装]青龙套装
 C	I04A	[打造套装]朱雀套装
@@ -166,7 +187,33 @@ C	I04C	白虎宝石
 C	I04D	青龙宝石
 C	I04E	朱雀宝石
 C	I04F	玄武宝石
+C	I04G	|cff00ff00青龙戬|r
+C	I04H	|cff00ff00朱雀羽扇|r
+C	I04I	|cff00ff00白虎战刀|r
+C	I04J	|cff00ff00玄武利刃|r
+C	I04K	|cff00ff00白虎战靴|r
+C	I04L	|cff00ff00朱雀战靴|r
+C	I04M	|cff00ff00青龙战靴|r
+C	I04N	|cff00ff00玄武战靴|r
+C	I04O	|cff00ff00白虎战甲|r
+C	I04P	|cff00ff00朱雀羽衣|r
+C	I04Q	|cff00ff00青龙战甲|r
+C	I04R	|cff00ff00玄武战甲|r
+C	I04T	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I04U	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I04V	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I04W	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I04X	2015年礼包
+C	I04Y	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I04Z	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I050	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I051	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I052	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I053	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I054	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I055	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I059	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I05A	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I05B	宝石兑换
 C	I05C	|cffff0000再不斩的大刀|r
 C	I05G	|cffff0000鲛肌|r
@@ -186,6 +233,10 @@ C	I05N	|cffff0000砂葫芦|r
 C	I05O	|cffff0000火影斗篷|r
 C	I05X	|cffff0000忍具.双截棍|r
 C	I05Y	|cff00ff00圣灵精华|r
+C	I05Z	圣灵-|cff00ff00孟章|r
+C	I060	圣灵-|cff00ff00监兵|r
+C	I061	圣灵-|cff00ff00执明|r
+C	I062	圣灵-|cff00ff00凌光|r
 C	I063	[打造圣灵套装]圣兽套装
 C	I064	有奖问答
 C	I065	|cffff0000戒指.朱|r
@@ -193,9 +244,15 @@ C	I066	领取 |c00FFFF00七|c00D5FF2B星|c00AAFF55剑|r
 C	I067	领取 |c00FFFF00八|c00D5FF2B尺|c00AAFF55镜|r
 C	I068	领取 |c00FFFF00六|c00D5FF2B道|c00AAFF55仙|c0080FF80杖|r
 C	I069	领取 |c00FFFF00幌|c00D5FF2B金|c00AAFF55绳|r
+C	I06A	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I06B	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I06C	|cffff0000拳套|r
+C	I06D	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I06E	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I06F	|cffff0000戒指.玉|r
 C	I06G	|cffff0000暗部配刀|r
+C	I06H	|cff00ff00象征|r[|cffff0000影之玉|r]
+C	I06I	|cff00ff00象征|r[|cffff0000影之玉|r]
 C	I06J	|cffff0000粘土口袋|r
 C	I06K	|cffff0000零食|r
 C	I06L	进入 |cff00ff00羁绊专区|r
@@ -280,6 +337,10 @@ C	I07X	兑换|c00FF8040强化之石|r
 C	I07Y	兑换|c000080FF融合石|r
 C	I07Z	合成|c00FF8040尾兽之力|r
 C	I080	尾兽精华
+C	I081	[上古] - |cffff0000盘古白虎刃|r
+C	I082	[上古] -|cffff0000炎帝青龙戬|r
+C	I083	[上古]-|cffff0000伏羲朱雀杖|r
+C	I084	[上古] -|cffff0000轩辕玄武剑|r
 C	I085	|c00FFFF00尾|c00D5FF2B兽|c00AAFF55结|c0080FF80晶|r
 C	I086	仙人最终试练
 C	I087	领取 |cffff0000上古魂石|r
@@ -294,6 +355,7 @@ C	I08F	挑战龙兜
 C	I08G	积分宝石兑换
 C	I08H	任务 - 追捕逃忍
 C	I08I	|cffff0000亲热暴力|r
+C	I08J	鱼竿
 C	I08K	红色的鱼
 C	I08L	蓝色的鱼
 C	I08M	黑色的鱼
@@ -327,6 +389,10 @@ C	I09C	|c00D5FF2B琼|c00AAFF55曲|c0080FF80玉|r
 C	I09D	合成 |c00D5FF2B琼|c00AAFF55曲|c0080FF80玉|r
 C	I09E	|cffff0000火影披风|r
 C	I09F	修行卷轴
+C	I09G	战魂白虎令
+C	I09H	镇魂苍龙鞭
+C	I09I	星魂朱雀杖
+C	I09J	御魂玄武印
 C	I09K	|cffff0000草雉剑|r
 C	I09L	影之玉 |c00FF00FF+13|r
 C	I09M	影之玉 |c005617E8+6|r
@@ -408,4 +474,3 @@ C	I03U	|cffff0000戒指.玄|r
 C	I03V	换取-|cff00ff00祥云坠饰|r
 C	I0BL	换取-|cff00ff00恐惧与信念|r
 C	I0BM	换取-|cff00ff00血雾之乡|r
-C	I0BN	|cffff0000附有划痕的护额|r

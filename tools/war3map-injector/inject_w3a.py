@@ -22,23 +22,31 @@ def find_main():
 def replace_file(main, file_path, target_name):
     """用「添加/替换文件」把 file_path 以 target_name 写回地图。
 
-    关键: HKE 主窗口的「文件选择」区有『自定义文件』/『Jass脚本』单选。
-    默认可能是『Jass脚本』(会把文件当成 war3map.j)。必须选『自定义文件』，
-    并在『采用自定义路径+文件名』的 Edit 里填目标内部名(war3map.w3a)。
+    HKE 主窗口有两个区域:
+      - 『文件选择』组: 『自定义文件』/『Jass脚本』单选 + 一个 Edit(填内部名)
+      - 『文件添加选项』组: 『采用自定义路径+文件名』/『采用上方文件选择中的完整文件名』
+    正确做法: 选『自定义文件』, 在『文件选择』的 Edit 里填内部名(war3map.w3a)。
     """
     # 1) 选『自定义文件』单选
     rb = im.find_child(main, "TRadioButton", "自定义文件")
     if rb:
         im.click_real(rb[0])
         time.sleep(0.5)
-    # 2) 选『采用自定义路径+文件名』并填内部名
-    rb2 = im.find_child(main, "TRadioButton", "采用自定义路径")
-    if rb2:
-        im.click_real(rb2[0])
-        time.sleep(0.5)
-    ed = im.find_child(main, "TEdit")
-    if ed:
-        user32.SendMessageW(ed[0], 0x000C, 0, ctypes.c_wchar_p(target_name))
+
+    # 2) 找『文件选择』组里的 Edit（用 Y 坐标区分: 文件选择组在文件添加选项组上方）
+    edits = im.find_child(main, "TEdit")
+    target_edit = None
+    for e in edits:
+        r = wintypes.RECT()
+        user32.GetWindowRect(e, ctypes.byref(r))
+        # 『文件选择』的 Edit 在 y≈567, 『文件添加选项』的 Edit 在 y≈663
+        if 500 < r.top < 620:
+            target_edit = e
+            break
+    if target_edit is None and edits:
+        target_edit = edits[0]
+    if target_edit:
+        user32.SendMessageW(target_edit, 0x000C, 0, ctypes.c_wchar_p(target_name))
         time.sleep(0.5)
 
     # 3) 点击「添加/替换文件」

@@ -1327,6 +1327,9 @@ function IB_RegisterChat8 takes nothing returns nothing
     loop
         exitwhen i > 11
         call TriggerRegisterPlayerChatEvent(t, Player(i), "listunit", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "addunit", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "removeunit", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "unitdiag", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)
@@ -1368,6 +1371,7 @@ function IB_RegisterChat5 takes nothing returns nothing
     loop
         exitwhen i > 11
         call TriggerRegisterPlayerChatEvent(t, Player(i), "listskill", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "setskill", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)
@@ -1420,6 +1424,9 @@ function IB_RegisterChat takes nothing returns nothing
     loop
         exitwhen i > 11
         call TriggerRegisterPlayerChatEvent(t, Player(i), "search", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "itembrowser", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "ibtest", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "ibcount", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)

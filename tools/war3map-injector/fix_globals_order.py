@@ -113,10 +113,7 @@ def main():
         if find_main():
             break
     h = find_main()
-    hdrop = im.make_dropfiles([map_path])
-    user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, ctypes.c_void_p, ctypes.c_void_p]
-    user32.PostMessageW(h, WM_DROPFILES, ctypes.c_void_p(hdrop), None)
-    time.sleep(4)
+    im.open_map_via_button(h, map_path)
     print("标题:", im.get_text(h))
 
     extracted = extract_script(h, map_path)

@@ -1386,6 +1386,21 @@ function IB_FingerAddAbility takes player p returns nothing
     set u = null
 endfunction
 
+// [诊断] 添加标准单位技能 ACcl(连锁闪电) 测试技能栏机制
+function IB_FingerAddTest takes player p returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    local integer lvl
+    if u == null then
+        call IB_FingerMessage(p, "请先选中一个英雄/单位")
+        return
+    endif
+    call UnitAddAbility(u, 'ACcl')
+    call UnitMakeAbilityPermanent(u, true, 'ACcl')
+    set lvl = GetUnitAbilityLevel(u, 'ACcl')
+    call IB_FingerMessage(p, "测试: 已添加标准技能 ACcl 连锁闪电, 等级=" + I2S(lvl))
+    set u = null
+endfunction
+
 //---------------------------------------------------------------------------
 // 解析聊天命令
 //---------------------------------------------------------------------------
@@ -1464,6 +1479,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_RemoveAllSkill(p)
     elseif IB_StrEqCI(cmd, "fingeradd") then
         call IB_FingerAddAbility(p)
+    elseif IB_StrEqCI(cmd, "fingertest") then
+        call IB_FingerAddTest(p)
     endif
 endfunction
 
@@ -1485,6 +1502,7 @@ function IB_RegisterChat8 takes nothing returns nothing
         call TriggerRegisterPlayerChatEvent(t, Player(i), "finger", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "removeallskill", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "fingeradd", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "fingertest", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)

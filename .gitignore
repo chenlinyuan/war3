@@ -78,3 +78,6 @@ venv/
 maps/*.original/
 # ---- 最小测试脚本 ----
 scripts/_test-min/
+
+# ---- HKE 替换脚本临时目录 ----
+tools/war3map-injector/_rep/

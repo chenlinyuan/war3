@@ -211,6 +211,39 @@ def open_map_via_drop(main, map_path):
         print("    警告: 地图可能未打开")
 
 
+def open_map_via_button(main, map_path):
+    """通过『打开地图』按钮打开地图（比拖放更可靠，拖放有时不触发分析）。"""
+    print("[3] 按钮打开地图")
+    b = find_child(main, "TButton", "打开地图")
+    if not b:
+        raise RuntimeError("未找到『打开地图』按钮")
+    click_real(b[0])
+    time.sleep(2)
+    handle_popups()
+    dlg = None
+    for _ in range(20):
+        for dh, dt in list_dialogs():
+            dlg = dh
+            break
+        if dlg:
+            break
+        time.sleep(0.5)
+    if not dlg:
+        raise RuntimeError("未出现文件选择对话框")
+    edit = find_child(dlg, "Edit")
+    user32.SendMessageW(edit[0], 0x000C, 0, ctypes.c_wchar_p(map_path))
+    time.sleep(0.5)
+    ob = find_child(dlg, "Button", "打开(&O)") or find_child(dlg, "Button", "打开")
+    click_real(ob[0])
+    time.sleep(5)
+    handle_popups()
+    time.sleep(2)
+    title = get_text(main)
+    print("    标题: %s" % title)
+    if os.path.basename(map_path) not in title:
+        print("    警告: 地图可能未打开")
+
+
 def inject(main):
     print("[4] 注入脚本")
     # 点击「注入脚本」打开插件窗口
@@ -306,7 +339,7 @@ def main():
 
     stage_scripts(script_dir, encoding)
     main_wnd = launch_tool()
-    open_map_via_drop(main_wnd, map_path)
+    open_map_via_button(main_wnd, map_path)
     ok = inject(main_wnd)
     recompress(main_wnd)
     close_tool()

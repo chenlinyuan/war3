@@ -8,10 +8,10 @@ newId 为自定义 ID。游戏会用标准技能数据补全未指定的字段�
 """
 import struct, sys, os
 
-# 基础技能: 死亡之指 (ANfd) —— 中立单位技能(非英雄), 主动、目标单位、可点击。
-# 关键: 必须用"单位技能"(AN/A+小写)而非"英雄技能"(AH), 否则 UnitAddAbility 后
+# 基础技能: 连锁闪电 (ACcl) —— 单位技能(X8=unit), 主动、目标敌方单位、可点击。
+# 关键: 必须用"单位技能"(X8=unit)而非"英雄技能"(X8=hero), 否则 UnitAddAbility 后
 #       不会出现在技能栏(英雄技能需 SelectHeroSkill 学习)。
-BASE = "ANfd"
+BASE = "ACcl"
 NEW = "A000"
 
 # 图标（标准死亡之指图标，游戏自带）
@@ -46,8 +46,8 @@ def build(out_path):
         mod("aub1", 3, 0, 0, "秒杀目标单位（对魔法免疫也生效）。"),
         mod("aart", 3, 0, 0, ICON),
         mod("arar", 3, 0, 0, ICON),
-        mod("arac", 3, 0, 0, "human"),
-        mod("aord", 3, 0, 0, "fingerofdeath"),
+        mod("arac", 3, 0, 0, "creeps"),
+        mod("aord", 3, 0, 0, "chainlightning"),
         # 目标：敌方单位（含建筑/中立）
         mod("atar", 3, 0, 0, "air,ground,structure,enemy,neutral"),
         mod("Ncl2", 3, 0, 0, ""),
@@ -60,8 +60,10 @@ def build(out_path):
         mod("acdn", 2, 1, 0, 1.0),
         mod("amcs", 0, 1, 0, 0),
         mod("aran", 2, 1, 0, 800.0),
-        # 死亡之指自带效果清零（伤害，实际秒杀由 JASS 执行）
-        mod("Nfd3", 2, 1, 3, 0.0),
+        # 连锁闪电自带效果清零（伤害/目标数，实际秒杀由 JASS 执行）
+        mod("Ocl1", 2, 1, 1, 0.0),
+        mod("Ocl2", 0, 1, 2, 0),
+        mod("Ocl3", 2, 1, 3, 0.0),
     ]
 
     entry = BASE.encode("latin-1") + NEW.encode("latin-1") + struct.pack("<i", len(mods))

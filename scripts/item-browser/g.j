@@ -89,3 +89,24 @@ integer ib_skSetLevel = 1
 player ib_skSetPlayer = null
 timer ib_skSetTimer = null
 
+//---------------------------------------------------------------------------
+// 单位列表（变身用）
+//---------------------------------------------------------------------------
+integer array ib_unitList
+string array ib_unitName
+string array ib_unitArmor
+integer ib_unitCount = 0
+
+// 单位填充状态
+integer ib_unFillIdx = 0
+integer ib_unFillTotal = 0
+timer ib_unFillTimer = null
+
+// 单位搜索状态
+integer ib_unSearchIdx = 0
+string ib_unSearchKey = ""
+string ib_unSearchOut = ""
+integer ib_unSearchN = 0
+player ib_unSearchPlayer = null
+timer ib_unSearchTimer = null
+

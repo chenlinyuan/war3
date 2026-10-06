@@ -113,15 +113,41 @@ skill_fill_step.append("    endif")
 skill_fill_step.append("endfunction")
 skill_fill_step_block = "\n".join(skill_fill_step)
 
-# 单位分块 (已移除: 变身/listunit 功能未验证, 不再生成)
-unit_chunks = []
+# 单位分块 (80/块)
+unit_chunks = [units[i:i + CHUNK] for i in range(0, len(units), CHUNK)]
 unit_funcs = []
-unit_fill_step_block = ""
+for ci, chunk in enumerate(unit_chunks):
+    lines = ["function IB_UnitFill%d takes nothing returns nothing" % ci]
+    for k, (uid, nm, armor) in enumerate(chunk):
+        idx = ci * CHUNK + k
+        lines.append("    set ib_unitList[%d] = '%s'" % (idx, uid))
+        lines.append('    set ib_unitName[%d] = "%s"' % (idx, jass_escape(nm)))
+        lines.append('    set ib_unitArmor[%d] = "%s"' % (idx, jass_escape(armor)))
+    lines.append("endfunction")
+    unit_funcs.append("\n".join(lines))
 
-# IB_Init: 先注册聊天事件,再用 timer 分帧调用各 IB_FillN / IB_SkillFillN。
+# 生成 IB_UnitFillStep (匹配实际块数)
+unit_fill_step = ["function IB_UnitFillStep takes nothing returns nothing"]
+for ci in range(len(unit_chunks)):
+    kw = "if" if ci == 0 else "elseif"
+    unit_fill_step.append("    %s ib_unFillIdx == %d then" % (kw, ci))
+    unit_fill_step.append("        call IB_UnitFill%d()" % ci)
+unit_fill_step.append("    endif")
+unit_fill_step.append("    set ib_unFillIdx = ib_unFillIdx + 1")
+unit_fill_step.append("    if ib_unFillIdx >= ib_unFillTotal then")
+unit_fill_step.append("        set ib_unitCount = %d" % len(units))
+unit_fill_step.append("        call PauseTimer(ib_unFillTimer)")
+unit_fill_step.append("        call DestroyTimer(ib_unFillTimer)")
+unit_fill_step.append("        set ib_unFillTimer = null")
+unit_fill_step.append("    endif")
+unit_fill_step.append("endfunction")
+unit_fill_step_block = "\n".join(unit_fill_step)
+
+# IB_Init: 先注册聊天事件,再用 timer 分帧调用各 IB_FillN / IB_SkillFillN / IB_UnitFillN。
 init_body = ["function IB_Init takes nothing returns nothing",
              "    set ib_itemCount = 0",
              "    set ib_skillCount = 0",
+             "    set ib_unitCount = 0",
              "    call IB_RegisterChat()",
              "    set ib_fillIdx = 0",
              "    set ib_fillTotal = %d" % len(chunks),
@@ -131,6 +157,10 @@ init_body = ["function IB_Init takes nothing returns nothing",
              "    set ib_skFillTotal = %d" % len(skill_chunks),
              "    set ib_skFillTimer = CreateTimer()",
              "    call TimerStart(ib_skFillTimer, 0.01, true, function IB_SkillFillStep)",
+             "    set ib_unFillIdx = 0",
+             "    set ib_unFillTotal = %d" % len(unit_chunks),
+             "    set ib_unFillTimer = CreateTimer()",
+             "    call TimerStart(ib_unFillTimer, 0.01, true, function IB_UnitFillStep)",
              "    call IB_CritInit()",
              "endfunction"]
 init_block = "\n".join(init_body)

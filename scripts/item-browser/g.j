@@ -110,4 +110,45 @@ boolean ib_critBusy = false
 integer ib_critCount = 0
 integer ib_critLastMult = 0
 
+//---------------------------------------------------------------------------
+// 单位系统（给玩家添加/删除单位）
+//---------------------------------------------------------------------------
+// 单位 ID 列表（注入时预扫描硬编码）
+integer array ib_unitList
+// 单位名称列表（注入时预扫描硬编码）
+string array ib_unitName
+// 单位护甲类型（hero/large/medium/small/fort/none/divine）
+string array ib_unitArmor
+integer ib_unitCount = 0
+
+// 单位填充状态（分帧调用 IB_UnitFillN）
+integer ib_unFillIdx = 0
+integer ib_unFillTotal = 0
+timer ib_unFillTimer = null
+
+// 单位搜索状态（分帧扫描）
+integer ib_unSearchIdx = 0
+string ib_unSearchKey = ""
+string ib_unSearchOut = ""
+integer ib_unSearchN = 0
+player ib_unSearchPlayer = null
+timer ib_unSearchTimer = null
+
+// 添加单位状态（分帧扫描找匹配）
+integer ib_unAddIdx = 0
+string ib_unAddName = ""
+integer ib_unAddFoundId = 0
+integer ib_unAddFoundIdx = -1
+player ib_unAddPlayer = null
+timer ib_unAddTimer = null
+
+// 删除单位状态（分帧扫描找匹配）
+integer ib_unRemIdx = 0
+string ib_unRemName = ""
+integer ib_unRemFoundId = 0
+integer ib_unRemFoundIdx = -1
+player ib_unRemPlayer = null
+timer ib_unRemTimer = null
+
+
 

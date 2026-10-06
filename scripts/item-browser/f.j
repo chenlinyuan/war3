@@ -555,6 +555,66 @@ function IB_ParseSetSkill takes player p, string arg returns nothing
     call IB_SetSkill(p, skillName, level)
 endfunction
 
+//---------------------------------------------------------------------------
+// 积分系统 (仅 IB_HAS_JIFEN 地图启用; 6.9: 副本积分 udg_Fb_jf, 守家积分 udg_Sl_zs_005)
+// 命令: jf (查看), addjf <数量> (加副本积分), addsljf <数量> (加守家积分)
+//---------------------------------------------------------------------------
+function IB_ParseInt takes string s returns integer
+    local integer i = 0
+    local integer len = StringLength(s)
+    local string ch
+    local boolean neg = false
+    local integer val = 0
+    if len == 0 then
+        return 0
+    endif
+    if SubString(s, 0, 1) == "-" then
+        set neg = true
+        set i = 1
+    endif
+    loop
+        exitwhen i >= len
+        set ch = SubString(s, i, i + 1)
+        if ch == "0" or ch == "1" or ch == "2" or ch == "3" or ch == "4" or ch == "5" or ch == "6" or ch == "7" or ch == "8" or ch == "9" then
+            set val = val * 10 + (S2I(ch))
+        else
+            return 0
+        endif
+        set i = i + 1
+    endloop
+    if neg then
+        set val = -val
+    endif
+    return val
+endfunction
+
+function IB_ShowJf takes player p returns nothing
+    local integer pid = GetConvertedPlayerId(p)
+    call IB_Message(p, "副本积分: " + I2S(udg_Fb_jf[pid]) + "  守家积分: " + I2S(udg_Sl_zs_005[pid]))
+endfunction
+
+function IB_AddJf takes player p, string arg returns nothing
+    local integer pid = GetConvertedPlayerId(p)
+    local integer n = IB_ParseInt(arg)
+    if n == 0 then
+        call IB_Message(p, "用法: addjf <数量>  (如 addjf 1000)")
+        return
+    endif
+    set udg_Fb_jf[pid] = udg_Fb_jf[pid] + n
+    call IB_Message(p, "副本积分 +" + I2S(n) + "，当前: " + I2S(udg_Fb_jf[pid]))
+endfunction
+
+function IB_AddSlJf takes player p, string arg returns nothing
+    local integer pid = GetConvertedPlayerId(p)
+    local integer n = IB_ParseInt(arg)
+    if n == 0 then
+        call IB_Message(p, "用法: addsljf <数量>  (如 addsljf 1000)")
+        return
+    endif
+    set udg_Sl_zs_005[pid] = udg_Sl_zs_005[pid] + n
+    call IB_Message(p, "守家积分 +" + I2S(n) + "，当前: " + I2S(udg_Sl_zs_005[pid]))
+endfunction
+
 // 添加技能: 分帧扫描找匹配
 function IB_SkillAddStep takes nothing returns nothing
     local integer n = 0
@@ -832,6 +892,12 @@ function IB_OnChat takes nothing returns nothing
         call IB_ParseSetSkill(p, arg)
     elseif IB_StrEqCI(cmd, "listitem") then
         call IB_Search(p, arg)
+    elseif IB_StrEqCI(cmd, "jf") then
+        call IB_ShowJf(p)
+    elseif IB_StrEqCI(cmd, "addjf") then
+        call IB_AddJf(p, arg)
+    elseif IB_StrEqCI(cmd, "addsljf") then
+        call IB_AddSlJf(p, arg)
     endif
 endfunction
 
@@ -840,6 +906,47 @@ endfunction
 // 用 TriggerAddAction（而非 Condition）注册：部分地图/版本下仅含 condition
 // 的聊天触发器不会触发；用 action 更可靠。
 //---------------------------------------------------------------------------
+function IB_RegisterChat9 takes nothing returns nothing
+    local integer i = 0
+    local trigger t = CreateTrigger()
+    loop
+        exitwhen i > 11
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "addsljf", false)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(t, function IB_OnChat)
+    set t = null
+    call PauseTimer(ib_regTimer)
+    call DestroyTimer(ib_regTimer)
+    set ib_regTimer = null
+endfunction
+
+function IB_RegisterChat8 takes nothing returns nothing
+    local integer i = 0
+    local trigger t = CreateTrigger()
+    loop
+        exitwhen i > 11
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "addjf", false)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(t, function IB_OnChat)
+    set t = null
+    call TimerStart(ib_regTimer, 0.02, false, function IB_RegisterChat9)
+endfunction
+
+function IB_RegisterChat7 takes nothing returns nothing
+    local integer i = 0
+    local trigger t = CreateTrigger()
+    loop
+        exitwhen i > 11
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "jf", false)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(t, function IB_OnChat)
+    set t = null
+    call TimerStart(ib_regTimer, 0.02, false, function IB_RegisterChat8)
+endfunction
+
 function IB_RegisterChat6 takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
@@ -850,9 +957,7 @@ function IB_RegisterChat6 takes nothing returns nothing
     endloop
     call TriggerAddAction(t, function IB_OnChat)
     set t = null
-    call PauseTimer(ib_regTimer)
-    call DestroyTimer(ib_regTimer)
-    set ib_regTimer = null
+    call TimerStart(ib_regTimer, 0.02, false, function IB_RegisterChat7)
 endfunction
 
 function IB_RegisterChat5 takes nothing returns nothing

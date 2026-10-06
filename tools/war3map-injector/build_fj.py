@@ -187,7 +187,9 @@ fill_step.append("endfunction")
 fill_step_block = "\n".join(fill_step)
 
 # Insert chunk functions right before IB_Init, and replace IB_Init body.
-with open(FJ, encoding="utf-8") as fh:
+# 注意: f.j 可能含上次构建写入的 GBK 字节(ib_unitNameGbk)，用 errors=replace 容错读取；
+#       这些字节所在的行会被重新生成，故不影响结果。
+with open(FJ, encoding="utf-8", errors="replace") as fh:
     txt = fh.read()
 
 # 1) Remove any previously generated IB_Fill* / IB_FillStep / IB_SkillFill* / IB_UnitFill* functions (idempotent rebuild)
@@ -216,6 +218,18 @@ gbk_map = {i: nm for i, (uid, nm, armor) in enumerate(units)}
 for i, nm in gbk_map.items():
     marker = "\x00GBK%d\x00" % i
     txt = txt.replace("@@GBK%d@@" % i, marker)
+
+# 4) 死亡之指技能 ID（可用环境变量 IB_FINGER_ABILITY 覆盖，默认 A000）
+#    注意: ib_fingerAbility 定义在 g.j 中
+finger_id = os.environ.get("IB_FINGER_ABILITY", "A000").strip()
+if len(finger_id) == 4:
+    gj = os.path.join(REPO, "scripts", "item-browser", "g.j")
+    gtxt = open(gj, encoding="utf-8").read()
+    gtxt2 = re.sub(r"integer ib_fingerAbility = '[^']*'",
+                   "integer ib_fingerAbility = '%s'" % finger_id, gtxt)
+    if gtxt2 != gtxt:
+        open(gj, "w", encoding="utf-8").write(gtxt2)
+    print("finger ability id = %s" % finger_id)
 
 with open(FJ, "wb") as fh:
     # 先按 UTF-8 编码，再把 \x00GBK<idx>\x00 标记替换为 GBK 字节

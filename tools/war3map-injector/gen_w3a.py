@@ -59,7 +59,8 @@ def write_mod(mid, t, a, b, v, c):
     elif t in (1, 2):
         out += struct.pack("<f", v)
     elif t == 3:
-        out += v.encode("latin-1") + b"\x00"
+        # 字符串按 UTF-8 存储（w3a 规范）
+        out += v.encode("utf-8") + b"\x00"
     out += struct.pack("<i", c)
     return out
 

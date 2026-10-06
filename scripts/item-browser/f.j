@@ -435,8 +435,124 @@ function IB_SkillGive takes player p, integer abilId, integer level returns noth
     if level > 1 then
         call SetUnitAbilityLevel(u, abilId, level)
     endif
-    call IB_SkillMessage(p, "已添加技能 \"" + IB_SkillName(ib_skAddFoundIdx) + "\" [" + IB_IdStr(abilId) + "] 到 " + GetUnitName(u))
+    call IB_SkillMessage(p, "已添加技能 \"" + IB_SkillName(ib_skAddFoundIdx) + "\" [" + IB_IdStr(abilId) + "] 等级" + I2S(level) + " 到 " + GetUnitName(u))
     set u = null
+endfunction
+
+// 设置选中单位已有技能的等级
+function IB_SkillSetLevel takes player p, integer abilId, integer level returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    local integer cur
+    if u == null then
+        call IB_SkillMessage(p, "请先选中一个英雄/单位")
+        return
+    endif
+    set cur = GetUnitAbilityLevel(u, abilId)
+    if cur == 0 then
+        // 没有该技能 -> 直接添加
+        call UnitAddAbility(u, abilId)
+        call UnitMakeAbilityPermanent(u, true, abilId)
+    endif
+    call SetUnitAbilityLevel(u, abilId, level)
+    call IB_SkillMessage(p, "已设置技能 \"" + IB_SkillName(ib_skSetFoundIdx) + "\" [" + IB_IdStr(abilId) + "] 为 " + I2S(level) + " 级 (原" + I2S(cur) + "级)")
+    set u = null
+endfunction
+
+// 设置技能等级: 分帧扫描找匹配
+function IB_SkillSetStep takes nothing returns nothing
+    local integer n = 0
+    local string name
+    loop
+        exitwhen ib_skSetIdx >= ib_skillCount or n >= 40
+        set name = IB_SkillName(ib_skSetIdx)
+        if name == ib_skSetName or IB_StrEqCI(IB_IdStr(ib_skillList[ib_skSetIdx]), ib_skSetName) then
+            set ib_skSetFoundId = ib_skillList[ib_skSetIdx]
+            set ib_skSetFoundIdx = ib_skSetIdx
+            set ib_skSetIdx = ib_skillCount
+        elseif ib_skSetFoundId == 0 then
+            if IB_NameMatch(name, ib_skSetName) then
+                set ib_skSetFoundId = ib_skillList[ib_skSetIdx]
+                set ib_skSetFoundIdx = ib_skSetIdx
+            endif
+        endif
+        set ib_skSetIdx = ib_skSetIdx + 1
+        set n = n + 1
+    endloop
+    if ib_skSetIdx >= ib_skillCount then
+        call PauseTimer(ib_skSetTimer)
+        call DestroyTimer(ib_skSetTimer)
+        set ib_skSetTimer = null
+        if ib_skSetFoundId == 0 then
+            call IB_SkillMessage(ib_skSetPlayer, "未找到技能 \"" + ib_skSetName + "\"")
+        else
+            call IB_SkillSetLevel(ib_skSetPlayer, ib_skSetFoundId, ib_skSetLevel)
+        endif
+        set ib_skSetPlayer = null
+    endif
+endfunction
+
+function IB_SetSkill takes player p, string skillName, integer level returns nothing
+    if level < 1 then
+        set level = 1
+    endif
+    set ib_skSetIdx = 0
+    set ib_skSetName = IB_LowerAscii(skillName)
+    set ib_skSetFoundId = 0
+    set ib_skSetFoundIdx = -1
+    set ib_skSetLevel = level
+    set ib_skSetPlayer = p
+    if ib_skSetTimer != null then
+        call PauseTimer(ib_skSetTimer)
+        call DestroyTimer(ib_skSetTimer)
+    endif
+    set ib_skSetTimer = CreateTimer()
+    call TimerStart(ib_skSetTimer, 0.01, true, function IB_SkillSetStep)
+endfunction
+
+// 解析 setskill 参数: "名称 等级"
+function IB_ParseSetSkill takes player p, string arg returns nothing
+    local integer len = StringLength(arg)
+    local integer i = len
+    local integer lastSpace = -1
+    local string skillName
+    local string numStr
+    local integer level = 1
+    local boolean isNum
+    local string ch
+
+    loop
+        exitwhen i <= 0
+        if SubString(arg, i - 1, i) == " " then
+            set lastSpace = i - 1
+            set i = 0
+        endif
+        set i = i - 1
+    endloop
+
+    if lastSpace <= 0 then
+        call IB_SkillMessage(p, "用法: setskill <技能名> <等级>")
+        return
+    endif
+    set skillName = SubString(arg, 0, lastSpace)
+    set numStr = SubString(arg, lastSpace + 1, len)
+    set isNum = StringLength(numStr) > 0
+    set i = 0
+    loop
+        exitwhen i >= StringLength(numStr)
+        set ch = SubString(numStr, i, i + 1)
+        if ch == "0" or ch == "1" or ch == "2" or ch == "3" or ch == "4" or ch == "5" or ch == "6" or ch == "7" or ch == "8" or ch == "9" then
+        else
+            set isNum = false
+            set i = StringLength(numStr)
+        endif
+        set i = i + 1
+    endloop
+    if not isNum then
+        call IB_SkillMessage(p, "等级必须是数字，用法: setskill <技能名> <等级>")
+        return
+    endif
+    set level = S2I(numStr)
+    call IB_SetSkill(p, skillName, level)
 endfunction
 
 // 添加技能: 分帧扫描找匹配
@@ -712,6 +828,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_ParseRemoveSkill(p, arg)
     elseif IB_StrEqCI(cmd, "listskill") then
         call IB_SkillSearch(p, arg)
+    elseif IB_StrEqCI(cmd, "setskill") then
+        call IB_ParseSetSkill(p, arg)
     elseif IB_StrEqCI(cmd, "listitem") then
         call IB_Search(p, arg)
     endif

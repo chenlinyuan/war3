@@ -1,0 +1,48 @@
+=== [勇者宝藏] 所在函数: Trig_cjwclqActions takes nothing returns nothing
+if ===
+function Trig_cjwclqActions takes nothing returns nothing
+if((udg_Ditu_wcl[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]>=10)and(udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]==0))then
+set udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]=1
+call AdjustPlayerStateBJ(3000,GetOwningPlayer(GetTriggerUnit()),PLAYER_STATE_RESOURCE_GOLD)
+call DisplayTimedTextToForce(GetPlayersAll(),5.00,("|cffffcc00[系统]：|r |cff00ff00"+(GetPlayerName(GetOwningPlayer(GetTriggerUnit()))+"|r 成就达到10% 成功领取 |cffffcc003000|r 金币！")))
+else
+if((udg_Ditu_wcl[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]>=20)and(udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]==1))then
+set udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]=2
+call AdjustPlayerStateBJ(17000,GetOwningPlayer(GetTriggerUnit()),PLAYER_STATE_RESOURCE_GOLD)
+call DisplayTimedTextToForce(GetPlayersAll(),5.00,("|cffffcc00[系统]：|r |cff00ff00"+(GetPlayerName(GetOwningPlayer(GetTriggerUnit()))+"|r 成就达到20% 成功领取 |cffffcc0017000|r 金币！")))
+else
+if((udg_Ditu_wcl[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]>=30)and(udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]==2))then
+set udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]=3
+call AdjustPlayerStateBJ(30000,GetOwningPlayer(GetTriggerUnit()),PLAYER_STATE_RESOURCE_GOLD)
+
+
+=== [极乐宝箱] 所在函数: Trig_cjwclqActions takes nothing returns nothing
+if ===
+function Trig_cjwclqActions takes nothing returns nothing
+if((udg_Ditu_wcl[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]>=10)and(udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]==0))then
+set udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]=1
+call AdjustPlayerStateBJ(3000,GetOwningPlayer(GetTriggerUnit()),PLAYER_STATE_RESOURCE_GOLD)
+call DisplayTimedTextToForce(GetPlayersAll(),5.00,("|cffffcc00[系统]：|r |cff00ff00"+(GetPlayerName(GetOwningPlayer(GetTriggerUnit()))+"|r 成就达到10% 成功领取 |cffffcc003000|r 金币！")))
+else
+if((udg_Ditu_wcl[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]>=20)and(udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]==1))then
+set udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]=2
+call AdjustPlayerStateBJ(17000,GetOwningPlayer(GetTriggerUnit()),PLAYER_STATE_RESOURCE_GOLD)
+call DisplayTimedTextToForce(GetPlayersAll(),5.00,("|cffffcc00[系统]：|r |cff00ff00"+(GetPlayerName(GetOwningPlayer(GetTriggerUnit()))+"|r 成就达到20% 成功领取 |cffffcc0017000|r 金币！")))
+else
+if((udg_Ditu_wcl[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]>=30)and(udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]==2))then
+set udg_cjlq_zs[GetConvertedPlayerId(GetOwningPlayer(GetTriggerUnit()))]=3
+call AdjustPlayerStateBJ(30000,GetOwningPlayer(GetTriggerUnit()),PLAYER_STATE_RESOURCE_GOLD)
+
+
+=== [仙人宝藏] 所在函数: Trig_Dmb008Func003Func003A takes nothing returns nothing
+set udg_Baowu_3[GetConve ===
+function Trig_Dmb008Func003Func003A takes nothing returns nothing
+set udg_Baowu_3[GetConvertedPlayerId(GetEnumPlayer())]=(udg_Baowu_3[GetConvertedPlayerId(GetEnumPlayer())]+1)
+call AdjustPlayerStateBJ((1000*udg_boshu),GetEnumPlayer(),PLAYER_STATE_RESOURCE_GOLD)
+call DisplayTimedTextToPlayer(GetEnumPlayer(),0,0,15.00,("|cffffcc00[系统]：|r 六道仙人的祝福你获得了 |cffffcc00"+(I2S((1000*udg_boshu))+"|r！！金钱")))
+call DisplayTimedTextToForce(GetPlayersAll(),15.00,("|cffffcc00[系统]：|r 恭喜 |cff00ff00"+(GetPlayerName(GetEnumPlayer())+"|r 对本部有着杰出的贡献，获得 |cff00ff00仙人宝藏 * 1|r 的奖励，可到宝宝处领取！！")))
+endfunction
+function Trig_Dmb008Actions takes nothing returns nothing
+if((udg_Shoujia_fuli[21]<10))then
+set udg_Shoujia_fuli[21]=(udg_Shoujia_fuli[21]+1)
+call ForForce(udg

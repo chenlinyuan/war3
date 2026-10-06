@@ -98,6 +98,13 @@ function IB_Message takes player p, string msg returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
+// [工具] 发送技能消息给玩家
+//---------------------------------------------------------------------------
+function IB_SkillMessage takes player p, string msg returns nothing
+    call DisplayTimedTextToPlayer(p, 0, 0, 15.0, "|cff00ffff[技能]|r " + msg)
+endfunction
+
+//---------------------------------------------------------------------------
 // [工具] 布尔转字符串（诊断用）
 //---------------------------------------------------------------------------
 function IB_BoolStr takes boolean b returns string
@@ -416,7 +423,7 @@ endfunction
 function IB_SkillGive takes player p, integer abilId, integer level returns nothing
     local unit u = IB_GetSelectedUnit(p)
     if u == null then
-        call IB_Message(p, "请先选中一个英雄/单位")
+        call IB_SkillMessage(p, "请先选中一个英雄/单位")
         return
     endif
     call UnitAddAbility(u, abilId)
@@ -424,7 +431,7 @@ function IB_SkillGive takes player p, integer abilId, integer level returns noth
     if level > 1 then
         call SetUnitAbilityLevel(u, abilId, level)
     endif
-    call IB_Message(p, "已添加技能 \"" + IB_SkillName(ib_skAddFoundIdx) + "\" [" + IB_IdStr(abilId) + "] 到 " + GetUnitName(u))
+    call IB_SkillMessage(p, "已添加技能 \"" + IB_SkillName(ib_skAddFoundIdx) + "\" [" + IB_IdStr(abilId) + "] 到 " + GetUnitName(u))
     set u = null
 endfunction
 
@@ -453,7 +460,7 @@ function IB_SkillAddStep takes nothing returns nothing
         call DestroyTimer(ib_skAddTimer)
         set ib_skAddTimer = null
         if ib_skAddFoundId == 0 then
-            call IB_Message(ib_skAddPlayer, "未找到技能 \"" + ib_skAddName + "\"")
+            call IB_SkillMessage(ib_skAddPlayer, "未找到技能 \"" + ib_skAddName + "\"")
         else
             call IB_SkillGive(ib_skAddPlayer, ib_skAddFoundId, ib_skAddLevel)
         endif
@@ -483,11 +490,11 @@ endfunction
 function IB_SkillRemove takes player p, integer abilId returns nothing
     local unit u = IB_GetSelectedUnit(p)
     if u == null then
-        call IB_Message(p, "请先选中一个英雄/单位")
+        call IB_SkillMessage(p, "请先选中一个英雄/单位")
         return
     endif
     call UnitRemoveAbility(u, abilId)
-    call IB_Message(p, "已移除技能 [" + IB_IdStr(abilId) + "]")
+    call IB_SkillMessage(p, "已移除技能 [" + IB_IdStr(abilId) + "]")
     set u = null
 endfunction
 
@@ -514,7 +521,7 @@ function IB_SkillRemStep takes nothing returns nothing
         call DestroyTimer(ib_skRemTimer)
         set ib_skRemTimer = null
         if ib_skRemFoundId == 0 then
-            call IB_Message(ib_skRemPlayer, "未找到技能 \"" + ib_skRemName + "\"")
+            call IB_SkillMessage(ib_skRemPlayer, "未找到技能 \"" + ib_skRemName + "\"")
         else
             call IB_SkillRemove(ib_skRemPlayer, ib_skRemFoundId)
         endif
@@ -558,12 +565,12 @@ function IB_SkillSearchStep takes nothing returns nothing
         call PauseTimer(ib_skSearchTimer)
         call DestroyTimer(ib_skSearchTimer)
         set ib_skSearchTimer = null
-        call IB_Message(ib_skSearchPlayer, "搜索 \"" + ib_skSearchKey + "\" 共 " + I2S(ib_skSearchStdN + ib_skSearchCusN) + " 个")
+        call IB_SkillMessage(ib_skSearchPlayer, "搜索 \"" + ib_skSearchKey + "\" 共 " + I2S(ib_skSearchStdN + ib_skSearchCusN) + " 个")
         if ib_skSearchStdN > 0 then
-            call IB_Message(ib_skSearchPlayer, "标准(" + I2S(ib_skSearchStdN) + "): " + ib_skSearchStd)
+            call IB_SkillMessage(ib_skSearchPlayer, "标准(" + I2S(ib_skSearchStdN) + "): " + ib_skSearchStd)
         endif
         if ib_skSearchCusN > 0 then
-            call IB_Message(ib_skSearchPlayer, "自定义(" + I2S(ib_skSearchCusN) + "): " + ib_skSearchCus)
+            call IB_SkillMessage(ib_skSearchPlayer, "自定义(" + I2S(ib_skSearchCusN) + "): " + ib_skSearchCus)
         endif
         set ib_skSearchPlayer = null
     endif
@@ -689,6 +696,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_ParseRemoveSkill(p, arg)
     elseif IB_StrEqCI(cmd, "listskill") then
         call IB_SkillSearch(p, arg)
+    elseif IB_StrEqCI(cmd, "listitem") then
+        call IB_Search(p, arg)
     endif
 endfunction
 
@@ -697,6 +706,21 @@ endfunction
 // 用 TriggerAddAction（而非 Condition）注册：部分地图/版本下仅含 condition
 // 的聊天触发器不会触发；用 action 更可靠。
 //---------------------------------------------------------------------------
+function IB_RegisterChat6 takes nothing returns nothing
+    local integer i = 0
+    local trigger t = CreateTrigger()
+    loop
+        exitwhen i > 11
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "listitem", false)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(t, function IB_OnChat)
+    set t = null
+    call PauseTimer(ib_regTimer)
+    call DestroyTimer(ib_regTimer)
+    set ib_regTimer = null
+endfunction
+
 function IB_RegisterChat5 takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
@@ -707,9 +731,7 @@ function IB_RegisterChat5 takes nothing returns nothing
     endloop
     call TriggerAddAction(t, function IB_OnChat)
     set t = null
-    call PauseTimer(ib_regTimer)
-    call DestroyTimer(ib_regTimer)
-    set ib_regTimer = null
+    call TimerStart(ib_regTimer, 0.02, false, function IB_RegisterChat6)
 endfunction
 
 function IB_RegisterChat4 takes nothing returns nothing

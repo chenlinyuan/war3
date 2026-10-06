@@ -117,6 +117,8 @@ integer ib_critLastMult = 0
 integer array ib_unitList
 // 单位名称列表（注入时预扫描硬编码）
 string array ib_unitName
+// 单位名称的 GBK 字节版本（用于匹配游戏聊天输入的 GBK 编码）
+string array ib_unitNameGbk
 // 单位护甲类型（hero/large/medium/small/fort/none/divine）
 string array ib_unitArmor
 integer ib_unitCount = 0

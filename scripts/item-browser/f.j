@@ -703,6 +703,23 @@ function IB_Metamorph takes player p, string arg returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
+// 神圣护甲: 给选中英雄加"神圣护甲"技能(保留等级/技能/物品)
+// 命令: godarmor   (加 ACds 神圣护甲技能)
+// 1.27 无法直接改护甲类型, 用神圣护甲技能模拟减伤效果
+//---------------------------------------------------------------------------
+function IB_GodArmor takes player p returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    if u == null then
+        call IB_Message(p, "请先选中一个英雄/单位")
+        return
+    endif
+    call UnitAddAbility(u, 'ACds')
+    call UnitMakeAbilityPermanent(u, true, 'ACds')
+    call IB_Message(p, "已给 " + GetUnitName(u) + " 添加神圣护甲技能(主动施放)")
+    set u = null
+endfunction
+
+//---------------------------------------------------------------------------
 // 单位列表: listunit [关键词] 列出单位(含护甲类型)
 //---------------------------------------------------------------------------
 function IB_UnitSearchStep takes nothing returns nothing
@@ -1039,6 +1056,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_Metamorph(p, arg)
     elseif IB_StrEqCI(cmd, "listunit") then
         call IB_UnitSearch(p, arg)
+    elseif IB_StrEqCI(cmd, "godarmor") then
+        call IB_GodArmor(p)
     endif
 endfunction
 
@@ -1047,6 +1066,21 @@ endfunction
 // 用 TriggerAddAction（而非 Condition）注册：部分地图/版本下仅含 condition
 // 的聊天触发器不会触发；用 action 更可靠。
 //---------------------------------------------------------------------------
+function IB_RegisterChat12 takes nothing returns nothing
+    local integer i = 0
+    local trigger t = CreateTrigger()
+    loop
+        exitwhen i > 11
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "godarmor", false)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(t, function IB_OnChat)
+    set t = null
+    call PauseTimer(ib_regTimer)
+    call DestroyTimer(ib_regTimer)
+    set ib_regTimer = null
+endfunction
+
 function IB_RegisterChat11 takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
@@ -1057,9 +1091,7 @@ function IB_RegisterChat11 takes nothing returns nothing
     endloop
     call TriggerAddAction(t, function IB_OnChat)
     set t = null
-    call PauseTimer(ib_regTimer)
-    call DestroyTimer(ib_regTimer)
-    set ib_regTimer = null
+    call TimerStart(ib_regTimer, 0.02, false, function IB_RegisterChat12)
 endfunction
 
 function IB_RegisterChat10 takes nothing returns nothing

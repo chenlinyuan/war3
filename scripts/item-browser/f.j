@@ -1401,6 +1401,21 @@ function IB_FingerAddTest takes player p returns nothing
     set u = null
 endfunction
 
+// [诊断] 添加自定义技能 A00O(来自 sj 地图的真实自定义技能) 测试 w3a 是否被读取
+function IB_FingerAddTest2 takes player p returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    local integer lvl
+    if u == null then
+        call IB_FingerMessage(p, "请先选中一个英雄/单位")
+        return
+    endif
+    call UnitAddAbility(u, 'A00O')
+    call UnitMakeAbilityPermanent(u, true, 'A00O')
+    set lvl = GetUnitAbilityLevel(u, 'A00O')
+    call IB_FingerMessage(p, "测试2: 已添加自定义技能 A00O, 等级=" + I2S(lvl))
+    set u = null
+endfunction
+
 //---------------------------------------------------------------------------
 // 解析聊天命令
 //---------------------------------------------------------------------------
@@ -1481,6 +1496,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_FingerAddAbility(p)
     elseif IB_StrEqCI(cmd, "fingertest") then
         call IB_FingerAddTest(p)
+    elseif IB_StrEqCI(cmd, "fingertest2") then
+        call IB_FingerAddTest2(p)
     endif
 endfunction
 
@@ -1503,6 +1520,7 @@ function IB_RegisterChat8 takes nothing returns nothing
         call TriggerRegisterPlayerChatEvent(t, Player(i), "removeallskill", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "fingeradd", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "fingertest", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "fingertest2", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)

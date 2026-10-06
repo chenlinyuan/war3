@@ -37,8 +37,10 @@ def write_mod(m):
     return out
 
 
-def build(out_path, cooldown=12.0, mana=100, cast_range=800.0, name="死亡之指",
-          tooltip="死亡之指(|cffffcc00D|r)", ubertip="秒杀目标单位（对魔法免疫也生效）。"):
+def build_new_entry(new_id, cooldown=12.0, mana=100, cast_range=800.0, name="死亡之指",
+                    tooltip="死亡之指(|cffffcc00D|r)",
+                    ubertip="秒杀目标单位（对魔法免疫也生效）。"):
+    """返回 (baseId, newId, mods)，供其他脚本复用。"""
     # 字段类型: 0=int, 1=real, 2=unreal, 3=string
     # A = 等级(0=全局), B = 数据列索引
     # 参考真实自定义主动技能(ANcl->A00O)的字段结构
@@ -72,13 +74,17 @@ def build(out_path, cooldown=12.0, mana=100, cast_range=800.0, name="死亡之�
         mod("Ocl2", 0, 1, 2, 0),
         mod("Ocl3", 2, 1, 3, 0.0),
     ]
+    return (BASE, new_id, mods)
 
-    entry = BASE.encode("latin-1") + NEW.encode("latin-1") + struct.pack("<i", len(mods))
+
+def build(out_path, cooldown=12.0, mana=100, cast_range=800.0, name="死亡之指",
+          tooltip="死亡之指(|cffffcc00D|r)", ubertip="秒杀目标单位（对魔法免疫也生效）。"):
+    entry = build_new_entry(NEW, cooldown, mana, cast_range, name, tooltip, ubertip)
+    mods = entry[2]
+    data = struct.pack("<ii", 2, 0) + struct.pack("<i", 1)
+    data += entry[0].encode("latin-1") + entry[1].encode("latin-1") + struct.pack("<i", len(mods))
     for m in mods:
-        entry += write_mod(m)
-
-    # version=2, originalCount=0, customCount=1
-    data = struct.pack("<ii", 2, 0) + struct.pack("<i", 1) + entry
+        data += write_mod(m)
     open(out_path, "wb").write(data)
     print("wrote %s: %d bytes (base=%s new=%s mods=%d cd=%.1f mana=%d range=%.0f)" % (
         out_path, len(data), BASE, NEW, len(mods), cooldown, mana, cast_range))

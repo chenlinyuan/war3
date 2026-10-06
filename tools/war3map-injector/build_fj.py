@@ -219,17 +219,21 @@ for i, nm in gbk_map.items():
     marker = "\x00GBK%d\x00" % i
     txt = txt.replace("@@GBK%d@@" % i, marker)
 
-# 4) 死亡之指技能 ID（可用环境变量 IB_FINGER_ABILITY 覆盖，默认 A000）
-#    注意: ib_fingerAbility 定义在 g.j 中
+# 4) 死亡之指 / 致命一击 技能 ID（可用环境变量覆盖，默认 A000/Azcr）
+#    注意: 这两个变量定义在 g.j 中
 finger_id = os.environ.get("IB_FINGER_ABILITY", "A000").strip()
+crit_id = os.environ.get("IB_CRIT_ABILITY", "Azcr").strip()
+gj = os.path.join(REPO, "scripts", "item-browser", "g.j")
+gtxt = open(gj, encoding="utf-8").read()
 if len(finger_id) == 4:
-    gj = os.path.join(REPO, "scripts", "item-browser", "g.j")
-    gtxt = open(gj, encoding="utf-8").read()
-    gtxt2 = re.sub(r"integer ib_fingerAbility = '[^']*'",
-                   "integer ib_fingerAbility = '%s'" % finger_id, gtxt)
-    if gtxt2 != gtxt:
-        open(gj, "w", encoding="utf-8").write(gtxt2)
+    gtxt = re.sub(r"integer ib_fingerAbility = '[^']*'",
+                  "integer ib_fingerAbility = '%s'" % finger_id, gtxt)
     print("finger ability id = %s" % finger_id)
+if len(crit_id) == 4:
+    gtxt = re.sub(r"integer ib_critAbility = '[^']*'",
+                  "integer ib_critAbility = '%s'" % crit_id, gtxt)
+    print("crit ability id = %s" % crit_id)
+open(gj, "w", encoding="utf-8").write(gtxt)
 
 with open(FJ, "wb") as fh:
     # 先按 UTF-8 编码，再把 \x00GBK<idx>\x00 标记替换为 GBK 字节

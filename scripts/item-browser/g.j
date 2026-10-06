@@ -80,3 +80,12 @@ integer ib_skRemFoundId = 0
 player ib_skRemPlayer = null
 timer ib_skRemTimer = null
 
+// 设置技能等级状态（分帧扫描）
+integer ib_skSetIdx = 0
+string ib_skSetName = ""
+integer ib_skSetFoundId = 0
+integer ib_skSetFoundIdx = -1
+integer ib_skSetLevel = 1
+player ib_skSetPlayer = null
+timer ib_skSetTimer = null
+

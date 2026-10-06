@@ -6,36 +6,18 @@
 
 ```
 tools/
-├── scripts/         # 辅助脚本（PowerShell / Python / Node）
-├── configs/         # 工具配置
+├── war3map-injector/   # 地图脚本注入工具链（本项目自研）
+├── war3-tools/         # 第三方 War3 工具备份（见下）
 └── README.md
 ```
 
-## 常用脚本
+## 第三方工具备份（`war3-tools/`）
 
-### 解包地图
+`H:\Games\War3\Tools` 的完整备份，防止本机工具丢失。见
+[`war3-tools/README.md`](war3-tools/README.md)。
 
-```powershell
-# unpack.ps1
-param([string]$MapPath, [string]$OutputDir)
-MPQEditor.exe extract $MapPath * $OutputDir
-```
-
-### 转 JSON
-
-```powershell
-# tojson.ps1
-param([string]$Dir)
-wc3maptranslator $Dir --toJson
-```
-
-### 打包地图
-
-```powershell
-# pack.ps1
-param([string]$MapPath, [string]$InputDir)
-MPQEditor.exe add $MapPath "$InputDir\*" /r
-```
+> ⚠️ 该目录为**第三方二进制备份**，体积较大（约 81 MB）。正常开发只需
+> `war3map-injector/`；`war3-tools/` 仅作存档用途。
 
 ## 外部工具
 
@@ -43,5 +25,5 @@ MPQEditor.exe add $MapPath "$InputDir\*" /r
 
 ## 注意
 
-- 不将第三方工具的二进制文件提交到仓库（体积大）。
-- 记录工具版本与下载来源。
+- 本仓库**例外地**纳入了 `war3-tools/` 第三方工具备份（用户要求，防止丢失）。
+- 记录工具版本与下载来源（见 `war3-tools/README.md`）。

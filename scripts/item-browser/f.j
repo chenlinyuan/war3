@@ -241,6 +241,10 @@ function IB_SearchStep takes nothing returns nothing
 endfunction
 
 function IB_Search takes player p, string keyword returns nothing
+    if StringLength(keyword) == 0 then
+        call IB_Message(p, "请输入关键词，如: search 剑")
+        return
+    endif
     call IB_Message(p, "搜索 \"" + keyword + "\" ...")
     set ib_searchIdx = 0
     set ib_searchFound = 0
@@ -549,13 +553,18 @@ function IB_SkillSearchStep takes nothing returns nothing
     loop
         exitwhen ib_skSearchIdx >= ib_skillCount or n >= 40
         if IB_NameMatch(IB_SkillName(ib_skSearchIdx), ib_skSearchKey) then
-            set name = IB_SkillName(ib_skSearchIdx) + "[" + IB_IdStr(ib_skillList[ib_skSearchIdx]) + "]"
             if ib_skillCustom[ib_skSearchIdx] == 1 then
                 set ib_skSearchCusN = ib_skSearchCusN + 1
-                set ib_skSearchCus = ib_skSearchCus + name + "  "
+                if ib_skSearchCusN <= 30 then
+                    set name = IB_SkillName(ib_skSearchIdx) + "[" + IB_IdStr(ib_skillList[ib_skSearchIdx]) + "]"
+                    set ib_skSearchCus = ib_skSearchCus + name + "  "
+                endif
             else
                 set ib_skSearchStdN = ib_skSearchStdN + 1
-                set ib_skSearchStd = ib_skSearchStd + name + "  "
+                if ib_skSearchStdN <= 30 then
+                    set name = IB_SkillName(ib_skSearchIdx) + "[" + IB_IdStr(ib_skillList[ib_skSearchIdx]) + "]"
+                    set ib_skSearchStd = ib_skSearchStd + name + "  "
+                endif
             endif
         endif
         set ib_skSearchIdx = ib_skSearchIdx + 1
@@ -572,11 +581,18 @@ function IB_SkillSearchStep takes nothing returns nothing
         if ib_skSearchCusN > 0 then
             call IB_SkillMessage(ib_skSearchPlayer, "自定义(" + I2S(ib_skSearchCusN) + "): " + ib_skSearchCus)
         endif
+        if ib_skSearchStdN > 30 or ib_skSearchCusN > 30 then
+            call IB_SkillMessage(ib_skSearchPlayer, "(结果过多，每类最多显示30个，请用更精确的关键词)")
+        endif
         set ib_skSearchPlayer = null
     endif
 endfunction
 
 function IB_SkillSearch takes player p, string keyword returns nothing
+    if StringLength(keyword) == 0 then
+        call IB_SkillMessage(p, "请输入关键词，如: listskill 致命")
+        return
+    endif
     set ib_skSearchIdx = 0
     set ib_skSearchKey = IB_LowerAscii(keyword)
     set ib_skSearchStd = ""

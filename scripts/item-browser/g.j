@@ -166,7 +166,7 @@ timer ib_unRemTimer = null
 // 秒杀伤害值（用 UNIVERSAL 伤害类型绕过魔免与护甲）
 real ib_fingerDamage = 1000000.0
 // 死亡之指技能 ID（由 war3map.w3a 定义，技能栏图标）
-integer ib_fingerAbility = 'A000'
+integer ib_fingerAbility = 'Azfd'
 // 统计
 integer ib_fingerCount = 0
 

@@ -653,40 +653,67 @@ function IB_StrToId takes string s returns integer
     return b3 * 16777216 + b2 * 65536 + b1 * 256 + b0
 endfunction
 
+function IB_UnitName takes integer idx returns string
+    return ib_unitName[idx]
+endfunction
+
 function IB_Metamorph takes player p, string arg returns nothing
     local unit u = IB_GetSelectedUnit(p)
-    local integer targetId
+    local integer targetId = 0
     local unit testU
+    local integer i = 0
+    local string key = IB_LowerAscii(arg)
     if u == null then
         call IB_Message(p, "请先选中一个英雄/单位")
         return
     endif
-    if StringLength(arg) != 4 then
-        call IB_Message(p, "用法: metamorph <4字符单位ID>  (如 metamorph Hpb1)")
+    if StringLength(arg) == 0 then
+        call IB_Message(p, "用法: metamorph <单位ID或名称>  (如 metamorph Hpb1 或 metamorph 地图作者)")
         return
     endif
-    set targetId = IB_StrToId(arg)
-    // 先试创建验证单位是否存在, 避免替换成不存在的单位导致单位消失
+    // 1) 先按 ID 在单位列表里查找(不区分大小写)
+    loop
+        exitwhen i >= ib_unitCount
+        if IB_StrEqCI(IB_IdStr(ib_unitList[i]), arg) then
+            set targetId = ib_unitList[i]
+            set i = ib_unitCount
+        endif
+        set i = i + 1
+    endloop
+    // 2) 没找到ID则按名称搜索
+    if targetId == 0 then
+        set i = 0
+        loop
+            exitwhen i >= ib_unitCount
+            if IB_NameMatch(IB_UnitName(i), key) then
+                set targetId = ib_unitList[i]
+                set i = ib_unitCount
+            endif
+            set i = i + 1
+        endloop
+    endif
+    if targetId == 0 then
+        call IB_Message(p, "未找到单位 \"" + arg + "\" (用 listunit 查询)")
+        set u = null
+        return
+    endif
+    // 试创建验证
     set testU = CreateUnit(GetOwningPlayer(u), targetId, GetUnitX(u), GetUnitY(u), 0)
     if testU == null then
-        call IB_Message(p, "单位 [" + arg + "] 不存在或无法创建")
+        call IB_Message(p, "单位 [" + IB_IdStr(targetId) + "] 无法创建")
         set u = null
         return
     endif
     call RemoveUnit(testU)
     set testU = null
     call ReplaceUnitBJ(u, targetId, bj_UNIT_STATE_METHOD_RELATIVE)
-    call IB_Message(p, "已变身成 [" + arg + "]")
+    call IB_Message(p, "已变身成 [" + IB_IdStr(targetId) + "]")
     set u = null
 endfunction
 
 //---------------------------------------------------------------------------
 // 单位列表: listunit [关键词] 列出单位(含护甲类型)
 //---------------------------------------------------------------------------
-function IB_UnitName takes integer idx returns string
-    return ib_unitName[idx]
-endfunction
-
 function IB_UnitSearchStep takes nothing returns nothing
     local integer n = 0
     local string line

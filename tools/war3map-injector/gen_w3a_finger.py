@@ -37,15 +37,16 @@ def write_mod(m):
     return out
 
 
-def build(out_path):
+def build(out_path, cooldown=12.0, mana=100, cast_range=800.0, name="死亡之指",
+          tooltip="死亡之指(|cffffcc00D|r)", ubertip="秒杀目标单位（对魔法免疫也生效）。"):
     # 字段类型: 0=int, 1=real, 2=unreal, 3=string
     # A = 等级(0=全局), B = 数据列索引
     # 参考真实自定义主动技能(ANcl->A00O)的字段结构
     mods = [
         # 名称 / 提示 / 图标
-        mod("anam", 3, 0, 0, "死亡之指"),
-        mod("atp1", 3, 1, 0, "死亡之指(|cffffcc00D|r)"),
-        mod("aub1", 3, 1, 0, "秒杀目标单位（对魔法免疫也生效）。"),
+        mod("anam", 3, 0, 0, name),
+        mod("atp1", 3, 1, 0, tooltip),
+        mod("aub1", 3, 1, 0, ubertip),
         mod("aart", 3, 0, 0, ICON),
         mod("arar", 3, 0, 0, ICON),
         mod("arac", 3, 0, 0, "creeps"),
@@ -63,9 +64,9 @@ def build(out_path):
         mod("abpx", 0, 0, 0, 0),
         mod("abpy", 0, 0, 0, 2),
         # 冷却 / 魔法 / 距离
-        mod("acdn", 2, 1, 0, 1.0),
-        mod("amcs", 0, 1, 0, 0),
-        mod("aran", 2, 1, 0, 800.0),
+        mod("acdn", 2, 1, 0, cooldown),
+        mod("amcs", 0, 1, 0, mana),
+        mod("aran", 2, 1, 0, cast_range),
         # 连锁闪电自带效果清零（伤害/目标数，实际秒杀由 JASS 执行）
         mod("Ocl1", 2, 1, 1, 0.0),
         mod("Ocl2", 0, 1, 2, 0),
@@ -79,9 +80,13 @@ def build(out_path):
     # version=2, originalCount=0, customCount=1
     data = struct.pack("<ii", 2, 0) + struct.pack("<i", 1) + entry
     open(out_path, "wb").write(data)
-    print("wrote %s: %d bytes (base=%s new=%s mods=%d)" % (out_path, len(data), BASE, NEW, len(mods)))
+    print("wrote %s: %d bytes (base=%s new=%s mods=%d cd=%.1f mana=%d range=%.0f)" % (
+        out_path, len(data), BASE, NEW, len(mods), cooldown, mana, cast_range))
 
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "_finger.w3a")
-    build(out)
+    cd = float(sys.argv[2]) if len(sys.argv) > 2 else 12.0
+    mana = int(sys.argv[3]) if len(sys.argv) > 3 else 100
+    rng = float(sys.argv[4]) if len(sys.argv) > 4 else 800.0
+    build(out, cooldown=cd, mana=mana, cast_range=rng)

@@ -116,6 +116,7 @@ skill_fill_step_block = "\n".join(skill_fill_step)
 # 单位分块 (80/块)
 unit_chunks = [units[i:i + CHUNK] for i in range(0, len(units), CHUNK)]
 unit_funcs = []
+unit_gbk_lines = []
 for ci, chunk in enumerate(unit_chunks):
     lines = ["function IB_UnitFill%d takes nothing returns nothing" % ci]
     for k, (uid, nm, armor) in enumerate(chunk):
@@ -123,6 +124,8 @@ for ci, chunk in enumerate(unit_chunks):
         lines.append("    set ib_unitList[%d] = '%s'" % (idx, uid))
         lines.append('    set ib_unitName[%d] = "%s"' % (idx, jass_escape(nm)))
         lines.append('    set ib_unitArmor[%d] = "%s"' % (idx, jass_escape(armor)))
+        # GBK 名称：占位符，稍后替换为 GBK 字节
+        lines.append("    set ib_unitNameGbk[%d] = \"@@GBK%d@@\"" % (idx, idx))
     lines.append("endfunction")
     unit_funcs.append("\n".join(lines))
 
@@ -207,8 +210,22 @@ combined = ("\n".join(chunk_funcs) + "\n\n" + "\n".join(skill_funcs) + "\n\n"
             + unit_fill_step_block + "\n\n" + init_block)
 txt = pattern.sub(lambda m: combined, txt, count=1)
 
-with open(FJ, "w", encoding="utf-8") as fh:
-    fh.write(txt)
+# 3) 把 @@GBK<idx>@@ 占位替换为真实 GBK 字节（写入时按字节替换）
+gbk_map = {i: nm for i, (uid, nm, armor) in enumerate(units)}
+for i, nm in gbk_map.items():
+    marker = "\x00GBK%d\x00" % i
+    txt = txt.replace("@@GBK%d@@" % i, marker)
+
+with open(FJ, "wb") as fh:
+    # 先按 UTF-8 编码，再把 \x00GBK<idx>\x00 标记替换为 GBK 字节
+    data = txt.encode("utf-8")
+    for i, nm in gbk_map.items():
+        try:
+            gbk_bytes = nm.encode("gbk")
+        except Exception:
+            gbk_bytes = nm.encode("utf-8")
+        data = data.replace(("\x00GBK%d\x00" % i).encode("utf-8"), gbk_bytes)
+    fh.write(data)
 
 print("embedded %d items (%d) + %d skills (%d) + %d units (%d) into %s" % (
     len(items), len(chunks), len(skills), len(skill_chunks), len(units), len(unit_chunks), FJ))

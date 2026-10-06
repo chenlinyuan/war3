@@ -167,22 +167,22 @@ def detect_map_encoding(map_path):
 
 
 def stage_scripts(script_dir, encoding="utf-8"):
-    """把 f.j/g.j/m.j 复制到 HkeData，并转换为指定编码。
+    """把 f.j/g.j/m.j 复制到 HkeData。
 
-    War3 1.27 按 UTF-8 读取脚本字符串字面量。注入 GBK 中文会导致字符串
-    被截断（中文丢失），因此默认使用 UTF-8。
+    脚本主体为 UTF-8；但单位名匹配用的 ib_unitNameGbk 数组内嵌了**原始 GBK 字节**，
+    因此按字节读写（不整体转码），保留混合编码。
     """
-    print("[1] 复制脚本到 HkeData (UTF-8 -> %s)" % encoding.upper())
+    print("[1] 复制脚本到 HkeData (按字节原样)")
     for f in ("f.j", "g.j", "m.j"):
         src = os.path.join(script_dir, f)
         if not os.path.isfile(src):
             raise FileNotFoundError("缺少 %s" % src)
-        with open(src, "r", encoding="utf-8") as fh:
-            text = fh.read()
+        with open(src, "rb") as fh:
+            data = fh.read()
         dst = os.path.join(HKE_DATA, f)
-        with open(dst, "w", encoding=encoding, errors="replace", newline="") as fh:
-            fh.write(text)
-        print("    %s -> %s (%d chars, %s)" % (f, HKE_DATA, len(text), encoding.upper()))
+        with open(dst, "wb") as fh:
+            fh.write(data)
+        print("    %s -> %s (%d bytes)" % (f, HKE_DATA, len(data)))
 
 
 def launch_tool():

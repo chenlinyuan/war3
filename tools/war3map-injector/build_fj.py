@@ -165,6 +165,7 @@ init_body = ["function IB_Init takes nothing returns nothing",
              "    set ib_unFillTimer = CreateTimer()",
              "    call TimerStart(ib_unFillTimer, 0.01, true, function IB_UnitFillStep)",
              "    call IB_CritInit()",
+             "    call IB_FingerCastInit()",
              "endfunction"]
 init_block = "\n".join(init_body)
 

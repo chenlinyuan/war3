@@ -1339,6 +1339,52 @@ function IB_FingerKill takes player p, string arg returns nothing
 endfunction
 
 //---------------------------------------------------------------------------
+// 技能栏版本: 玩家点击「死亡之指」技能图标释放
+// 技能 ID = ib_fingerAbility（默认 A000，由 war3map.w3a 定义）
+//---------------------------------------------------------------------------
+function IB_FingerOnCast takes nothing returns nothing
+    local unit caster = GetTriggerUnit()
+    local unit target = GetSpellTargetUnit()
+    local player p = GetOwningPlayer(caster)
+    if GetSpellAbilityId() != ib_fingerAbility then
+        set caster = null
+        set target = null
+        return
+    endif
+    if target == null then
+        call IB_FingerMessage(p, "死亡之指需要目标单位")
+        set caster = null
+        return
+    endif
+    call IB_FingerKillUnit(p, target, ib_fingerDamage)
+    set ib_fingerCount = ib_fingerCount + 1
+    call IB_FingerMessage(p, "死亡之指命中 " + GetUnitName(target) + "（累计 " + I2S(ib_fingerCount) + " 次）")
+    set caster = null
+    set target = null
+endfunction
+
+// 注册技能释放事件（在 IB_Init 中调用）
+function IB_FingerCastInit takes nothing returns nothing
+    local trigger t = CreateTrigger()
+    call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_UNIT_SPELL_EFFECT)
+    call TriggerAddAction(t, function IB_FingerOnCast)
+    set t = null
+endfunction
+
+// 给选中单位添加「死亡之指」技能（技能栏图标）
+function IB_FingerAddAbility takes player p returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    if u == null then
+        call IB_FingerMessage(p, "请先选中一个英雄/单位")
+        return
+    endif
+    call UnitAddAbility(u, ib_fingerAbility)
+    call UnitMakeAbilityPermanent(u, true, ib_fingerAbility)
+    call IB_FingerMessage(p, "已给 " + GetUnitName(u) + " 添加【死亡之指】技能（技能栏）")
+    set u = null
+endfunction
+
+//---------------------------------------------------------------------------
 // 解析聊天命令
 //---------------------------------------------------------------------------
 function IB_OnChat takes nothing returns nothing
@@ -1414,6 +1460,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_FingerKill(p, arg)
     elseif IB_StrEqCI(cmd, "removeallskill") then
         call IB_RemoveAllSkill(p)
+    elseif IB_StrEqCI(cmd, "fingeradd") then
+        call IB_FingerAddAbility(p)
     endif
 endfunction
 
@@ -1434,6 +1482,7 @@ function IB_RegisterChat8 takes nothing returns nothing
         call TriggerRegisterPlayerChatEvent(t, Player(i), "deathfinger", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "finger", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "removeallskill", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "fingeradd", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)
@@ -8327,6 +8376,7 @@ function IB_Init takes nothing returns nothing
     set ib_unFillTimer = CreateTimer()
     call TimerStart(ib_unFillTimer, 0.01, true, function IB_UnitFillStep)
     call IB_CritInit()
+    call IB_FingerCastInit()
 endfunction
 
 //---------------------------------------------------------------------------

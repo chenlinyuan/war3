@@ -81,3 +81,6 @@ scripts/_test-min/
 
 # ---- HKE 替换脚本临时目录 ----
 tools/war3map-injector/_rep/
+
+# ---- HKE 解压出的地图文件目录 ----
+maps/*/LostTemple/

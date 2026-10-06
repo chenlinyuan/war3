@@ -1,0 +1,4 @@
+set gg_trg_asdfghj=CreateTrigger()
+call TriggerRegisterAnyUnitEventBJ(gg_trg_asdfghj,EVENT_PLAYER_HERO_LEVEL)
+call TriggerAddCondition(gg_trg_asdfghj,Condition(function Trig_asdfghj_Conditions))
+call TriggerAddAction(gg_trg_asdfghj,function Trig_asdfghj_Actions)

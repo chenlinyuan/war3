@@ -1,0 +1,14 @@
+> 简单作弊：
+输入：war3sucai 开启
+
+wudi    无敌
+buwudi  取消无敌
+qian    加钱
+mu      加木
+dengji  加等级
+sanwei  加属性
+liliang 加力量 
+minjie  加敏捷
+zhili   加智力 
+qingli  清理
+

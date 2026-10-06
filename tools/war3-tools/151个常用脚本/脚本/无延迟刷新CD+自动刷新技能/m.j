@@ -1,0 +1,5 @@
+    call InitTrig_sx1(  )
+    call InitTrig_sx1_sx(  )
+    call InitTrig_CD(  )
+    call InitTrig_NOCD(  )
+    call InitTrig_CSH_CD(  )

@@ -1,0 +1,5 @@
+﻿integer udg_skillIdToAdd=0
+trigger gg_trg_addItem_DeathMask
+trigger gg_trg_addItem_GlovesOfHaste
+trigger gg_trg_addItem_Necklace
+

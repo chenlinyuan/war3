@@ -1,0 +1,132 @@
+# [JSP Template] 141
+
+; ================ Jass Template File ==============
+; The first line is about version, don't change it.
+; ';' is the beginning of a comment line.
+; You can define your custom template file with config.exe.
+; If Jass Shop Pro cannot find custom template file, it will auto load the file named "Default.tmt".
+; ==================================
+
+; ==================================
+;       Menus
+; ---------------------------------
+; - : Line(separator)
+; Menu Tilte|ShortCut = Text
+; ShorCut = { ([Ctrl]+[Shift|Alt] | [Ctrl|Shift|Alt]) + [ASCKey|F1..12] }
+; ---------------------------------
+; {Menu1
+;   {Menu 2
+;      Menu 3
+;      ...
+;   }
+;   ...
+; }
+;
+; ==================================
+
+; ==================================
+;       Commanders
+; ---------------------------------
+; Comment char = ;
+; Comand char = #
+; Sub comand char = | n t b c
+; #| = postion
+; #B = Selecting Start
+; #E = Selecting End
+; #n = return
+; #t = Tab
+; #s = Shift+Tab
+; #c = Clear indent
+; #C = Clear line
+; ## = #
+; #* =   (* is others)
+; #? = Command mode - must be the ending of a line
+; ---- Command mode ----
+; ? = Beginning commander
+; , = New command
+; ,, = ,
+; a = Select text of this tamplate
+; A = Select all text
+; R = Show Replace Dialog
+; ---------------------------------
+; "New Trigger" could be a sample.
+; ==================================
+
+创建 "if"|Ctrl+I=if #| then#n#t#n#sendif#n
+创建 "if-else"|Ctrl+Shift+I=if #| then#n#t#n#selse#n#t#n#sendif#n
+创建 "else-if"|Ctrl+E=#selse if #| then#n#t
+创建 "loop"|Ctrl+L=loop#n#texitwhen #|#n#n#sendloop#n
+-
+
+创建 Function|Ctrl+U=#n#cfunction #| takes  returns #n#t#n//return #n#sendfunction#n
+创建 Conditions=#n#cfunction #BNew#E_Conditions takes nothing returns boolean#n#t#nreturn #n#sendfunction#n
+创建 Actions=#n#cfunction #BNew#E_Actions takes nothing returns nothing#n#t#n#sendfunction#n
+创建 Trigger|Ctrl+T=#n#cfunction Trig_NewTrigger_Conditions takes nothing returns boolean#n#t#nreturn #n#sendfunction#n#nfunction Trig_NewTrigger_Actions takes nothing returns nothing#n#t#n#sendfunction#n#n//==== Init Trigger NewTrigger ====#nfunction InitTrig_NewTrigger takes nothing returns nothing#n#tset gg_trg_NewTrigger = CreateTrigger()#n//call TriggerRegister__(gg_trg_NewTrigger, )#ncall TriggerAddCondition(gg_trg_NewTrigger, Condition(function Trig_NewTrigger_Conditions))#ncall TriggerAddAction(gg_trg_NewTrigger, function Trig_NewTrigger_Actions)#n#sendfunction#n#n#?a,RNewTrigger,Enter a new name,, then Replace All
+
+-
+
+{事件
+{单位
+Specific Unit Event=call TriggerRegisterUnitEvent(#|, EVENT_UNIT_)
+Generic Unit Event=call TriggerRegisterAnyUnitEventBJ(#|, EVENT_PLAYER_UNIT_)
+Player-Owned Unit Event=call TriggerRegisterPlayerUnitEventSimple(#|, EVENT_PLAYER_UNIT_)
+Unit Enters Region=call TriggerRegisterEnterRectSimple(#|, )
+}
+{玩家
+Player Event=call TriggerRegisterPlayerEvent(#|, , EVENT_PLAYER_)
+Chat Message=call TriggerRegisterPlayerChatEvent(#|, , " ", )
+Selection Event=call TriggerRegisterPlayerSelectionEventBJ(#|, , )
+Leaves Game=call TriggerRegisterPlayerEventLeave(#|, )
+}
+}
+
+{动作
+Wait=call TriggerSleepAction(#|)
+Wait(game-time)=call PolledWait(#|)
+Want Destroy Group=set bj_wantDestroyGroup = true
+{单位
+Create Units=CreateNUnitsAtLoc(#|, , , , )
+Create An Unit=CreateUnit(#|, '', , , bj_UNIT_FACING)
+Remove=call RemoveUnit(#|)
+}
+}
+
+{BJ 代码
+{真实
+PIE=bj_PI
+}
+{单位
+Last Created Unit=bj_lastCreatedUnit
+}
+{组
+Want Destroy Group=bj_wantDestroyGroup
+}
+}
+
+{颜色
+{玩家颜色
+玩家 1=|c00ff0000#||r
+玩家 2=|c000000ff#||r
+玩家 3=|c0018e7bd#||r
+玩家 4=|c00520084#||r
+玩家 5=|c00ffff00#||r
+玩家 6=|c00ff8a08#||r
+玩家 7=|c0018be00#||r
+玩家 8=|c00e759ad#||r
+玩家 9=|c00949694#||r
+玩家 10=|c007bbef7#||r
+玩家 11=|c00086142#||r
+玩家 12=|c004a2800#||r
+}
+红=|c00ff0000#||r
+绿=|c0000ff00#||r
+蓝=|c000000ff#||r
+黄=|c00ffff00#||r
+橙=|c00ff8000#||r
+亮蓝=|c0000ffff#||r
+粉红=|c00ff00ff#||r
+白=|c00ffffff#||r
+黑=|c00000000#||r
+灰=|c00808080#||r
+褐=|c00800000#||r
+}

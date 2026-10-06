@@ -1,0 +1,14 @@
+force A=null
+player B=null
+force C=null
+player D=null
+trigger E=null
+trigger F=null
+trigger G=null
+trigger H=null
+trigger I=null
+trigger J=null
+trigger K=null
+trigger L=null
+timer M=null
+handle N

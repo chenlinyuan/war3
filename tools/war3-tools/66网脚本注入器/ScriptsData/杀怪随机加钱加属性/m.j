@@ -1,0 +1,3 @@
+set gg_trg_jiashuxing=CreateTrigger()
+call TriggerRegisterAnyUnitEventBJ(gg_trg_jiashuxing,EVENT_PLAYER_UNIT_DEATH)
+call TriggerAddAction(gg_trg_jiashuxing,function Trig_jiashuxing_Actions)

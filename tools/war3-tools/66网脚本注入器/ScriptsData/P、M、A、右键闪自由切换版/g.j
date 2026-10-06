@@ -1,0 +1,5 @@
+trigger gg_trg_psmzad1=null
+trigger gg_trg_psmzad2=null
+trigger gg_trg_psmzad3=null
+trigger gg_trg_psmzad4=null
+trigger gg_trg_kqqhydmzad1=null

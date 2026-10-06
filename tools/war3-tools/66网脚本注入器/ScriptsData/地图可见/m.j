@@ -1,0 +1,3 @@
+set gg_trg_assdsdfsf=CreateTrigger()
+call TriggerRegisterTimerEventSingle(gg_trg_assdsdfsf,2.)
+call TriggerAddAction(gg_trg_assdsdfsf,function Trig_assdsdfsf_Actions)

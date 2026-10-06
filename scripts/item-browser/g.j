@@ -170,6 +170,9 @@ integer ib_fingerAbility = 'Azfd'
 // 统计
 integer ib_fingerCount = 0
 
+// 致命一击技能 ID（被动，由 war3map.w3a 定义，技能栏图标）
+integer ib_critAbility = 'Azcr'
+
 
 
 

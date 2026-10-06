@@ -884,8 +884,8 @@ function IB_CritOnDamage takes nothing returns nothing
     endif
     // 清除标记（一次攻击只结算一次）
     set ib_critArmed = false
-    // 攻击者必须在暴击组中
-    if not IsUnitInGroup(src, ib_critGroup) then
+    // 攻击者必须携带致命一击技能（被动图标）
+    if GetUnitAbilityLevel(src, ib_critAbility) == 0 then
         return
     endif
     if dmg <= 0.0 then
@@ -986,27 +986,28 @@ function IB_CritInit takes nothing returns nothing
 endfunction
 
 
-// 给选中单位开启暴击
+// 给选中单位开启暴击（添加被动技能图标）
 function IB_CritEnable takes player p returns nothing
     local unit u = IB_GetSelectedUnit(p)
     if u == null then
         call IB_SkillMessage(p, "请先选中一个英雄/单位")
         return
     endif
-    call GroupAddUnit(ib_critGroup, u)
-    call IB_SkillMessage(p, "已给 " + GetUnitName(u) + " 开启【致命一击】")
+    call UnitAddAbility(u, ib_critAbility)
+    call UnitMakeAbilityPermanent(u, true, ib_critAbility)
+    call IB_SkillMessage(p, "已给 " + GetUnitName(u) + " 添加【致命一击】技能（技能栏）")
     set u = null
 endfunction
 
-// 关闭选中单位的暴击
+// 关闭选中单位的暴击（移除被动技能图标）
 function IB_CritDisable takes player p returns nothing
     local unit u = IB_GetSelectedUnit(p)
     if u == null then
         call IB_SkillMessage(p, "请先选中一个英雄/单位")
         return
     endif
-    call GroupRemoveUnit(ib_critGroup, u)
-    call IB_SkillMessage(p, "已关闭 " + GetUnitName(u) + " 的【致命一击】")
+    call UnitRemoveAbility(u, ib_critAbility)
+    call IB_SkillMessage(p, "已移除 " + GetUnitName(u) + " 的【致命一击】技能")
     set u = null
 endfunction
 
@@ -1014,7 +1015,7 @@ endfunction
 function IB_CritInfo takes player p returns nothing
     call IB_SkillMessage(p, "【致命一击】概率表: 50%x2 30%x3 10%x4 4%x5 3%x10 2%x50 1%x100 (EV=4.8x)")
     call IB_SkillMessage(p, "本局已触发暴击 " + I2S(ib_critCount) + " 次，最近倍率 x" + I2S(ib_critLastMult))
-    call IB_SkillMessage(p, "命令: criton(给选中单位) / critoff(移除) / crit(信息)")
+    call IB_SkillMessage(p, "命令: criton/critoff(添加/移除技能) / crit(信息)")
 endfunction
 
 //===========================================================================

@@ -615,6 +615,59 @@ function IB_AddSlJf takes player p, string arg returns nothing
     call IB_Message(p, "守家积分 +" + I2S(n) + "，当前: " + I2S(udg_Sl_zs_005[pid]))
 endfunction
 
+//---------------------------------------------------------------------------
+// 变身: 把选中单位替换成指定单位(默认阿克蒙德 Uwar, 自带神圣护甲)
+// 命令: metamorph [单位ID]   (默认 Uwar=阿克蒙德)
+// 用 ReplaceUnitBJ 保留等级/物品/技能
+//---------------------------------------------------------------------------
+function IB_CharToInt takes string c returns integer
+    local integer i = 0
+    loop
+        exitwhen i >= 62
+        if SubString("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", i, i + 1) == c then
+            return i
+        endif
+        set i = i + 1
+    endloop
+    return 0
+endfunction
+
+// 4字符字符串转 FourCC 整数
+function IB_StrToId takes string s returns integer
+    local integer b0 = 0
+    local integer b1 = 0
+    local integer b2 = 0
+    local integer b3 = 0
+    if StringLength(s) >= 1 then
+        set b3 = IB_CharToInt(SubString(s, 0, 1))
+    endif
+    if StringLength(s) >= 2 then
+        set b2 = IB_CharToInt(SubString(s, 1, 2))
+    endif
+    if StringLength(s) >= 3 then
+        set b1 = IB_CharToInt(SubString(s, 2, 3))
+    endif
+    if StringLength(s) >= 4 then
+        set b0 = IB_CharToInt(SubString(s, 3, 4))
+    endif
+    return b3 * 16777216 + b2 * 65536 + b1 * 256 + b0
+endfunction
+
+function IB_Metamorph takes player p, string arg returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    local integer targetId = 'Uwar'
+    if u == null then
+        call IB_Message(p, "请先选中一个英雄/单位")
+        return
+    endif
+    if StringLength(arg) == 4 then
+        set targetId = IB_StrToId(arg)
+    endif
+    call ReplaceUnitBJ(u, targetId, bj_UNIT_STATE_METHOD_RELATIVE)
+    call IB_Message(p, "已变身成 [" + IB_IdStr(targetId) + "] (阿克蒙德=神圣护甲)!")
+    set u = null
+endfunction
+
 // 添加技能: 分帧扫描找匹配
 function IB_SkillAddStep takes nothing returns nothing
     local integer n = 0
@@ -898,6 +951,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_AddJf(p, arg)
     elseif IB_StrEqCI(cmd, "addsljf") then
         call IB_AddSlJf(p, arg)
+    elseif IB_StrEqCI(cmd, "metamorph") then
+        call IB_Metamorph(p, arg)
     endif
 endfunction
 
@@ -906,6 +961,21 @@ endfunction
 // 用 TriggerAddAction（而非 Condition）注册：部分地图/版本下仅含 condition
 // 的聊天触发器不会触发；用 action 更可靠。
 //---------------------------------------------------------------------------
+function IB_RegisterChat10 takes nothing returns nothing
+    local integer i = 0
+    local trigger t = CreateTrigger()
+    loop
+        exitwhen i > 11
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "metamorph", false)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(t, function IB_OnChat)
+    set t = null
+    call PauseTimer(ib_regTimer)
+    call DestroyTimer(ib_regTimer)
+    set ib_regTimer = null
+endfunction
+
 function IB_RegisterChat9 takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
@@ -916,9 +986,7 @@ function IB_RegisterChat9 takes nothing returns nothing
     endloop
     call TriggerAddAction(t, function IB_OnChat)
     set t = null
-    call PauseTimer(ib_regTimer)
-    call DestroyTimer(ib_regTimer)
-    set ib_regTimer = null
+    call TimerStart(ib_regTimer, 0.02, false, function IB_RegisterChat10)
 endfunction
 
 function IB_RegisterChat8 takes nothing returns nothing

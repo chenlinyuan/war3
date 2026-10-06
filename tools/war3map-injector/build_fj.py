@@ -50,6 +50,19 @@ if os.path.isfile(skill_path):
                 is_custom = 1 if (len(sid) == 4 and sid[0] == "A" and sid[1].isdigit()) else 0
                 skills.append((is_custom, sid, nm))
 
+# 读取单位列表 (id<TAB>name<TAB>armor)
+units = []
+unit_path = os.path.join(HERE, "_unitids.txt")
+if os.path.isfile(unit_path):
+    with open(unit_path, encoding="utf-8") as fh:
+        for line in fh:
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) >= 3 and len(parts[0].strip()) == 4:
+                uid = parts[0].strip()
+                nm = clean_name(parts[1].strip())
+                armor = parts[2].strip()
+                units.append((uid, nm, armor))
+
 
 def jass_escape(s):
     return s.replace("\\", "\\\\").replace('"', '\\"')
@@ -100,10 +113,40 @@ skill_fill_step.append("    endif")
 skill_fill_step.append("endfunction")
 skill_fill_step_block = "\n".join(skill_fill_step)
 
-# IB_Init: 先注册聊天事件,再用 timer 分帧调用各 IB_FillN 和 IB_SkillFillN。
+# 单位分块 (80/块)
+unit_chunks = [units[i:i + CHUNK] for i in range(0, len(units), CHUNK)]
+unit_funcs = []
+for ci, chunk in enumerate(unit_chunks):
+    lines = ["function IB_UnitFill%d takes nothing returns nothing" % ci]
+    for k, (uid, nm, armor) in enumerate(chunk):
+        idx = ci * CHUNK + k
+        lines.append("    set ib_unitList[%d] = '%s'" % (idx, uid))
+        lines.append('    set ib_unitName[%d] = "%s"' % (idx, jass_escape(nm)))
+        lines.append('    set ib_unitArmor[%d] = "%s"' % (idx, jass_escape(armor)))
+    lines.append("endfunction")
+    unit_funcs.append("\n".join(lines))
+
+unit_fill_step = ["function IB_UnitFillStep takes nothing returns nothing"]
+for ci in range(len(unit_chunks)):
+    kw = "if" if ci == 0 else "elseif"
+    unit_fill_step.append("    %s ib_unFillIdx == %d then" % (kw, ci))
+    unit_fill_step.append("        call IB_UnitFill%d()" % ci)
+unit_fill_step.append("    endif")
+unit_fill_step.append("    set ib_unFillIdx = ib_unFillIdx + 1")
+unit_fill_step.append("    if ib_unFillIdx >= ib_unFillTotal then")
+unit_fill_step.append("        set ib_unitCount = %d" % len(units))
+unit_fill_step.append("        call PauseTimer(ib_unFillTimer)")
+unit_fill_step.append("        call DestroyTimer(ib_unFillTimer)")
+unit_fill_step.append("        set ib_unFillTimer = null")
+unit_fill_step.append("    endif")
+unit_fill_step.append("endfunction")
+unit_fill_step_block = "\n".join(unit_fill_step)
+
+# IB_Init: 先注册聊天事件,再用 timer 分帧调用各 IB_FillN / IB_SkillFillN / IB_UnitFillN。
 init_body = ["function IB_Init takes nothing returns nothing",
              "    set ib_itemCount = 0",
              "    set ib_skillCount = 0",
+             "    set ib_unitCount = 0",
              "    call IB_RegisterChat()",
              "    set ib_fillIdx = 0",
              "    set ib_fillTotal = %d" % len(chunks),
@@ -113,6 +156,10 @@ init_body = ["function IB_Init takes nothing returns nothing",
              "    set ib_skFillTotal = %d" % len(skill_chunks),
              "    set ib_skFillTimer = CreateTimer()",
              "    call TimerStart(ib_skFillTimer, 0.01, true, function IB_SkillFillStep)",
+             "    set ib_unFillIdx = 0",
+             "    set ib_unFillTotal = %d" % len(unit_chunks),
+             "    set ib_unFillTimer = CreateTimer()",
+             "    call TimerStart(ib_unFillTimer, 0.01, true, function IB_UnitFillStep)",
              "endfunction"]
 init_block = "\n".join(init_body)
 
@@ -137,11 +184,13 @@ fill_step_block = "\n".join(fill_step)
 with open(FJ, encoding="utf-8") as fh:
     txt = fh.read()
 
-# 1) Remove any previously generated IB_Fill* / IB_FillStep / IB_SkillFill* functions (idempotent rebuild)
+# 1) Remove any previously generated IB_Fill* / IB_FillStep / IB_SkillFill* / IB_UnitFill* functions (idempotent rebuild)
 txt = re.sub(r"function IB_FillStep takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
 txt = re.sub(r"function IB_Fill\d+ takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
 txt = re.sub(r"function IB_SkillFillStep takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
 txt = re.sub(r"function IB_SkillFill\d+ takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
+txt = re.sub(r"function IB_UnitFillStep takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
+txt = re.sub(r"function IB_UnitFill\d+ takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
 
 # 2) Replace IB_Init body (整块替换到 endfunction)
 pattern = re.compile(
@@ -151,11 +200,13 @@ if not pattern.search(txt):
     raise SystemExit("IB_Init block not found in f.j")
 # 顺序: chunk 函数 -> FillStep -> IB_Init (JASS 要求先定义后引用)
 combined = ("\n".join(chunk_funcs) + "\n\n" + "\n".join(skill_funcs) + "\n\n"
-            + fill_step_block + "\n\n" + skill_fill_step_block + "\n\n" + init_block)
+            + "\n".join(unit_funcs) + "\n\n"
+            + fill_step_block + "\n\n" + skill_fill_step_block + "\n\n"
+            + unit_fill_step_block + "\n\n" + init_block)
 txt = pattern.sub(lambda m: combined, txt, count=1)
 
 with open(FJ, "w", encoding="utf-8") as fh:
     fh.write(txt)
 
-print("embedded %d items (%d chunks) + %d skills (%d chunks) into %s" % (
-    len(items), len(chunks), len(skills), len(skill_chunks), FJ))
+print("embedded %d items (%d) + %d skills (%d) + %d units (%d) into %s" % (
+    len(items), len(chunks), len(skills), len(skill_chunks), len(units), len(unit_chunks), FJ))

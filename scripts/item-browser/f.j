@@ -1241,6 +1241,57 @@ function IB_RemoveUnit takes player p, string arg returns nothing
     call TimerStart(ib_unRemTimer, 0.01, true, function IB_UnitRemoveStep)
 endfunction
 
+//===========================================================================
+// 死亡之指（秒杀任意单位，含魔免）
+//---------------------------------------------------------------------------
+// 命令:
+//   deathfinger          秒杀当前选中的单位（对魔免也生效）
+//   deathfinger <伤害>   自定义秒杀伤害（默认 1000000）
+//
+// 原理: 用 DAMAGE_TYPE_UNIVERSAL 伤害类型绕过魔法免疫与护甲，
+//       造成极大伤害实现"秒杀"。对英雄/建筑同样有效。
+//===========================================================================
+
+// 发送死亡之指消息
+function IB_FingerMessage takes player p, string msg returns nothing
+    call DisplayTimedTextToPlayer(p, 0, 0, 15.0, "|cffcc00ff[死亡之指]|r " + msg)
+endfunction
+
+// 秒杀指定单位（UNIVERSAL 伤害绕过魔免/护甲）
+function IB_FingerKillUnit takes player p, unit u, real dmg returns nothing
+    call UnitDamageTarget(u, u, dmg, true, true, ATTACK_TYPE_CHAOS, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS)
+    // 兜底: 若目标仍存活（如无敌/免疫伤害），再直接置 0 血
+    if GetUnitState(u, UNIT_STATE_LIFE) > 0.0 and not IsUnitType(u, UNIT_TYPE_DEAD) then
+        call SetUnitLifeBJ(u, 1.0)
+        call UnitDamageTarget(u, u, dmg, true, true, ATTACK_TYPE_CHAOS, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS)
+    endif
+endfunction
+
+// 秒杀当前选中单位
+function IB_FingerKill takes player p, string arg returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    local real dmg = ib_fingerDamage
+    if u == null then
+        call IB_FingerMessage(p, "请先选中一个目标单位")
+        return
+    endif
+    // 解析可选伤害参数
+    if StringLength(arg) > 0 then
+        if S2I(arg) > 0 then
+            set dmg = I2R(S2I(arg))
+        endif
+    endif
+    if IsUnitType(u, UNIT_TYPE_DEAD) then
+        call IB_FingerMessage(p, "目标已死亡")
+        set u = null
+        return
+    endif
+    call IB_FingerKillUnit(p, u, dmg)
+    set ib_fingerCount = ib_fingerCount + 1
+    call IB_FingerMessage(p, "已对 " + GetUnitName(u) + " 施放死亡之指（伤害 " + R2S(dmg) + "，累计 " + I2S(ib_fingerCount) + " 次）")
+    set u = null
+endfunction
+
 //---------------------------------------------------------------------------
 // 解析聊天命令
 //---------------------------------------------------------------------------
@@ -1313,6 +1364,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_RemoveUnit(p, arg)
     elseif IB_StrEqCI(cmd, "unitdiag") then
         call IB_EncProbe(p, arg)
+    elseif IB_StrEqCI(cmd, "deathfinger") or IB_StrEqCI(cmd, "finger") then
+        call IB_FingerKill(p, arg)
     endif
 endfunction
 
@@ -1330,6 +1383,8 @@ function IB_RegisterChat8 takes nothing returns nothing
         call TriggerRegisterPlayerChatEvent(t, Player(i), "addunit", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "removeunit", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "unitdiag", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "deathfinger", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "finger", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)

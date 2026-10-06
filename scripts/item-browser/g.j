@@ -152,5 +152,14 @@ integer ib_unRemFoundIdx = -1
 player ib_unRemPlayer = null
 timer ib_unRemTimer = null
 
+//---------------------------------------------------------------------------
+// 死亡之指（秒杀任意单位，含魔免）
+//---------------------------------------------------------------------------
+// 秒杀伤害值（用 UNIVERSAL 伤害类型绕过魔免与护甲）
+real ib_fingerDamage = 1000000.0
+// 统计
+integer ib_fingerCount = 0
+
+
 
 

@@ -131,6 +131,7 @@ init_body = ["function IB_Init takes nothing returns nothing",
              "    set ib_skFillTotal = %d" % len(skill_chunks),
              "    set ib_skFillTimer = CreateTimer()",
              "    call TimerStart(ib_skFillTimer, 0.01, true, function IB_SkillFillStep)",
+             "    call IB_CritInit()",
              "endfunction"]
 init_block = "\n".join(init_body)
 

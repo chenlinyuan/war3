@@ -773,6 +773,204 @@ function IB_ParseRemoveSkill takes player p, string arg returns nothing
     call IB_RemoveSkill(p, arg)
 endfunction
 
+//===========================================================================
+// 致命一击系统（自定义暴击）
+//---------------------------------------------------------------------------
+// 机制: 用 unit group 注册"携带暴击"的单位，其普通攻击按加权表随机触发暴击，
+//       额外造成 (倍率-1) 倍伤害。用"攻击事件标记 + 伤害事件结算"限定只对普攻生效。
+//       不依赖任何自定义技能对象数据，可在任意地图使用。
+//
+// 加权表（概率加和 = 100%，单次掷骰命中一档）:
+//   50%  x2    30%  x3    10%  x4    4%   x5
+//   3%   x10   2%   x50   1%   x100
+//   期望倍率 EV = 4.8x
+//   —— 如需调整数值，只改下面 IB_CritRoll 里的阈值即可。
+//===========================================================================
+
+// 掷骰：返回本次暴击倍率（>=2 表示暴击）
+// 单次掷骰加权表，累计概率: 50/80/90/94/97/99/100
+function IB_CritRoll takes nothing returns integer
+    local integer r = GetRandomInt(1, 100)
+    if r <= 50 then
+        return 2
+    elseif r <= 80 then
+        return 3
+    elseif r <= 90 then
+        return 4
+    elseif r <= 94 then
+        return 5
+    elseif r <= 97 then
+        return 10
+    elseif r <= 99 then
+        return 50
+    endif
+    return 100
+endfunction
+
+// 攻击事件: 记录攻击者/目标，标记"下一次伤害可能来自普攻"
+function IB_CritOnAttack takes nothing returns nothing
+    set ib_critAttacker = GetAttacker()
+    set ib_critTarget = GetTriggerUnit()
+    set ib_critArmed = true
+endfunction
+
+// 伤害事件: 若为标记的普攻且攻击者在暴击组中，则掷骰并追加伤害
+function IB_CritOnDamage takes nothing returns nothing
+    local unit src = GetEventDamageSource()
+    local unit tgt = GetTriggerUnit()
+    local real dmg = GetEventDamage()
+    local integer mult
+    local real bonus
+
+    // 重入保护: 追加伤害会再次触发本事件，直接忽略
+    if ib_critBusy then
+        return
+    endif
+    if not ib_critEnabled then
+        return
+    endif
+    // 只处理"攻击事件刚标记过"的那次普攻
+    if not ib_critArmed then
+        return
+    endif
+    if src != ib_critAttacker or tgt != ib_critTarget then
+        return
+    endif
+    // 清除标记（一次攻击只结算一次）
+    set ib_critArmed = false
+    // 攻击者必须在暴击组中
+    if not IsUnitInGroup(src, ib_critGroup) then
+        return
+    endif
+    if dmg <= 0.0 then
+        return
+    endif
+
+    set mult = IB_CritRoll()
+    set bonus = dmg * I2R(mult - 1)
+    set ib_critBusy = true
+    call UnitDamageTarget(src, tgt, bonus, true, false, ATTACK_TYPE_NORMAL, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS)
+    set ib_critBusy = false
+
+    set ib_critCount = ib_critCount + 1
+    set ib_critLastMult = mult
+    // 只在暴击倍率较高时提示，避免刷屏
+    if mult >= 5 then
+        call DisplayTextToPlayer(GetOwningPlayer(src), 0, 0, "|cffff2020[暴击]|r x" + I2S(mult) + "  (" + R2S(dmg) + " + " + R2S(bonus) + ")")
+    endif
+endfunction
+
+// 单位死亡: 从暴击组移除（避免组内积累无效单位）
+function IB_CritOnDeath takes nothing returns nothing
+    local unit u = GetTriggerUnit()
+    if IsUnitInGroup(u, ib_critGroup) then
+        call GroupRemoveUnit(ib_critGroup, u)
+    endif
+    set u = null
+endfunction
+
+// 为单个单位注册伤害事件（已注册则跳过）
+function IB_CritRegisterUnit takes unit u returns nothing
+    if u == null then
+        return
+    endif
+    if IsUnitInGroup(u, ib_critRegGroup) then
+        return
+    endif
+    call GroupAddUnit(ib_critRegGroup, u)
+    call TriggerRegisterUnitEvent(ib_critDmgTrig, u, EVENT_UNIT_DAMAGED)
+endfunction
+
+// 单位进入地图 -> 注册伤害事件
+function IB_CritOnEnter takes nothing returns nothing
+    call IB_CritRegisterUnit(GetEnteringUnit())
+endfunction
+
+// 为地图上所有现有单位注册伤害事件
+function IB_CritRegisterAllUnits takes nothing returns nothing
+    local group g = CreateGroup()
+    local unit u
+    call GroupEnumUnitsInRect(g, GetWorldBounds(), null)
+    loop
+        set u = FirstOfGroup(g)
+        exitwhen u == null
+        call IB_CritRegisterUnit(u)
+        call GroupRemoveUnit(g, u)
+    endloop
+    call DestroyGroup(g)
+    set g = null
+endfunction
+
+// 注册暴击事件（在 IB_Init 中调用一次）
+// 注意: War3 1.27 没有 EVENT_PLAYER_UNIT_DAMAGED，伤害检测需用
+//       "单位进入地图 -> 为该单位注册 EVENT_UNIT_DAMAGED" 的经典 Damage Engine 模式。
+function IB_CritInit takes nothing returns nothing
+    local trigger ta = CreateTrigger()
+    local trigger tt = CreateTrigger()
+    local trigger te = CreateTrigger()
+    local region reg = CreateRegion()
+    local rect rc = GetWorldBounds()
+
+    // 先建组（后续注册/统计都要用）
+    set ib_critGroup = CreateGroup()
+    set ib_critRegGroup = CreateGroup()
+
+    // 攻击事件（全局）
+    call TriggerRegisterAnyUnitEventBJ(ta, EVENT_PLAYER_UNIT_ATTACKED)
+    call TriggerAddAction(ta, function IB_CritOnAttack)
+
+    // 死亡事件（全局）
+    call TriggerRegisterAnyUnitEventBJ(tt, EVENT_PLAYER_UNIT_DEATH)
+    call TriggerAddAction(tt, function IB_CritOnDeath)
+
+    // 伤害事件：为每个进入地图的单位单独注册
+    set ib_critDmgTrig = CreateTrigger()
+    call TriggerAddAction(ib_critDmgTrig, function IB_CritOnDamage)
+    call RegionAddRect(reg, rc)
+    call TriggerRegisterEnterRegion(te, reg, null)
+    call TriggerAddAction(te, function IB_CritOnEnter)
+
+    // 已在地图上的预置单位
+    call IB_CritRegisterAllUnits()
+
+    set ta = null
+    set tt = null
+    set te = null
+    set rc = null
+endfunction
+
+
+// 给选中单位开启暴击
+function IB_CritEnable takes player p returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    if u == null then
+        call IB_SkillMessage(p, "请先选中一个英雄/单位")
+        return
+    endif
+    call GroupAddUnit(ib_critGroup, u)
+    call IB_SkillMessage(p, "已给 " + GetUnitName(u) + " 开启【致命一击】")
+    set u = null
+endfunction
+
+// 关闭选中单位的暴击
+function IB_CritDisable takes player p returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    if u == null then
+        call IB_SkillMessage(p, "请先选中一个英雄/单位")
+        return
+    endif
+    call GroupRemoveUnit(ib_critGroup, u)
+    call IB_SkillMessage(p, "已关闭 " + GetUnitName(u) + " 的【致命一击】")
+    set u = null
+endfunction
+
+// 显示暴击系统信息
+function IB_CritInfo takes player p returns nothing
+    call IB_SkillMessage(p, "【致命一击】概率表: 50%x2 30%x3 10%x4 4%x5 3%x10 2%x50 1%x100 (EV=4.8x)")
+    call IB_SkillMessage(p, "本局已触发暴击 " + I2S(ib_critCount) + " 次，最近倍率 x" + I2S(ib_critLastMult))
+    call IB_SkillMessage(p, "命令: criton(给选中单位) / critoff(移除) / crit(信息)")
+endfunction
+
 //---------------------------------------------------------------------------
 // 解析聊天命令
 //---------------------------------------------------------------------------
@@ -831,6 +1029,12 @@ function IB_OnChat takes nothing returns nothing
         call IB_ParseSetSkill(p, arg)
     elseif IB_StrEqCI(cmd, "listitem") then
         call IB_Search(p, arg)
+    elseif IB_StrEqCI(cmd, "criton") then
+        call IB_CritEnable(p)
+    elseif IB_StrEqCI(cmd, "critoff") then
+        call IB_CritDisable(p)
+    elseif IB_StrEqCI(cmd, "crit") then
+        call IB_CritInfo(p)
     endif
 endfunction
 
@@ -839,6 +1043,21 @@ endfunction
 // 用 TriggerAddAction（而非 Condition）注册：部分地图/版本下仅含 condition
 // 的聊天触发器不会触发；用 action 更可靠。
 //---------------------------------------------------------------------------
+function IB_RegisterChat7 takes nothing returns nothing
+    local integer i = 0
+    local trigger t = CreateTrigger()
+    loop
+        exitwhen i > 11
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "crit", false)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(t, function IB_OnChat)
+    set t = null
+    call PauseTimer(ib_regTimer)
+    call DestroyTimer(ib_regTimer)
+    set ib_regTimer = null
+endfunction
+
 function IB_RegisterChat6 takes nothing returns nothing
     local integer i = 0
     local trigger t = CreateTrigger()
@@ -849,9 +1068,7 @@ function IB_RegisterChat6 takes nothing returns nothing
     endloop
     call TriggerAddAction(t, function IB_OnChat)
     set t = null
-    call PauseTimer(ib_regTimer)
-    call DestroyTimer(ib_regTimer)
-    set ib_regTimer = null
+    call TimerStart(ib_regTimer, 0.02, false, function IB_RegisterChat7)
 endfunction
 
 function IB_RegisterChat5 takes nothing returns nothing
@@ -924,6 +1141,10 @@ endfunction
 //---------------------------------------------------------------------------
 // 入口：直接填充预扫描的物品 ID 列表，立即注册聊天事件（无需枚举）
 //---------------------------------------------------------------------------
+
+
+
+
 function IB_Fill0 takes nothing returns nothing
     set ib_itemList[0] = 'ckng'
     set ib_itemName[0] = "金币"
@@ -6183,6 +6404,7 @@ function IB_Init takes nothing returns nothing
     set ib_skFillTotal = 17
     set ib_skFillTimer = CreateTimer()
     call TimerStart(ib_skFillTimer, 0.01, true, function IB_SkillFillStep)
+    call IB_CritInit()
 endfunction
 
 //---------------------------------------------------------------------------

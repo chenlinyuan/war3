@@ -3935,6 +3935,7 @@ function IB_SkillFillStep takes nothing returns nothing
     endif
     set ib_skFillIdx = ib_skFillIdx + 1
     if ib_skFillIdx >= ib_skFillTotal then
+        set ib_skillCount = 881
         call PauseTimer(ib_skFillTimer)
         call DestroyTimer(ib_skFillTimer)
         set ib_skFillTimer = null

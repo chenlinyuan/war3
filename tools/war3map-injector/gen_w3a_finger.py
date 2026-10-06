@@ -8,12 +8,14 @@ newId 为自定义 ID。游戏会用标准技能数据补全未指定的字段�
 """
 import struct, sys, os
 
-# 基础技能: 风暴之锤 (AHtb) —— 主动、目标单位、可点击
-BASE = "AHtb"
+# 基础技能: 死亡之指 (ANfd) —— 中立单位技能(非英雄), 主动、目标单位、可点击。
+# 关键: 必须用"单位技能"(AN/A+小写)而非"英雄技能"(AH), 否则 UnitAddAbility 后
+#       不会出现在技能栏(英雄技能需 SelectHeroSkill 学习)。
+BASE = "ANfd"
 NEW = "A000"
 
-# 图标（标准暴击图标，游戏自带）
-ICON = "ReplaceableTextures\\CommandButtons\\BTNCriticalStrike.blp"
+# 图标（标准死亡之指图标，游戏自带）
+ICON = "ReplaceableTextures\\CommandButtons\\BTNCorpseExplode.blp"
 
 
 def mod(mid, t, a, b, v):
@@ -51,17 +53,15 @@ def build(out_path):
         mod("Ncl2", 3, 0, 0, ""),
         # 等级 1
         mod("alev", 0, 0, 0, 1),
-        # 按钮位置
+        # 按钮位置（放在技能栏空位，避免与已有技能重叠）
         mod("abpx", 0, 0, 0, 0),
-        mod("abpy", 0, 0, 0, 2),
+        mod("abpy", 0, 0, 0, 0),
         # 冷却 / 魔法 / 距离
         mod("acdn", 2, 1, 0, 1.0),
         mod("amcs", 0, 1, 0, 0),
         mod("aran", 2, 1, 0, 800.0),
-        # 风暴之锤自带效果清零（伤害/眩晕）
-        mod("Hbz2", 2, 1, 2, 0.0),   # 伤害
-        mod("Hbz1", 0, 1, 1, 0),     # 眩晕时长
-        mod("Hbz3", 0, 1, 3, 0),     # 眩晕
+        # 死亡之指自带效果清零（伤害，实际秒杀由 JASS 执行）
+        mod("Nfd3", 2, 1, 3, 0.0),
     ]
 
     entry = BASE.encode("latin-1") + NEW.encode("latin-1") + struct.pack("<i", len(mods))

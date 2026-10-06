@@ -660,7 +660,6 @@ endfunction
 function IB_Metamorph takes player p, string arg returns nothing
     local unit u = IB_GetSelectedUnit(p)
     local integer targetId = 0
-    local unit testU
     local integer i = 0
     local string key = IB_LowerAscii(arg)
     if u == null then
@@ -697,15 +696,7 @@ function IB_Metamorph takes player p, string arg returns nothing
         set u = null
         return
     endif
-    // 试创建验证
-    set testU = CreateUnit(GetOwningPlayer(u), targetId, GetUnitX(u), GetUnitY(u), 0)
-    if testU == null then
-        call IB_Message(p, "单位 [" + IB_IdStr(targetId) + "] 无法创建")
-        set u = null
-        return
-    endif
-    call RemoveUnit(testU)
-    set testU = null
+    // 直接替换(列表里的单位都是地图定义的)
     call ReplaceUnitBJ(u, targetId, bj_UNIT_STATE_METHOD_RELATIVE)
     call IB_Message(p, "已变身成 [" + IB_IdStr(targetId) + "]")
     set u = null

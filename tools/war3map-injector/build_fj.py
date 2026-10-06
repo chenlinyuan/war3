@@ -92,6 +92,7 @@ for ci in range(len(skill_chunks)):
 skill_fill_step.append("    endif")
 skill_fill_step.append("    set ib_skFillIdx = ib_skFillIdx + 1")
 skill_fill_step.append("    if ib_skFillIdx >= ib_skFillTotal then")
+skill_fill_step.append("        set ib_skillCount = %d" % len(skills))
 skill_fill_step.append("        call PauseTimer(ib_skFillTimer)")
 skill_fill_step.append("        call DestroyTimer(ib_skFillTimer)")
 skill_fill_step.append("        set ib_skFillTimer = null")

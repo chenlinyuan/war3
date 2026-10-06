@@ -773,6 +773,52 @@ function IB_ParseRemoveSkill takes player p, string arg returns nothing
     call IB_RemoveSkill(p, arg)
 endfunction
 
+//---------------------------------------------------------------------------
+// 移除选中单位的全部技能（分帧遍历技能列表，逐个检测并移除）
+// JASS 1.27 无法直接枚举单位技能，故遍历内嵌技能表 + GetUnitAbilityLevel 检测
+//---------------------------------------------------------------------------
+function IB_RemoveAllSkillStep takes nothing returns nothing
+    local integer n = 0
+    local integer lvl
+    loop
+        exitwhen ib_skClrIdx >= ib_skillCount or n >= 60
+        set lvl = GetUnitAbilityLevel(ib_skClrUnit, ib_skillList[ib_skClrIdx])
+        if lvl > 0 then
+            call UnitRemoveAbility(ib_skClrUnit, ib_skillList[ib_skClrIdx])
+            set ib_skClrCount = ib_skClrCount + 1
+        endif
+        set ib_skClrIdx = ib_skClrIdx + 1
+        set n = n + 1
+    endloop
+    if ib_skClrIdx >= ib_skillCount then
+        call PauseTimer(ib_skClrTimer)
+        call DestroyTimer(ib_skClrTimer)
+        set ib_skClrTimer = null
+        call IB_SkillMessage(ib_skClrPlayer, "已移除 " + GetUnitName(ib_skClrUnit) + " 的 " + I2S(ib_skClrCount) + " 个技能")
+        set ib_skClrPlayer = null
+        set ib_skClrUnit = null
+    endif
+endfunction
+
+function IB_RemoveAllSkill takes player p returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    if u == null then
+        call IB_SkillMessage(p, "请先选中一个英雄/单位")
+        return
+    endif
+    set ib_skClrIdx = 0
+    set ib_skClrCount = 0
+    set ib_skClrPlayer = p
+    set ib_skClrUnit = u
+    if ib_skClrTimer != null then
+        call PauseTimer(ib_skClrTimer)
+        call DestroyTimer(ib_skClrTimer)
+    endif
+    set ib_skClrTimer = CreateTimer()
+    call TimerStart(ib_skClrTimer, 0.01, true, function IB_RemoveAllSkillStep)
+    set u = null
+endfunction
+
 //===========================================================================
 // 致命一击系统（自定义暴击）
 //---------------------------------------------------------------------------
@@ -1366,6 +1412,8 @@ function IB_OnChat takes nothing returns nothing
         call IB_EncProbe(p, arg)
     elseif IB_StrEqCI(cmd, "deathfinger") or IB_StrEqCI(cmd, "finger") then
         call IB_FingerKill(p, arg)
+    elseif IB_StrEqCI(cmd, "removeallskill") then
+        call IB_RemoveAllSkill(p)
     endif
 endfunction
 
@@ -1385,6 +1433,7 @@ function IB_RegisterChat8 takes nothing returns nothing
         call TriggerRegisterPlayerChatEvent(t, Player(i), "unitdiag", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "deathfinger", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "finger", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "removeallskill", false)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)

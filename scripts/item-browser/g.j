@@ -89,6 +89,14 @@ integer ib_skSetLevel = 1
 player ib_skSetPlayer = null
 timer ib_skSetTimer = null
 
+// 移除全部技能状态（分帧扫描技能列表）
+integer ib_skClrIdx = 0
+integer ib_skClrCount = 0
+player ib_skClrPlayer = null
+unit ib_skClrUnit = null
+timer ib_skClrTimer = null
+
+
 //---------------------------------------------------------------------------
 // 致命一击系统（自定义暴击）
 //---------------------------------------------------------------------------

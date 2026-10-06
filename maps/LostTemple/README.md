@@ -33,11 +33,23 @@
 - `criton` / `critoff` / `crit` — 致命一击（自定义暴击，50%x2 … 1%x100，EV=4.8x）
 - `itembrowser` — 显示帮助
 
-**注入后大小**：301,394 字节（+56,307）
+**注入后大小**：286,339 字节（+41,252）
 
-> ✅ **进游戏立即可用**：物品 ID 列表（273 个）在注入时预扫描硬编码，无需 2-3 分钟枚举。
+> ✅ **进游戏立即可用**：物品 ID 列表（273 个标准物品）在注入时预扫描硬编码，无需 2-3 分钟枚举。
 > ⚠️ **脚本编码**：War3 1.27 以 GBK 解析地图脚本。`inject_map.py` 会自动把
 > UTF-8 源脚本转为 GBK 再注入，否则中文字符串会破坏解析，导致**加载后回到选图界面**。
+
+> ⚠️ **数据源**：`_itemids.txt` / `_skillids.txt` 是**按地图生成**的临时文件。
+> Lost Temple 是官方地图（无自定义对象数据），因此使用**游戏标准物品/技能**：
+> - 物品：273 个（`itemdata.slk` + `itemstrings.txt`）
+> - 技能：817 个（8 个种族 `abilitystrings.txt`）
+>
+> 重新生成（`_lt_tmp` 为不含地图对象数据的空目录）：
+> ```powershell
+> python tools/war3map-injector/collect_items.py "_lt_tmp"
+> python tools/war3map-injector/collect_skills.py "_lt_tmp"
+> python tools/war3map-injector/build_fj.py
+> ```
 
 ## 部署位置
 

@@ -24,7 +24,7 @@ NEW_ATTACK = "A001"
 NEW_SPEED = "A002"
 
 # 图标
-ICON_ATTACK = "ReplaceableTextures\\CommandButtons\\BTNTrueshotAura.blp"
+ICON_ATTACK = "ReplaceableTextures\\CommandButtons\\BTNCorpseExplode.blp"
 ICON_SPEED = "ReplaceableTextures\\CommandButtons\\BTNGlove.blp"
 
 
@@ -46,7 +46,10 @@ def write_mod(m):
     return out
 
 
-def build_attack_entry(new_id, percent, name="强击光环", icon=ICON_ATTACK):
+def build_attack_entry(new_id, percent, name="阿克蒙德之力",
+                       tooltip="阿克蒙德之力",
+                       ubertip="增加周围友军 50% 攻击力（近战/远程均生效）。",
+                       icon=ICON_ATTACK):
     """攻击力百分比光环技能（基于 AIar ItemAuraTrueshot）。percent: 0.5 = +50%。
 
     强击光环字段 (AEar 默认值): Ear1=攻击力%(0.1), Ear2=近战开关(0), Ear3=远程开关(1)。
@@ -55,7 +58,10 @@ def build_attack_entry(new_id, percent, name="强击光环", icon=ICON_ATTACK):
     """
     mods = [
         mod("anam", 3, 0, 0, name),
+        mod("atp1", 3, 1, 0, tooltip),
+        mod("aub1", 3, 1, 0, ubertip),
         mod("aart", 3, 0, 0, icon),
+        mod("arar", 3, 0, 0, icon),
         mod("alev", 0, 0, 0, 1),
         # 数据字段: Ear1 = 攻击力加成百分比 (unreal, 0.5 = +50%)
         mod("Ear1", 2, 1, 1, float(percent)),

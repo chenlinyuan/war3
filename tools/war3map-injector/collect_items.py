@@ -81,23 +81,60 @@ def parse_wts(path):
 def parse_w3t(path, wts_path=None):
     """Return list of (id, name) custom items from war3map.w3t.
 
-    The w3t modification table is not reliably walkable byte-by-byte (the
-    writer emits stray object-id fields between mods), so we anchor on the
-    `unam` (name) modification: every custom item id is followed within a
-    short window by `unam\\x03\\x00\\x00\\x00TRIGSTR_N\\x00`.
+    w3t v2 结构: version(4) + origCount(4) + [entries] + customCount(4) + [entries]
+    entry = oldId(4) + newId(4) + modCount(4) + [mods]
+    mod   = modId(4) + type(4) + a(4) + b(4) + value + c(4)
+    type: 0=int, 1=real, 2=unreal, 3=string(UTF-8 或 TRIGSTR_N)
+    名称字段: unam(TRIGSTR) 或 inam(直接字符串)。
     """
+    import struct
     data = open(path, "rb").read()
     trig = parse_wts(wts_path) if wts_path and os.path.isfile(wts_path) else {}
-    items = {}
-    for m in re.finditer(rb"I[0-9A-Za-z]{3}", data):
-        start = m.start()
-        iid = m.group(0).decode("latin-1")
-        seg = data[start:start + 120]
-        um = re.search(rb"unam\x03\x00\x00\x00(TRIGSTR_\d+)\x00", seg)
-        if um:
-            key = um.group(1).decode("latin-1")
-            items[iid] = trig.get(key, "")
-    return list(items.items())
+    items = []
+    if len(data) < 12:
+        return items
+    off = 0
+    version = struct.unpack_from("<i", data, off)[0]; off += 4
+    orig_n = struct.unpack_from("<i", data, off)[0]; off += 4
+
+    def read_entry(off):
+        old = data[off:off + 4].decode("latin-1"); off += 4
+        new = data[off:off + 4].decode("latin-1"); off += 4
+        n = struct.unpack_from("<i", data, off)[0]; off += 4
+        name = ""
+        for _ in range(n):
+            mid = data[off:off + 4].decode("latin-1"); off += 4
+            t = struct.unpack_from("<i", data, off)[0]; off += 4
+            off += 8  # a, b
+            if t == 0:
+                off += 4
+            elif t in (1, 2):
+                off += 4
+            elif t == 3:
+                e = data.find(b"\x00", off)
+                val = data[off:e].decode("utf-8", "replace"); off = e + 1
+                if mid in ("unam", "inam"):
+                    if val.startswith("TRIGSTR_"):
+                        name = trig.get(val, "")
+                    else:
+                        name = val
+            else:
+                return old, new, name, len(data)  # 无法解析，终止
+            off += 4  # c
+        return old, new, name, off
+
+    try:
+        for _ in range(orig_n):
+            _, _, _, off = read_entry(off)
+        cust_n = struct.unpack_from("<i", data, off)[0]; off += 4
+        for _ in range(cust_n):
+            _, new, name, off = read_entry(off)
+            if new:
+                items.append((new, name))
+    except (struct.error, IndexError):
+        pass
+    return items
+
 
 
 def main():

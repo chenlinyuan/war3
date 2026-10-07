@@ -84,3 +84,12 @@ tools/war3map-injector/_rep/
 
 # ---- HKE 解压出的地图文件目录 ----
 maps/*/LostTemple/
+
+# ---- HKE 解压出的地图文件目录 ----
+maps/*.w3x.orig/
+maps/*.w3m.orig/
+maps/*_extract/
+_yingling_files.txt
+
+# ---- 超大英灵传说地图(753MB, 不入库) ----
+maps/英灵传说*.w3x

@@ -1135,16 +1135,6 @@ function IB_CritOnDamage takes nothing returns nothing
         return
     endif
 
-    // --- 阿克蒙德之手: +50% 攻击力（普攻追加 50% 伤害）---
-    // 攻击者携带手套技能(A001)时生效，独立于暴击
-    if GetUnitAbilityLevel(src, ib_handAbility) > 0 then
-        set bonus = dmg * ib_handBonus
-        set ib_critBusy = true
-        call UnitDamageTarget(src, tgt, bonus, true, false, ATTACK_TYPE_NORMAL, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS)
-        set ib_critBusy = false
-        set ib_handCount = ib_handCount + 1
-    endif
-
     // --- 致命一击 ---
     if not ib_critEnabled then
         return

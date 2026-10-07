@@ -1,24 +1,22 @@
-"""生成 war3map.w3a，包含自定义物品技能（攻击力标记 + 攻击速度加成）。
+"""生成 war3map.w3a，包含自定义物品技能（攻击力百分比光环 + 攻击速度加成）。
 
 基于标准物品技能：
-  AIat = AttackBonus            数据字段 Iatt (int, 固定攻击力加成)
-  AIsx = Attack Speed Increase  数据字段 Isx1 (unreal, 1.0 = +100%)
+  AIar = ItemAuraTrueshot (物品版强击光环)  数据字段 Ear1 (unreal, 0.5 = +50%)
+  AIsx = Attack Speed Increase              数据字段 Isx1 (unreal, 1.0 = +100%)
 
-注意: War3 没有"被动百分比攻击力"技能。AIaa(AttackMod) 是"使用后永久加攻"，
-      不是被动。故 +50% 攻击力由 JASS 脚本(IB_CritOnDamage)在普攻时追加伤害实现，
-      A001 仅作为"携带手套"的标记技能(Iatt=0, 无固定加成)。
+强击光环是 War3 标准的**百分比攻击力光环**，装备时被动生效（无需脚本）。
 
 用法:
-    python gen_item_abils.py <输出w3a> [标记攻击力] [攻速]
+    python gen_item_abils.py <输出w3a> [攻击力百分比] [攻速]
 示例:
-    python gen_item_abils.py _hand_abil.w3a 0 1.0
+    python gen_item_abils.py _hand_abil.w3a 0.5 1.0
 """
 import struct
 import sys
 import os
 
 # 基础技能
-BASE_ATTACK = "AIat"   # 攻击力加成(此处作为标记, Iatt=0)
+BASE_ATTACK = "AIar"   # 物品版强击光环 (百分比攻击力)
 BASE_SPEED = "AIsx"    # 攻击速度加成
 
 # 自定义 ID
@@ -26,7 +24,7 @@ NEW_ATTACK = "A001"
 NEW_SPEED = "A002"
 
 # 图标
-ICON_ATTACK = "ReplaceableTextures\\CommandButtons\\BTNSteelMelee.blp"
+ICON_ATTACK = "ReplaceableTextures\\CommandButtons\\BTNTrueshotAura.blp"
 ICON_SPEED = "ReplaceableTextures\\CommandButtons\\BTNGlove.blp"
 
 
@@ -48,14 +46,14 @@ def write_mod(m):
     return out
 
 
-def build_attack_entry(new_id, flat, name="攻击力加成", icon=ICON_ATTACK):
-    """攻击力标记技能（基于 AIat）。flat: 固定加成值(0=纯标记, 百分比由脚本处理)。"""
+def build_attack_entry(new_id, percent, name="强击光环", icon=ICON_ATTACK):
+    """攻击力百分比光环技能（基于 AIar ItemAuraTrueshot）。percent: 0.5 = +50%。"""
     mods = [
         mod("anam", 3, 0, 0, name),
         mod("aart", 3, 0, 0, icon),
         mod("alev", 0, 0, 0, 1),
-        # 数据字段: Iatt = 固定攻击力加成 (int)
-        mod("Iatt", 0, 1, 1, int(flat)),
+        # 数据字段: Ear1 = 攻击力加成百分比 (unreal, 0.5 = +50%)
+        mod("Ear1", 2, 1, 1, float(percent)),
     ]
     return (BASE_ATTACK, new_id, mods)
 
@@ -72,9 +70,9 @@ def build_speed_entry(new_id, amount, name="攻击速度加成", icon=ICON_SPEED
     return (BASE_SPEED, new_id, mods)
 
 
-def build(out_path, attack=0, speed=1.0):
+def build(out_path, attack=0.5, speed=1.0):
     entries = [
-        build_attack_entry(NEW_ATTACK, int(attack)),
+        build_attack_entry(NEW_ATTACK, float(attack)),
         build_speed_entry(NEW_SPEED, float(speed)),
     ]
     data = struct.pack("<ii", 2, 0) + struct.pack("<i", len(entries))
@@ -83,13 +81,13 @@ def build(out_path, attack=0, speed=1.0):
         for m in mods:
             data += write_mod(m)
     open(out_path, "wb").write(data)
-    print("wrote %s: %d bytes (attack=%s marker=%d, speed=%s +%.0f%%)" % (
-        out_path, len(data), NEW_ATTACK, attack, NEW_SPEED, speed * 100))
+    print("wrote %s: %d bytes (attack=%s +%.0f%%, speed=%s +%.0f%%)" % (
+        out_path, len(data), NEW_ATTACK, attack * 100, NEW_SPEED, speed * 100))
 
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "_hand_abil.w3a")
-    atk = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    atk = float(sys.argv[2]) if len(sys.argv) > 2 else 0.5
     spd = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
     build(out, atk, spd)

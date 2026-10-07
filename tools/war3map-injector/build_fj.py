@@ -257,6 +257,9 @@ if item_abils:
     fn.append("    return false")
     fn.append("endfunction")
     itemabil_fn = "\n".join(fn)
+    # 先移除旧的 IB_IsItemAbility（幂等重建）
+    txt = re.sub(r"function IB_IsItemAbility takes integer abilId returns boolean\n.*?\nendfunction\n\n?",
+                 "", txt, flags=re.S)
     # 插入到 f.j 中 IB_SkillIsProtected 函数之前
     txt = txt.replace("function IB_SkillIsProtected takes integer abilId returns boolean",
                       itemabil_fn + "\n\nfunction IB_SkillIsProtected takes integer abilId returns boolean", 1)

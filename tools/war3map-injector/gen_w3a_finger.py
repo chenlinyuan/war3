@@ -38,7 +38,7 @@ def write_mod(m):
 
 
 def build_new_entry(new_id, cooldown=12.0, mana=100, cast_range=800.0, name="死亡之指",
-                    tooltip="死亡之指(|cffffcc00D|r)",
+                    tooltip="死亡之指(|cffffcc00F|r)",
                     ubertip="秒杀目标单位（对魔法免疫也生效）。"):
     """返回 (baseId, newId, mods)，供其他脚本复用。"""
     # 字段类型: 0=int, 1=real, 2=unreal, 3=string
@@ -53,6 +53,8 @@ def build_new_entry(new_id, cooldown=12.0, mana=100, cast_range=800.0, name="死
         mod("arar", 3, 0, 0, ICON),
         mod("arac", 3, 0, 0, "creeps"),
         mod("aord", 3, 0, 0, ""),
+        # 快捷键 F（同阿克蒙德死亡之指）
+        mod("ahky", 3, 0, 0, "F"),
         # 目标类型（关键: Ncl2 是 int，不是字符串！）
         mod("Ncl2", 0, 1, 2, 1),          # 目标类型 = 单位
         mod("Ncl1", 2, 1, 1, 0.0),        # 数据列1

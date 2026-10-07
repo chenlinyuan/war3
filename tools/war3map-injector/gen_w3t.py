@@ -57,11 +57,13 @@ def build_new_entry(new_id, name="阿克蒙德之手",
     """返回 (baseId, newId, mods)，供其他脚本复用。"""
     # 字段类型: 0=int, 1=real, 2=unreal, 3=string
     # A = 等级(0=全局), B = 数据列索引
+    # 注意: WC3 物品对象数据的名称/提示字段 ID 与单位共用 unam/utip/utub
+    #       (文档里的 inam/itip/iutb 是错的, 实测游戏读 unam)。
     mods = [
-        mod("inam", 3, 0, 0, name),
+        mod("unam", 3, 0, 0, name),
+        mod("utip", 3, 0, 0, tip),
+        mod("utub", 3, 0, 0, ubertip),
         mod("ides", 3, 0, 0, desc),
-        mod("itip", 3, 0, 0, tip),
-        mod("iutb", 3, 0, 0, ubertip),
         mod("ihot", 3, 0, 0, hotkey),
         mod("iico", 3, 0, 0, icon),
         mod("icla", 3, 0, 0, class_),

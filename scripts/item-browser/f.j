@@ -773,6 +773,23 @@ function IB_ParseRemoveSkill takes player p, string arg returns nothing
     call IB_RemoveSkill(p, arg)
 endfunction
 
+// 判断技能是否"危险"（不能移除，否则可能崩溃/破坏单位）
+// 例如: 物品栏(AInv)、英雄(AHer)、蝗虫(Aloc)、防御(Adef)、采集(Ahrl) 等
+function IB_SkillIsProtected takes integer abilId returns boolean
+    // AInv 物品栏 / AHer 英雄 / Aloc 蝗虫 / Adef 防御 / Ahrl 采集 / Amov 移动 / Aatk 攻击
+    if abilId == 'AInv' or abilId == 'AHer' or abilId == 'Aloc' then
+        return true
+    endif
+    if abilId == 'Adef' or abilId == 'Ahrl' or abilId == 'Amov' or abilId == 'Aatk' then
+        return true
+    endif
+    // 攻击/移动类 (Aatk/Aat1..Aat3, Amov 等) 前缀
+    if abilId == 'Aat1' or abilId == 'Aat2' or abilId == 'Aat3' or abilId == 'Aatk' then
+        return true
+    endif
+    return false
+endfunction
+
 //---------------------------------------------------------------------------
 // 移除选中单位的全部技能（分帧遍历技能列表，逐个检测并移除）
 // JASS 1.27 无法直接枚举单位技能，故遍历内嵌技能表 + GetUnitAbilityLevel 检测
@@ -780,12 +797,26 @@ endfunction
 function IB_RemoveAllSkillStep takes nothing returns nothing
     local integer n = 0
     local integer lvl
+    local integer aid
+    // 单位可能已失效（死亡/移除）-> 直接结束
+    if ib_skClrUnit == null or GetUnitTypeId(ib_skClrUnit) == 0 then
+        call PauseTimer(ib_skClrTimer)
+        call DestroyTimer(ib_skClrTimer)
+        set ib_skClrTimer = null
+        set ib_skClrPlayer = null
+        set ib_skClrUnit = null
+        return
+    endif
     loop
         exitwhen ib_skClrIdx >= ib_skillCount or n >= 60
-        set lvl = GetUnitAbilityLevel(ib_skClrUnit, ib_skillList[ib_skClrIdx])
-        if lvl > 0 then
-            call UnitRemoveAbility(ib_skClrUnit, ib_skillList[ib_skClrIdx])
-            set ib_skClrCount = ib_skClrCount + 1
+        set aid = ib_skillList[ib_skClrIdx]
+        // 跳过受保护技能（移除会导致崩溃/破坏单位）
+        if not IB_SkillIsProtected(aid) then
+            set lvl = GetUnitAbilityLevel(ib_skClrUnit, aid)
+            if lvl > 0 then
+                call UnitRemoveAbility(ib_skClrUnit, aid)
+                set ib_skClrCount = ib_skClrCount + 1
+            endif
         endif
         set ib_skClrIdx = ib_skClrIdx + 1
         set n = n + 1
@@ -1533,11 +1564,12 @@ function IB_RegisterChat8 takes nothing returns nothing
         call TriggerRegisterPlayerChatEvent(t, Player(i), "removeunit", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "unitdiag", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "deathfinger", false)
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "finger", false)
+        // "finger" 用精确匹配，否则会误匹配 fingeradd/fingertest
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "finger", true)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "removeallskill", false)
         call TriggerRegisterPlayerChatEvent(t, Player(i), "fingeradd", false)
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "fingertest", false)
-        call TriggerRegisterPlayerChatEvent(t, Player(i), "fingertest2", false)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "fingertest", true)
+        call TriggerRegisterPlayerChatEvent(t, Player(i), "fingertest2", true)
         set i = i + 1
     endloop
     call TriggerAddAction(t, function IB_OnChat)

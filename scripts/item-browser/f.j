@@ -1104,11 +1104,6 @@ function IB_CritShowText takes unit u, real amount, integer mult returns nothing
     set tt = null
 endfunction
 
-// 播放暴击动画（跳劈）
-function IB_CritPlayAnim takes unit u returns nothing
-    call SetUnitAnimation(u, "attack slam")
-    call QueueUnitAnimation(u, "attack")
-endfunction
 
 // 伤害事件: 若为标记的普攻且攻击者在暴击组中，则掷骰并追加伤害
 function IB_CritOnDamage takes nothing returns nothing
@@ -1156,8 +1151,6 @@ function IB_CritOnDamage takes nothing returns nothing
     set ib_critLastMult = mult
     // 在目标上方跳出红色伤害数字 + 倍率（如 "1234  x3!"）
     call IB_CritShowText(tgt, dmg + bonus, mult)
-    // 播放跳劈动画
-    call IB_CritPlayAnim(src)
 endfunction
 
 // 单位死亡: 从暴击组移除（避免组内积累无效单位）

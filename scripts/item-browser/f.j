@@ -822,6 +822,15 @@ function IB_RemoveAllSkillStep takes nothing returns nothing
         set n = n + 1
     endloop
     if ib_skClrIdx >= ib_skillCount then
+        // 额外移除我们添加的自定义技能（不在标准技能表中）
+        if GetUnitAbilityLevel(ib_skClrUnit, ib_critAbility) > 0 then
+            call UnitRemoveAbility(ib_skClrUnit, ib_critAbility)
+            set ib_skClrCount = ib_skClrCount + 1
+        endif
+        if GetUnitAbilityLevel(ib_skClrUnit, ib_fingerAbility) > 0 then
+            call UnitRemoveAbility(ib_skClrUnit, ib_fingerAbility)
+            set ib_skClrCount = ib_skClrCount + 1
+        endif
         call PauseTimer(ib_skClrTimer)
         call DestroyTimer(ib_skClrTimer)
         set ib_skClrTimer = null
@@ -857,31 +866,32 @@ endfunction
 //       额外造成 (倍率-1) 倍伤害。用"攻击事件标记 + 伤害事件结算"限定只对普攻生效。
 //       不依赖任何自定义技能对象数据，可在任意地图使用。
 //
-// 加权表（概率加和 = 100%，单次掷骰命中一档）:
-//   50%  x2    30%  x3    10%  x4    4%   x5
-//   3%   x10   2%   x50   1%   x100
-//   期望倍率 EV = 4.8x
+// 加权表（概率加和 = 57%，其余 43% 不暴击）:
+//   30%  x2    12%  x3    8%   x4    4%   x5
+//   2%   x50   1%   x100
 //   —— 如需调整数值，只改下面 IB_CritRoll 里的阈值即可。
 //===========================================================================
 
 // 掷骰：返回本次暴击倍率（>=2 表示暴击）
-// 单次掷骰加权表，累计概率: 50/80/90/94/97/99/100
+// 掷骰：返回本次暴击倍率（>=2 表示暴击；0 表示未暴击）
+// 单次掷骰加权表，累计概率: 30/42/50/54/56/57/100
+//   30% x2  12% x3  8% x4  4% x5  2% x50  1% x100  43% 不暴击
 function IB_CritRoll takes nothing returns integer
     local integer r = GetRandomInt(1, 100)
-    if r <= 50 then
+    if r <= 30 then
         return 2
-    elseif r <= 80 then
+    elseif r <= 42 then
         return 3
-    elseif r <= 90 then
+    elseif r <= 50 then
         return 4
-    elseif r <= 94 then
+    elseif r <= 54 then
         return 5
-    elseif r <= 97 then
-        return 10
-    elseif r <= 99 then
+    elseif r <= 56 then
         return 50
+    elseif r <= 57 then
+        return 100
     endif
-    return 100
+    return 0
 endfunction
 
 // 攻击事件: 记录攻击者/目标，标记"下一次伤害可能来自普攻"
@@ -891,12 +901,12 @@ function IB_CritOnAttack takes nothing returns nothing
     set ib_critArmed = true
 endfunction
 
-// 在单位上方显示红色漂浮伤害数字（模拟原版暴击红字）
-function IB_CritShowText takes unit u, real amount returns nothing
+// 在单位上方显示红色漂浮伤害数字 + 暴击倍率（如 "1234  x3!"）
+function IB_CritShowText takes unit u, real amount, integer mult returns nothing
     local texttag tt = CreateTextTag()
     local real x = GetUnitX(u)
     local real y = GetUnitY(u)
-    call SetTextTagText(tt, I2S(R2I(amount)), 0.024)
+    call SetTextTagText(tt, I2S(R2I(amount)) + "  x" + I2S(mult) + "!", 0.024)
     call SetTextTagPos(tt, x, y, 60.0)
     call SetTextTagColor(tt, 255, 0, 0, 255)
     call SetTextTagVelocity(tt, 0.0, 0.04)
@@ -940,6 +950,10 @@ function IB_CritOnDamage takes nothing returns nothing
     endif
 
     set mult = IB_CritRoll()
+    // mult == 0 表示未暴击，不追加伤害
+    if mult < 2 then
+        return
+    endif
     set bonus = dmg * I2R(mult - 1)
     set ib_critBusy = true
     call UnitDamageTarget(src, tgt, bonus, true, false, ATTACK_TYPE_NORMAL, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS)
@@ -947,8 +961,8 @@ function IB_CritOnDamage takes nothing returns nothing
 
     set ib_critCount = ib_critCount + 1
     set ib_critLastMult = mult
-    // 在目标上方跳出红色伤害数字（模拟原版暴击红字）
-    call IB_CritShowText(tgt, dmg + bonus)
+    // 在目标上方跳出红色伤害数字 + 倍率（如 "1234  x3!"）
+    call IB_CritShowText(tgt, dmg + bonus, mult)
 endfunction
 
 // 单位死亡: 从暴击组移除（避免组内积累无效单位）

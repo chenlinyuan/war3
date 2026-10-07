@@ -89,6 +89,15 @@ integer ib_skSetLevel = 1
 player ib_skSetPlayer = null
 timer ib_skSetTimer = null
 
+// 移除技能对话框状态
+dialog ib_remDialog = null
+integer array ib_remDlgAbil      // 按钮索引 -> 技能 ID
+button array ib_remDlgButton     // 按钮句柄（用于比对点击）
+unit ib_remDlgUnit = null
+player ib_remDlgPlayer = null
+integer ib_remDlgCount = 0
+trigger ib_remDlgTrig = null
+
 // 移除全部技能状态（分帧扫描技能列表）
 integer ib_skClrIdx = 0
 integer ib_skClrCount = 0

@@ -769,9 +769,101 @@ function IB_ParseAddSkill takes player p, string arg returns nothing
     call IB_AddSkill(p, skillName, level)
 endfunction
 
+//---------------------------------------------------------------------------
+// 移除技能对话框: 列出选中单位拥有的技能, 点击按钮移除
+//---------------------------------------------------------------------------
+function IB_RemoveSkillDialogClick takes nothing returns nothing
+    local button b = GetClickedButton()
+    local integer i = 0
+    local integer aid
+    loop
+        exitwhen i >= ib_remDlgCount
+        if b == ib_remDlgButton[i] then
+            set aid = ib_remDlgAbil[i]
+            if ib_remDlgUnit != null and GetUnitTypeId(ib_remDlgUnit) != 0 then
+                call UnitRemoveAbility(ib_remDlgUnit, aid)
+                call IB_SkillMessage(ib_remDlgPlayer, "已移除技能 [" + IB_IdStr(aid) + "]")
+            endif
+            set i = ib_remDlgCount
+        endif
+        set i = i + 1
+    endloop
+endfunction
+
+function IB_ShowRemoveSkillDialog takes player p returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    local integer i = 0
+    local integer aid
+    local integer n = 0
+    local string nm
+    if u == null then
+        call IB_SkillMessage(p, "请先选中一个英雄/单位")
+        return
+    endif
+    if ib_remDialog != null then
+        call DialogDestroy(ib_remDialog)
+    endif
+    set ib_remDialog = DialogCreate()
+    set ib_remDlgUnit = u
+    set ib_remDlgPlayer = p
+    set ib_remDlgCount = 0
+    // 遍历标准技能表，找出单位拥有的技能（最多 12 个）
+    loop
+        exitwhen i >= ib_skillCount or n >= 12
+        set aid = ib_skillList[i]
+        if GetUnitAbilityLevel(u, aid) > 0 then
+            set ib_remDlgAbil[n] = aid
+            set nm = ib_skillName[i]
+            if StringLength(nm) == 0 then
+                set nm = IB_IdStr(aid)
+            endif
+            set ib_remDlgButton[n] = DialogAddButton(ib_remDialog, nm + " [" + IB_IdStr(aid) + "]", 0)
+            set n = n + 1
+        endif
+        set i = i + 1
+    endloop
+    // 自定义技能
+    if GetUnitAbilityLevel(u, ib_critAbility) > 0 and n < 12 then
+        set ib_remDlgAbil[n] = ib_critAbility
+        set ib_remDlgButton[n] = DialogAddButton(ib_remDialog, "致命一击 [" + IB_IdStr(ib_critAbility) + "]", 0)
+        set n = n + 1
+    endif
+    if GetUnitAbilityLevel(u, ib_fingerAbility) > 0 and n < 12 then
+        set ib_remDlgAbil[n] = ib_fingerAbility
+        set ib_remDlgButton[n] = DialogAddButton(ib_remDialog, "死亡之指 [" + IB_IdStr(ib_fingerAbility) + "]", 0)
+        set n = n + 1
+    endif
+    set ib_remDlgCount = n
+    if n == 0 then
+        call IB_SkillMessage(p, "该单位没有可移除的技能")
+        call DialogDestroy(ib_remDialog)
+        set ib_remDialog = null
+        set u = null
+        return
+    endif
+    // 注册点击事件（只注册一次）
+    if ib_remDlgTrig == null then
+        set ib_remDlgTrig = CreateTrigger()
+        call TriggerRegisterDialogEvent(ib_remDlgTrig, ib_remDialog)
+        call TriggerAddAction(ib_remDlgTrig, function IB_RemoveSkillDialogClick)
+    else
+        call TriggerRegisterDialogEvent(ib_remDlgTrig, ib_remDialog)
+    endif
+    call DialogSetMessage(ib_remDialog, "选择要移除的技能")
+    call DialogDisplay(p, ib_remDialog, true)
+    set u = null
+endfunction
+
 function IB_ParseRemoveSkill takes player p, string arg returns nothing
+    // 无参数 -> 弹出对话框列出单位技能供点击移除
+    if StringLength(arg) == 0 then
+        call IB_ShowRemoveSkillDialog(p)
+        return
+    endif
     call IB_RemoveSkill(p, arg)
 endfunction
+
+
 
 // 判断技能是否"危险"（不能移除，否则可能崩溃/破坏单位）
 // 例如: 物品栏(AInv)、英雄(AHer)、蝗虫(Aloc)、防御(Adef)、采集(Ahrl) 等
@@ -963,6 +1055,8 @@ function IB_CritOnDamage takes nothing returns nothing
     set ib_critLastMult = mult
     // 在目标上方跳出红色伤害数字 + 倍率（如 "1234  x3!"）
     call IB_CritShowText(tgt, dmg + bonus, mult)
+    // 播放攻击动画（模拟跳劈）
+    call SetUnitAnimation(src, "attack")
 endfunction
 
 // 单位死亡: 从暴击组移除（避免组内积累无效单位）

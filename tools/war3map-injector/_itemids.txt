@@ -1,237 +1,1795 @@
-S	infs	恶魔岩石
-S	sres	恢复卷轴
-S	pres	恢复药水
+S	afac	阿利亚之笛
+S	ajen	古之忍耐姜歌
+S	amrc	召唤护身符
+S	anfg	远古雕像
 S	ankh	重生十字章
-S	whwd	治疗守卫
-S	hlst	医疗石
-S	mnst	魔法石
-S	pghe	大生命药水
-S	pgma	大魔法药水
-S	sror	野兽卷轴
-S	tdx2	敏捷之书 +10
-S	texp	经验之书
-S	tin2	智力之书 +10
-S	tpow	知识之书
-S	tst2	力量之书 +10
-S	manh	生命手册
-S	ofir	火焰之球
-S	ocor	腐蚀之球
-S	oven	毒液之球
-S	stel	传送权杖
-S	stwp	回城卷轴
-S	shea	医疗卷轴
+S	arsc	神秘卷轴
+S	arsh	芒硝护盾
+S	asbl	刺客佩刀
+S	axas	先祖权杖
+S	azhr	埃苏尼之心
+S	belv	奎尔萨拉斯之靴 +6
+S	bfhr	血羽之心
+S	bgst	巨人力量腰带+6
+S	blba	剑刃护甲
+S	brac	神秘腰带
+S	brag	敏捷腰带
+S	bspd	速度之靴
+S	btst	战斗标准
+S	bzbe	空瓶
+S	bzbf	盛满泉水的瓶子
+S	ccmd	统治权杖
+S	ches	奶酪
+S	ciri	法师长袍 +6
+S	ckng	国王之冠 +5
+S	clfm	火焰风衣
+S	clsd	影子风衣
+S	cnhn	赛纳留斯的号角
+S	cnob	贵族圆环
+S	cosl	灵魂之球
+S	crdt	死亡领主皇冠
+S	crys	水晶球
+S	desc	科勒恩的逃脱匕首
+S	dkfw	雷霆水桶
+S	dphe	雷霆凤凰蛋
+S	drph	德鲁伊布袋
+S	dsum	召唤钻石
+S	dthb	雷电花芯
+S	dtsb	德雷克萨尔魔法书
 S	dust	尘土之影
-S	pinv	隐形药水
-S	phea	生命药水
-S	pman	魔法药水
-S	moon	月亮石
-S	skul	献祭头骨
+S	engs	魔法宝石
+S	envl	魔法小瓶
+S	esaz	埃苏尼之精髓
+S	evtl	闪避护符
+S	fgdg	恶魔雕像
+S	fgfh	长钉衣领
+S	fgrd	红龙之卵
+S	fgrg	岩石印记
+S	fgsk	死亡之书
+S	fgun	信号枪
+S	flag	人族旗帜
+S	frgd	霜冻守卫
+S	frhg	火焰手套
+S	fwss	冰霜巨龙头骨护盾
+S	gcel	加速手套
+S	gemt	显形宝石
+S	gfor	防御浮雕
+S	gldo	基尔加丹之球
+S	glsk	古尔丹之颅
+S	gmfr	宝石碎片
+S	gobm	地精地雷
+S	gold	金币
+S	gomn	全知浮雕
+S	gopr	净化浮雕
+S	grsl	灵魂宝物
+S	gsou	灵魂宝石
+S	guvi	夜视浮雕
+S	gvsm	法术大师手套
+S	hbth	战舰之舵
+S	hcun	灵巧头巾
+S	hlst	医疗石
+S	horl	稀有神器
+S	hslv	医疗剂
+S	hval	英勇面具
+S	infs	恶魔岩石
+S	iwbr	铁树枝干
+S	jdrn	灵巧指环
+S	jpnt	给吉安娜?普罗德摩尔的便条
+S	k3m1	月亮水晶
+S	k3m2	三月之钥的另外一个部分
+S	k3m3	三月之钥
+S	kgal	麦酒桶
+S	klmm	远古战斧
+S	kpin	卡嘉长萧
+S	ktrm	泰瑞纳斯国王的骨灰瓮
+S	kybl	鲜血钥匙
+S	kygh	魔鬼钥匙
+S	kymn	月之钥匙
+S	kysn	太阳钥匙
+S	ledg	吉拉德的帐本
+S	lgdh	毁灭之角
+S	lhst	风暴狮角
+S	lmbr	木材堆
+S	lnrn	雄狮之戒
+S	lure	怪兽诱捕守卫
+S	manh	生命手册
+S	mcou	勇气勋章
 S	mcri	机械类的小玩艺
-S	rnec	巫术妖棍
-S	tsct	象牙塔
+S	mgtk	魔法钥匙串
+S	mlst	力量之锤
+S	mnsf	心灵权杖
+S	mnst	魔法石
+S	modt	死亡面罩
+S	moon	月亮石
+S	mort	莫哥林的报告
+S	nflg	暗夜精灵族旗帜
+S	nspi	魔法免疫项链
+S	ocor	腐蚀之球
+S	odef	黑暗之球
+S	ofir	火焰之球
+S	oflg	兽族旗帜
+S	ofro	霜冻之球
+S	oli2	闪电之球
+S	olig	闪电之球
+S	oslo	减速之球
+S	oven	毒液之球
 S	pams	抗体药水
-S	spre	保存权杖
+S	pclr	净化药水
+S	pdiv	神圣药水
+S	penr	能量垂饰
+S	pghe	大生命药水
+S	pgin	大隐形药水
+S	pgma	大魔法药水
+S	phea	生命药水
+S	phlt	李维特
+S	pinv	隐形药水
 S	plcl	小净化药水
+S	pman	魔法药水
+S	pmna	魔法垂饰
+S	pnvl	较小的无敌药水
+S	pnvu	无敌药水
+S	pomn	全知药水
+S	pres	恢复药水
+S	prvt	生命护身符
+S	pspd	速度药水
+S	rag1	敏捷便鞋  +3
+S	ram1	大魔法师指环
+S	ram2	大魔法师指环
+S	ram3	大魔法师指环
+S	ram4	大魔法师指环
+S	rat3	攻击之爪 +3
+S	rat6	攻击之爪 +6
+S	rat9	攻击之爪 +9
+S	ratc	攻击之爪 +12
+S	ratf	攻击之爪 +15
+S	rde0	守护指环 +1
+S	rde1	守护指环 +2
+S	rde2	守护指环 +3
+S	rde3	守护指环 +4
+S	rde4	守护指环 +5
+S	rdis	驱魔神符
+S	rej1	小型恢复药水
+S	rej2	小型恢复药水
+S	rej3	恢复药水
+S	rej4	大型恢复药水
+S	rej5	小型恢复卷轴
+S	rej6	大型恢复卷轴
+S	rhe1	小型治疗神符
+S	rhe2	治疗神符
+S	rhe3	大型治疗神符
+S	rhth	卡嘉医疗宝石
+S	rin1	智力斗篷 +3
+S	rlif	恢复指环
+S	rma2	大型魔法神符
+S	rman	魔法神符
+S	rnec	巫术妖棍
+S	rnsp	优越之戒
+S	rots	海之权杖
+S	rre1	小型复活神符
+S	rre2	大型复活神符
+S	rreb	重生神符
+S	rres	恢复神符
+S	rspd	速度神符
+S	rspl	灵魂锁链神符
+S	rsps	护盾神符
+S	rst1	食人鬼手套 +3
+S	rugt	神秘手套
+S	rump	生锈的矿铲
+S	rwat	岗哨神符
+S	rwiz	艺人面罩
+S	sand	操作死尸卷轴
+S	sbch	天灾骨钟
+S	sbok	魔法书
+S	schl	医疗权杖
+S	sclp	秘密关卡激活
+S	scul	邪恶军团卷轴
+S	sehr	赛瑞诺克斯之心
+S	sfog	乌云号角
+S	shar	冰冻碎片
+S	shas	速度卷轴
+S	shcw	萨满利爪
+S	shdt	死亡领主护盾
+S	shea	医疗卷轴
+S	shen	施魔护盾
+S	shhn	荣誉护盾
+S	shrs	烤肉
+S	shtm	萨满图腾
+S	shwd	荧光草
+S	silk	蜘蛛丝饰针
+S	skrt	骸骨宝物
+S	sksh	防护面具
+S	skul	献祭头骨
+S	sman	魔法卷轴
+S	sneg	否决权杖
+S	sor1	影子之球 +1
+S	sor2	影子之球 +2
+S	sor3	影子之球 +3
+S	sor4	影子之球 +4
+S	sor5	影子之球 +5
+S	sor6	影子之球 +6
+S	sor7	影子之球 +7
+S	sor8	影子之球 +8
+S	sor9	影子之球 +9
+S	sora	影子之球 +10
+S	sorf	影子之球碎片
+S	soul	灵魂
+S	spre	保存权杖
+S	sprn	蜘蛛戒指
+S	spro	守护卷轴
+S	spsh	魔法护盾护身符
+S	srbd	灼热之刀
 S	sreg	恢复卷轴
+S	sres	恢复卷轴
+S	sror	野兽卷轴
+S	srrc	复活卷轴
+S	srtl	瑟拉思尔
 S	ssan	避难权杖
-C	I000	-火系攻击技能
-C	I001	-水系攻击技能
-C	I002	-火系攻击技能-箭
-C	I003	-地系攻击技能
-C	I007	|cffCC99FF黑龙筋
-C	I004	|cffCC99FF水晶箭
-C	I009	|cff00FFFF天|cff00D5FF霜|cff00AAFF之|cff0080FF弓|r
-C	I00Q	攻击技能
-C	I00R	辅助技能
-C	I00S	医疗技能
-C	I00T	光环技能
-C	I00U	防御技能
-C	I00V	|cff00FFFF奖励物资1
-C	I00W	|cff00FFFF奖励物资1
-C	I00X	|cff00FFFF奖励物资4
-C	I00Y	|cff00FFFF奖励物资3
-C	I005	|cffFFFF80爆|cffFFAA55炎|cffFF552B之|cffFF0000剑|r
-C	I014	|cffFFFF00火|cffFFAA00雨|cffFF5500之|cffFF0000弓|r
-C	I015	|cffFFFF00风|cffE6FF33神|cffCCFF66战|cffB3FF99弓|r
-C	I016	|cff00FFFF冰|cff00D5FF雪|cff00AAFF之|cff0080FF弓|r
-C	I017	|cff00FFFF碎|cff00FFBF星|cff00FF80之|cff00FF40弓|r
-C	I018	|cffCC99FF魔法弓
-C	I019	|cffFFFF00焚|cffFFAA00天|cffFF5500之|cffFF0000弓|r
-C	I01A	|cffFFFF00凤|cffFFAA00凰|cffFF5500之|cffFF0000弓|r
-C	I00Z	|cffCCFF33魔法剑
-C	I006	|cffCCFF33赤龙牙
-C	I010	|cffCCFF33阵法宝石
-C	I011	|cff93C9FF符纹宝石
-C	I012	|cff93C9FF精灵树枝
-C	I013	|cff93C9FF魔法杖
-C	I01B	|cff00FFFF水|cff00D5FF神|cff00AAFF权|cff0080FF杖|r
-C	I01C	|cff00FFFF大|cff00FFBF地|cff00FF80神|cff00FF40锤|r
-C	I01D	|cffFFFF80火|cffFFAA55神|cffFF552B战|cffFF0000刃|r
-C	I01E	|cff00FFFF碧|cff00D5FF波|cff00AAFF之|cff0080FF剑|r
-C	I01F	|cffFFFF80灼|cffFFAA55热|cffFF552B之|cffFF0000剑|r
-C	I01H	|cffFFFF00裁|cffFFAA55决|cffFF55AA之|cffFF00FF剑|r
-C	I01I	|cffFFFF00圣|cffFFAA55光|cffFF55AA法|cffFF00FF杖|r
-C	I01J	|cff00FFFF暴|cff00D5FF雪|cff00AAFF法|cff0080FF杖|r
-C	I01K	之剑
-C	I01L	闪电法杖
-C	I01M	之剑
-C	I01N	之剑
-C	I01P	之剑
-C	I01Q	之剑
-C	I01R	之剑
-C	I01T	之剑
-C	I01U	之剑
-C	I01V	之剑
-C	I01W	之剑
-C	I01X	之剑
-C	I01Y	之剑
-C	I021	龙骨法杖
-C	I022	法杖
-C	I023	法杖
-C	I024	|cff00FFFF灵|cff00FFBF木|cff00FF80法|cff00FF40杖|r
-C	I025	天火法杖
-C	I026	|cff3E3E3E邪|cff696969恶|cff959595法|cffC0C0C0杖|r
-C	I027	法杖
-C	I028	|cff3E3E3E诅|cff696969咒|cff959595法|cffC0C0C0杖|r
-C	I029	|cffFFFF00破|cffFFAA55军|cffFF55AA之|cffFF00FF剑|r
-C	I02A	|cffFFFF00雷|cffE6FF33暴|cffCCFF66法|cffB3FF99杖|r
-C	I02B	之剑
-C	I02C	法杖
-C	I008	|cff3E3E3E死|cff696969神|cff959595战|cffC0C0C0剑|r
-C	I02E	|cff3E3E3E地|cff696969狱|cff959595之|cffC0C0C0剑|r
-C	I02F	(天)活力之戒
-C	I02G	(天)生命之戒
-C	I02H	(天)幸运之戒
-C	I02I	|cffCC33FF天使手镯|r
-C	I00G	[天]魔力护符
-C	I00H	[天]魔法挂坠
-C	I00L	[天]魔力球
-C	I02J	|cffCC33FF魔源结晶|r
-C	I00I	[死]|cffCC33FF诅咒铠甲|r
-C	I00J	[死]|cff00ff00黑魔剑
-C	I00K	[死]|cff00ff00骷髅冠
-C	I00M	[死]亡灵盾
-C	I00N	[死]|cff00FFFF骨质胸甲
-C	I02K	(死)亡灵护身符
-C	I02L	(死)|cff00FFFF吸血鬼披风
-C	I02M	(死)|cff00ff00死神靴
-C	I02N	(死)|cffCC33FF鬼王斗篷|r
-C	I02O	|cff3E3E3E死|cff696969神|cff959595战|cffC0C0C0铠|r
-C	I02P	(战1)真实头环
-C	I02Q	(战1)|cff00ff00真实面具
-C	I02R	(战1)|cff00FFFF真实头冠
-C	I02S	(战2)威严护肩
-C	I02T	(战2)|cff00ff00威严塔盾
-C	I02U	(战2)|cff00FFFF威严胸甲
-C	I02V	(战3)卓越战靴
-C	I02W	(战3)|cff00ff00卓越护腿
-C	I02X	(战3)|cff00FFFF卓越腰带
-C	I02Y	(战4)|cff00FFFF银光巨战斧
-C	I02Z	(战4)|cff00ff00银光短战棍
-C	I030	(战4)银光连指手套
-C	I031	(战5)光明护身符
-C	I032	(战5)|cff00ff00光明纹章
-C	I033	(战5)|cff00FFFF光明之眼
-C	I034	(战6)勇气匕首
-C	I035	(战6)|cff00ff00勇气臂盾
-C	I036	(战6)|cff00FFFF勇气指环
-C	I037	(战)|cffCC33FF荣耀拳爪|r
-C	I038	(战)|cffCC33FF混沌双刃斧|r
-C	I039	(战)|cffCC33FF圣光手镯|r
-C	I03A	(战)|cffCC33FF神圣头盔|r
-C	I03B	(战)|cffCC33FF华丽战甲|r
-C	I03C	(战)|cffCC33FF秘银披风|r
-C	I03D	|cff8000FF战|cff8055FF神|cff80AAFF圣|cff80FFFF铠|r
-C	I03E	|cff8000FF战|cff8055FF神|cff80AAFF圣|cff80FFFF斧|r
-C	I00A	(水)珊瑚头饰
-C	I00B	(水)|cff00FFFF水之心
-C	I00D	(水)|cffCC33FF温蒂的祝福|r
-C	I00E	(火)|cff00FFFF炎之结晶
-C	I00F	[火]|cff00ff00火龙臂盾
-C	I00O	[土]|cffCC33FF诺姆的图腾|r
-C	I00P	(土)|cffCC33FF诺姆的守护|r
-C	I03F	[水]|cffCC33FF温蒂的庇护|r
-C	I03G	(水)|cff00ff00沧浪项链
-C	I03H	(火)|cffCC33FF沙拉曼德的精神|r
-C	I03I	[火]|cffCC33FF沙拉曼德的灵魂|r
-C	I03J	[火]|cff00FFFF地狱火炬
-C	I03K	(风)|cff00ff00风之纹章
-C	I03L	(风)|cff00FFFF风之号角
-C	I00C	[水]|cff00FFFF海妖壳甲
-C	I03M	[水]|cff00ff00鱼鳞镶嵌甲
-C	I03N	[水]鲨皮腰带
-C	I03O	(风)飘逸之戒
-C	I03P	[风]|cff00FFFF飞鹰锁环甲
-C	I03Q	[风]|cff00ff00疾风之靴
-C	I03R	[风]闪电手套
-C	I03S	(火)|cff00ff00火炎护身符
-C	I03T	(火)流光刺刀
-C	I03U	[火]暮光指环
-C	I03V	(土)|cff00FFFF坚韧的胸甲
-C	I03W	(土)|cff00ff00锁链流星锤
-C	I03X	(土)洞穴巨魔腰带
-C	I03Y	[土]|cff00FFFF裂地战盾
-C	I03Z	[土]|cff00ff00刻着神秘符纹的石锤
-C	I040	[土]黄宝石手环
-C	I041	|cffCC33FF憎恨之王的镜盾(魔器)|r
-C	I044	钢制盾牌
-C	I046	备份的
-C	I047	|cffCC33FF破坏之王的戳魂魔槊(魔器)|r
-C	I048	备份的
-C	I04A	备份的
-C	I04B	备份的
-C	I04C	备份的
-C	I04E	|cffCC33FF罪恶之王的护心镜(魔器)|r
-C	I04F	(风)|cffCC33FF西弗儿的印记|r
-C	I04G	[风]|cffCC33FF西弗儿的关爱|r
-C	I04H	|cff00FFFF土|cff00FFBF神|cff00FF80战|cff00FF40铠|r
-C	I04I	|cff00FFFF水|cff00D5FF神|cff00AAFF战|cff0080FF铠|r
-C	I04J	|cffFFFF00风|cffE6FF33神|cffCCFF66战|cffB3FF99铠|r
-C	I04K	|cffFFFF80火|cffFFAA55神|cffFF552B战|cffFF0000铠|r
-C	I01O	|cffCC33FF折磨女王的能量增幅器(魔器)|r
-C	I020	|cffCC33FF痛苦之王的灵魂之瓶(魔器)|r
-C	I02D	升级盟军士兵武器1
-C	I042	升级盟军士兵装甲2
-C	I043	升级盟军士兵装甲3
-C	I045	升级盟军士兵装甲1
-C	I049	升级盟军士兵装甲4
-C	I04D	升级盟军士兵武器2
-C	I04L	升级盟军士兵武器3
-C	I04M	升级盟军士兵武器4
-C	I04N	|cffFFFF00封印战兽的蛋
-C	I04O	重生十字章
-C	I04P	|cffFFFF00天|cffFFAA55使|cffFF55AA之|cffFF00FF翼|r
-C	I04Q	|cff3E3E3E恶|cff696969魔|cff959595之|cffC0C0C0翼|r
-C	I01S	|cff3E3E3E恶|cff696969魔|cff959595法|cffC0C0C0袍|r
-C	I04R	|cffCC33FF黑暗之心|r
-C	I04S	|cffCC33FF堕落天使之翼|r
-C	I04T	[测试]经验值提升8W
-C	I04U	传送
-C	I04V	要求盟军返回驻地
-C	I04W	|cff00FF00雷|cff55FF00神|cffAAFF00战|cffFFFF00铠|r
-C	I04X	|cffFF0000冥|cffAA5500皇|cff55AA00战|cff00FF00铠|r
-C	I04Y	|cff00FF00雷|cff55FF00神|cffAAFF00之|cffFFFF00刺|r
-C	I04Z	|cffFF0000冥|cffAA5500皇|cff55AA00权|cff00FF00杖|r
-C	I050	(雷)|cff00FFFF雷龙之角
-C	I051	(雷)|cff00ff00能量之瓶
-C	I052	(雷)|cffCC33FF雷克斯的力量|r
-C	I053	(雷)迅猛之爪
-C	I054	[雷]|cff00FFFF雷电之芯
-C	I055	[雷]|cff00ff00闪电之球
-C	I056	[雷]|cffCC33FF雷克斯的权威|r
-C	I057	[雷]迅雷腰带
-C	I058	(冥)|cff00FFFF镇魂法决
-C	I059	(冥)|cff00ff00灵魂之石
-C	I05A	(冥)|cffCC33FF哈迪斯的血腥|r
-C	I05B	(冥)安魂之笛
-C	I05C	[冥]|cff00FFFF养魂之法
-C	I05D	[冥]|cff00ff00炼魂符纹
-C	I05E	[冥]|cffCC33FF哈迪斯的残忍|r
-C	I05F	[冥]亡魂之气
-C	I05G	|cffCC33FF正直勋章|r
-C	I01G	|cffFFFF00高级火系魔法指南
-C	I01Z	|cffFFFF00灵木之心|r
-C	I05H	|cff00FFFF精|cff00FFBF灵王|cff00FF80权|cff00FF40杖|r
-C	I05I	(木)|cffCC33FF雅露的微笑|r
-C	I05J	[木]|cffCC33FF雅露的温馨|r
-C	I05K	|cff00FFFF精|cff00FFBF灵王|cff00FF80战|cff00FF40铠|r
+S	ssil	沉默权杖
+S	stel	传送权杖
+S	stpg	时钟企鹅
+S	stre	鼓舞权杖
+S	stwa	战斧
+S	stwp	回城卷轴
+S	tbak	微型国王祭坛
+S	tbar	微型兵营
+S	tbsm	微型铁匠铺
+S	tcas	小城堡
+S	tdex	敏捷之书
+S	tdx2	敏捷之书 +2
+S	tels	地精夜视镜
+S	texp	经验之书
+S	tfar	微型农场
+S	tgrh	小型的大厅
+S	tgxp	超级经验之书
+S	thdm	雷霆蜥蜴钻石
+S	thle	雷霆蜥蜴之蛋
+S	tin2	智力之书 +2
+S	tint	智力之书
+S	tkno	能量之书
+S	tlum	微型伐木场
+S	tmmt	力量图腾
+S	tmsc	牺牲之书
+S	totw	野性护符
+S	tpow	知识之书
+S	tret	再训练之书
+S	tsct	象牙塔
+S	tst2	力量之书 +2
+S	tstr	力量之书
+S	uflg	不死族旗帜
+S	vamp	吸血药水
+S	vddl	巫毒玩偶
+S	ward	战歌之鼓
+S	wcyc	飓风权杖
+S	whwd	治疗守卫
+S	wild	野性护身符
+S	will	幻象权杖
+S	wlsd	闪电护盾权杖
+S	wneg	否决权杖
+S	wneu	中和权杖
+S	wolg	怀特的另一条腿
+S	woms	魔法盗取权杖
+S	wshs	影子权杖
+S	wswd	岗哨守卫
+S	wtlg	怀特之腿
+C	I000	
+C	I001	
+C	I002	
+C	I003	
+C	I004	
+C	I005	
+C	I006	
+C	I007	
+C	I008	
+C	I009	
+C	I00A	
+C	I00B	
+C	I00C	
+C	I00D	
+C	I00E	
+C	I00F	
+C	I00G	
+C	I00H	
+C	I00I	
+C	I00J	
+C	I00K	
+C	I00L	
+C	I00M	
+C	I00N	
+C	I00O	
+C	I00P	
+C	I00Q	
+C	I00R	
+C	I00S	
+C	I00T	
+C	I00U	
+C	I00V	
+C	I00W	
+C	I00X	
+C	I00Y	
+C	I00Z	
+C	I010	
+C	I011	
+C	I012	
+C	I013	
+C	I014	
+C	I015	
+C	I016	
+C	I017	
+C	I018	
+C	I019	
+C	I01A	
+C	I01B	
+C	I01C	
+C	I01D	
+C	I01E	
+C	I01F	
+C	I01G	
+C	I01H	
+C	I01I	
+C	I01J	
+C	I01K	
+C	I01L	
+C	I01M	
+C	I01N	
+C	I01O	
+C	I01P	
+C	I01Q	
+C	I01R	
+C	I01S	
+C	I01T	
+C	I01U	
+C	I01V	
+C	I01W	
+C	I01X	
+C	I01Y	
+C	I01Z	
+C	I020	
+C	I021	
+C	I022	
+C	I023	
+C	I024	
+C	I025	
+C	I026	
+C	I027	
+C	I028	
+C	I029	
+C	I02A	
+C	I02B	
+C	I02C	
+C	I02D	
+C	I02E	
+C	I02F	
+C	I02G	
+C	I02H	
+C	I02I	
+C	I02J	
+C	I02K	
+C	I02L	
+C	I02M	
+C	I02N	
+C	I02O	
+C	I02P	
+C	I02Q	
+C	I02R	
+C	I02S	
+C	I02T	
+C	I02U	
+C	I02V	
+C	I02W	
+C	I02X	
+C	I02Y	
+C	I02Z	
+C	I030	
+C	I031	
+C	I032	
+C	I033	
+C	I034	
+C	I035	
+C	I036	
+C	I037	
+C	I038	
+C	I039	
+C	I03A	
+C	I03B	
+C	I03C	
+C	I03D	
+C	I03E	
+C	I03F	
+C	I03G	
+C	I03H	
+C	I03I	
+C	I03J	
+C	I03K	
+C	I03L	
+C	I03M	
+C	I03N	
+C	I03O	
+C	I03P	
+C	I03Q	
+C	I03R	
+C	I03S	
+C	I03T	
+C	I03U	
+C	I03V	
+C	I03W	
+C	I03X	
+C	I03Y	
+C	I03Z	
+C	I040	
+C	I041	
+C	I042	
+C	I043	
+C	I044	
+C	I045	
+C	I046	
+C	I047	
+C	I048	
+C	I049	
+C	I04A	
+C	I04B	
+C	I04C	
+C	I04D	
+C	I04E	
+C	I04F	
+C	I04G	
+C	I04H	
+C	I04I	
+C	I04J	
+C	I04K	
+C	I04L	
+C	I04M	
+C	I04N	
+C	I04O	
+C	I04P	
+C	I04Q	
+C	I04R	
+C	I04S	
+C	I04T	
+C	I04U	
+C	I04V	
+C	I04W	
+C	I04X	
+C	I04Y	
+C	I04Z	
+C	I050	
+C	I051	
+C	I052	
+C	I053	
+C	I054	
+C	I055	
+C	I056	
+C	I057	
+C	I058	
+C	I059	
+C	I05A	
+C	I05B	
+C	I05C	
+C	I05D	
+C	I05E	
+C	I05F	
+C	I05G	
+C	I05H	
+C	I05I	
+C	I05J	
+C	I05K	
+C	I05L	
+C	I05M	
+C	I05N	
+C	I05O	
+C	I05P	
+C	I05Q	
+C	I05R	
+C	I05S	
+C	I05T	
+C	I05U	
+C	I05V	
+C	I05W	
+C	I05X	
+C	I05Y	
+C	I05Z	
+C	I060	
+C	I061	
+C	I062	
+C	I063	
+C	I064	
+C	I065	
+C	I066	
+C	I067	
+C	I068	
+C	I069	
+C	I06A	
+C	I06B	
+C	I06C	
+C	I06D	
+C	I06E	
+C	I06F	
+C	I06G	
+C	I06H	
+C	I06I	
+C	I06J	
+C	I06K	
+C	I06L	
+C	I06M	
+C	I06N	
+C	I06O	
+C	I06P	
+C	I06Q	
+C	I06R	
+C	I06S	
+C	I06T	
+C	I06U	
+C	I06V	
+C	I06W	
+C	I06X	
+C	I06Y	
+C	I06Z	
+C	I070	
+C	I071	
+C	I072	
+C	I073	
+C	I074	
+C	I075	
+C	I076	
+C	I077	
+C	I078	
+C	I079	
+C	I07A	
+C	I07B	
+C	I07C	
+C	I07D	
+C	I07E	
+C	I07F	
+C	I07G	
+C	I07H	
+C	I07I	
+C	I07J	
+C	I07K	
+C	I07L	
+C	I07M	
+C	I07N	
+C	I07O	
+C	I07P	
+C	I07Q	
+C	I07R	
+C	I07S	
+C	I07T	
+C	I07U	
+C	I07V	
+C	I07W	
+C	I07X	
+C	I07Y	
+C	I07Z	
+C	I080	
+C	I081	
+C	I082	
+C	I083	
+C	I084	
+C	I085	
+C	I086	
+C	I087	
+C	I088	
+C	I089	
+C	I08A	
+C	I08B	
+C	I08C	
+C	I08D	
+C	I08E	
+C	I08F	
+C	I08G	
+C	I08H	
+C	I08I	
+C	I08J	
+C	I08K	
+C	I08L	
+C	I08M	
+C	I08N	
+C	I08O	
+C	I08P	
+C	I08Q	
+C	I08R	
+C	I08S	
+C	I08T	
+C	I08U	
+C	I08V	
+C	I08W	
+C	I08X	
+C	I08Y	
+C	I08Z	
+C	I090	
+C	I091	
+C	I092	
+C	I093	
+C	I094	
+C	I095	
+C	I096	
+C	I097	
+C	I098	
+C	I099	
+C	I09A	
+C	I09B	
+C	I09C	
+C	I09D	
+C	I09E	
+C	I09F	
+C	I09G	
+C	I09H	
+C	I09I	
+C	I09J	
+C	I09K	
+C	I09L	
+C	I09M	
+C	I09N	
+C	I09O	
+C	I09P	
+C	I09Q	
+C	I09R	
+C	I09S	
+C	I09T	
+C	I09U	
+C	I09V	
+C	I09W	
+C	I09X	
+C	I09Y	
+C	I09Z	
+C	I0A0	
+C	I0A1	
+C	I0A2	
+C	I0A3	
+C	I0A4	
+C	I0A5	
+C	I0A6	
+C	I0A7	
+C	I0A8	
+C	I0A9	
+C	I0AA	
+C	I0AB	
+C	I0AC	
+C	I0AD	
+C	I0AE	
+C	I0AF	
+C	I0AG	
+C	I0AH	
+C	I0AI	
+C	I0AJ	
+C	I0AK	
+C	I0AL	
+C	I0AM	
+C	I0AN	
+C	I0AO	
+C	I0AP	
+C	I0AQ	
+C	I0AR	
+C	I0AS	
+C	I0AT	
+C	I0AU	
+C	I0AV	
+C	I0AW	
+C	I0AX	
+C	I0AY	
+C	I0AZ	
+C	I0B0	
+C	I0B1	
+C	I0B2	
+C	I0B3	
+C	I0B4	
+C	I0B5	
+C	I0B6	
+C	I0B7	
+C	I0B8	
+C	I0B9	
+C	I0BA	
+C	I0BB	
+C	I0BC	
+C	I0BD	
+C	I0BE	
+C	I0BF	
+C	I0BG	
+C	I0BH	
+C	I0BI	
+C	I0BJ	
+C	I0BK	
+C	I0BL	
+C	I0BM	
+C	I0BN	
+C	I0BO	
+C	I0BP	
+C	I0BQ	
+C	I0BR	
+C	I0BS	
+C	I0BT	
+C	I0BU	
+C	I0BV	
+C	I0BW	
+C	I0BX	
+C	I0BY	
+C	I0BZ	
+C	I0C0	
+C	I0C1	
+C	I0C2	
+C	I0C3	
+C	I0C4	
+C	I0C5	
+C	I0C6	
+C	I0C7	
+C	I0C8	
+C	I0C9	
+C	I0CA	
+C	I0CB	
+C	I0CC	
+C	I0CD	
+C	I0CE	
+C	I0CF	
+C	I0CG	
+C	I0CH	
+C	I0CI	
+C	I0CJ	
+C	I0CK	
+C	I0CL	
+C	I0CM	
+C	I0CN	
+C	I0CO	
+C	I0CP	
+C	I0CQ	
+C	I0CR	
+C	I0CS	
+C	I0CT	
+C	I0CU	
+C	I0CV	
+C	I0CW	
+C	I0CX	
+C	I0CY	
+C	I0CZ	
+C	I0D0	
+C	I0D1	
+C	I0D2	
+C	I0D3	
+C	I0D4	
+C	I0D5	
+C	I0D6	
+C	I0D7	
+C	I0D8	
+C	I0D9	
+C	I0DA	
+C	I0DB	
+C	I0DC	
+C	I0DD	
+C	I0DE	
+C	I0DF	
+C	I0DG	
+C	I0DH	
+C	I0DI	
+C	I0DJ	
+C	I0DK	
+C	I0DL	
+C	I0DM	
+C	I0DN	
+C	I0DO	
+C	I0DP	
+C	I0DQ	
+C	I0DR	
+C	I0DS	
+C	I0DT	
+C	I0DU	
+C	I0DV	
+C	I0DW	
+C	I0DX	
+C	I0DY	
+C	I0DZ	
+C	I0E0	
+C	I0E1	
+C	I0E2	
+C	I0E3	
+C	I0E4	
+C	I0E5	
+C	I0E6	
+C	I0E7	
+C	I0E8	
+C	I0E9	
+C	I0EA	
+C	I0EB	
+C	I0EC	
+C	I0ED	
+C	I0EE	
+C	I0EF	
+C	I0EG	
+C	I0EH	
+C	I0EI	
+C	I0EJ	
+C	I0EK	
+C	I0EL	
+C	I0EM	
+C	I0EN	
+C	I0EO	
+C	I0EP	
+C	I0EQ	
+C	I0ER	
+C	I0ES	
+C	I0ET	
+C	I0EU	
+C	I0EV	
+C	I0EW	
+C	I0EX	
+C	I0EY	
+C	I0EZ	
+C	I0F0	
+C	I0F1	
+C	I0F2	
+C	I0F3	
+C	I0F4	
+C	I0F5	
+C	I0F6	
+C	I0F7	
+C	I0F8	
+C	I0F9	
+C	I0FA	
+C	I0FB	
+C	I0FC	
+C	I0FD	
+C	I0FE	
+C	I0FF	
+C	I0FG	
+C	I0FH	
+C	I0FI	
+C	I0FJ	
+C	I0FK	
+C	I0FL	
+C	I0FM	
+C	I0FN	
+C	I0FO	
+C	I0FP	
+C	I0FQ	
+C	I0FR	
+C	I0FS	
+C	I0FT	
+C	I0FU	
+C	I0FV	
+C	I0FW	
+C	I0FX	
+C	I0FY	
+C	I0FZ	
+C	I0G0	
+C	I0G1	
+C	I0G2	
+C	I0G3	
+C	I0G4	
+C	I0G5	
+C	I0G6	
+C	I0G7	
+C	I0G8	
+C	I0G9	
+C	I0GA	
+C	I0GB	
+C	I0GC	
+C	I0GD	
+C	I0GE	
+C	I0GF	
+C	I0GG	
+C	I0GH	
+C	I0GI	
+C	I0GJ	
+C	I0GK	
+C	I0GL	
+C	I0GM	
+C	I0GN	
+C	I0GO	
+C	I0GP	
+C	I0GQ	
+C	I0GR	
+C	I0GS	
+C	I0GT	
+C	I0GU	
+C	I0GV	
+C	I0GW	
+C	I0GX	
+C	I0GY	
+C	I0GZ	
+C	I0H0	
+C	I0H1	
+C	I0H2	
+C	I0H3	
+C	I0H4	
+C	I0H5	
+C	I0H6	
+C	I0H7	
+C	I0H8	
+C	I0H9	
+C	I0HA	
+C	I0HB	
+C	I0HC	
+C	I0HD	
+C	I0HE	
+C	I0HF	
+C	I0HG	
+C	I0HH	
+C	I0HI	
+C	I0HJ	
+C	I0HK	
+C	I0HL	
+C	I0HM	
+C	I0HN	
+C	I0HO	
+C	I0HP	
+C	I0HQ	
+C	I0HR	
+C	I0HS	
+C	I0HT	
+C	I0HU	
+C	I0HV	
+C	I0HW	
+C	I0HX	
+C	I0HY	
+C	I0HZ	
+C	I0I0	
+C	I0I1	
+C	I0I2	
+C	I0I3	
+C	I0I4	
+C	I0I5	
+C	I0I6	
+C	I0I7	
+C	I0I8	
+C	I0I9	
+C	I0IA	
+C	I0IB	
+C	I0IC	
+C	I0ID	
+C	I0IE	
+C	I0IF	
+C	I0IG	
+C	I0IH	
+C	I0II	
+C	I0IJ	
+C	I0IK	
+C	I0IL	
+C	I0IM	
+C	I0IN	
+C	I0IO	
+C	I0IP	
+C	I0IQ	
+C	I0IR	
+C	I0IS	
+C	I0IT	
+C	I0IU	
+C	I0IV	
+C	I0IW	
+C	I0IX	
+C	I0IY	
+C	I0IZ	
+C	I0J0	
+C	I0J1	
+C	I0J2	
+C	I0J3	
+C	I0J4	
+C	I0J5	
+C	I0J6	
+C	I0J7	
+C	I0J8	
+C	I0J9	
+C	I0JA	
+C	I0JB	
+C	I0JC	
+C	I0JD	
+C	I0JE	
+C	I0JF	
+C	I0JG	
+C	I0JH	
+C	I0JI	
+C	I0JJ	
+C	I0JK	
+C	I0JL	
+C	I0JM	
+C	I0JN	
+C	I0JO	
+C	I0JP	
+C	I0JQ	
+C	I0JR	
+C	I0JS	
+C	I0JT	
+C	I0JU	
+C	I0JV	
+C	I0JW	
+C	I0JX	
+C	I0JY	
+C	I0JZ	
+C	I0K0	
+C	I0K1	
+C	I0K2	
+C	I0K3	
+C	I0K4	
+C	I0K5	
+C	I0K6	
+C	I0K7	
+C	I0K8	
+C	I0K9	
+C	I0KA	
+C	I0KB	
+C	I0KC	
+C	I0KD	
+C	I0KE	
+C	I0KF	
+C	I0KG	
+C	I0KH	
+C	I0KI	
+C	I0KJ	
+C	I0KK	
+C	I0KL	
+C	I0KM	
+C	I0KN	
+C	I0KO	
+C	I0KP	
+C	I0KQ	
+C	I0KR	
+C	I0KS	
+C	I0KT	
+C	I0KU	
+C	I0KV	
+C	I0KW	
+C	I0KX	
+C	I0KY	
+C	I0KZ	
+C	I0L0	
+C	I0L1	
+C	I0L2	
+C	I0L3	
+C	I0L4	
+C	I0L5	
+C	I0L6	
+C	I0L7	
+C	I0L8	
+C	I0L9	
+C	I0LA	
+C	I0LB	
+C	I0LC	
+C	I0LD	
+C	I0LE	
+C	I0LF	
+C	I0LG	
+C	I0LH	
+C	I0LI	
+C	I0LJ	
+C	I0LK	
+C	I0LL	
+C	I0LM	
+C	I0LN	
+C	I0LO	
+C	I0LP	
+C	I0LQ	
+C	I0LR	
+C	I0LS	
+C	I0LT	
+C	I0LU	
+C	I0LV	
+C	I0LW	
+C	I0LX	
+C	I0LY	
+C	I0LZ	
+C	I0M0	
+C	I0M1	
+C	I0M2	
+C	I0M3	
+C	I0M4	
+C	I0M5	
+C	I0M6	
+C	I0M7	
+C	I0M8	
+C	I0M9	
+C	I0MA	
+C	I0MB	
+C	I0MC	
+C	I0MD	
+C	I0ME	
+C	I0MF	
+C	I0MG	
+C	I0MH	
+C	I0MI	
+C	I0MJ	
+C	I0MK	
+C	I0ML	
+C	I0MM	
+C	I0MN	
+C	I0MO	
+C	I0MP	
+C	I0MQ	
+C	I0MR	
+C	I0MS	
+C	I0MT	
+C	I0MU	
+C	I0MV	
+C	I0MW	
+C	I0MX	
+C	I0MY	
+C	I0MZ	
+C	I0N0	
+C	I0N1	
+C	I0N2	
+C	I0N3	
+C	I0N4	
+C	I0N5	
+C	I0N6	
+C	I0N7	
+C	I0N8	
+C	I0N9	
+C	I0NA	
+C	I0NB	
+C	I0NC	
+C	I0ND	
+C	I0NE	
+C	I0NF	
+C	I0NG	
+C	I0NH	
+C	I0NI	
+C	I0NJ	
+C	I0NK	
+C	I0NL	
+C	I0NM	
+C	I0NN	
+C	I0NO	
+C	I0NP	
+C	I0NQ	
+C	I0NR	
+C	I0NS	
+C	I0NT	
+C	I0NU	
+C	I0NV	
+C	I0NW	
+C	I0NX	
+C	I0NY	
+C	I0NZ	
+C	I0O0	
+C	I0O1	
+C	I0O2	
+C	I0O3	
+C	I0O4	
+C	I0O5	
+C	I0O6	
+C	I0O7	
+C	I0O8	
+C	I0O9	
+C	I0OA	
+C	I0OB	
+C	I0OC	
+C	I0OD	
+C	I0OE	
+C	I0OF	
+C	I0OG	
+C	I0OH	
+C	I0OI	
+C	I0OJ	
+C	I0OK	
+C	I0OL	
+C	I0OM	
+C	I0ON	
+C	I0OO	
+C	I0OP	
+C	I0OQ	
+C	I0OR	
+C	I0OS	
+C	I0OT	
+C	I0OU	
+C	I0OV	
+C	I0OW	
+C	I0OX	
+C	I0OY	
+C	I0OZ	
+C	I0P0	
+C	I0P1	
+C	I0P2	
+C	I0P3	
+C	I0P4	
+C	I0P5	
+C	I0P6	
+C	I0P7	
+C	I0P8	
+C	I0P9	
+C	I0PA	
+C	I0PB	
+C	I0PC	
+C	I0PD	
+C	I0PE	
+C	I0PF	
+C	I0PG	
+C	I0PH	
+C	I0PI	
+C	I0PJ	
+C	I0PK	
+C	I0PL	
+C	I0PM	
+C	I0PN	
+C	I0PO	
+C	I0PP	
+C	I0PQ	
+C	I0PR	
+C	I0PS	
+C	I0PT	
+C	I0PU	
+C	I0PV	
+C	I0PW	
+C	I0PX	
+C	I0PY	
+C	I0PZ	
+C	I0Q0	
+C	I0Q1	
+C	I0Q2	
+C	I0Q3	
+C	I0Q4	
+C	I0Q5	
+C	I0Q6	
+C	I0Q7	
+C	I0Q8	
+C	I0Q9	
+C	I0QA	
+C	I0QB	
+C	I0QC	
+C	I0QD	
+C	I0QE	
+C	I0QF	
+C	I0QG	
+C	I0QH	
+C	I0QI	
+C	I0QJ	
+C	I0QK	
+C	I0QL	
+C	I0QM	
+C	I0QN	
+C	I0QO	
+C	I0QP	
+C	I0QQ	
+C	I0QR	
+C	I0QS	
+C	I0QT	
+C	I0QU	
+C	I0QV	
+C	I0QW	
+C	I0QX	
+C	I0QY	
+C	I0QZ	
+C	I0R0	
+C	I0R1	
+C	I0R2	
+C	I0R3	
+C	I0R4	
+C	I0R5	
+C	I0R6	
+C	I0R7	
+C	I0R8	
+C	I0R9	
+C	I0RA	
+C	I0RB	
+C	I0RC	
+C	I0RD	
+C	I0RE	
+C	I0RF	
+C	I0RG	
+C	I0RH	
+C	I0RI	
+C	I0RJ	
+C	I0RK	
+C	I0RL	
+C	I0RM	
+C	I0RN	
+C	I0RO	
+C	I0RP	
+C	I0RQ	
+C	I0RR	
+C	I0RS	
+C	I0RT	
+C	I0RU	
+C	I0RV	
+C	I0RW	
+C	I0RX	
+C	I0RY	
+C	I0RZ	
+C	I0S0	
+C	I0S1	
+C	I0S2	
+C	I0S3	
+C	I0S4	
+C	I0S5	
+C	I0S6	
+C	I0S7	
+C	I0S8	
+C	I0S9	
+C	I0SA	
+C	I0SB	
+C	I0SC	
+C	I0SD	
+C	I0SE	
+C	I0SF	
+C	I0SG	
+C	I0SH	
+C	I0SI	
+C	I0SJ	
+C	I0SK	
+C	I0SL	
+C	I0SM	
+C	I0SN	
+C	I0SO	
+C	I0SP	
+C	I0SQ	
+C	I0SR	
+C	I0SS	
+C	I0ST	
+C	I0SU	
+C	I0SV	
+C	I0SW	
+C	I0SX	
+C	I0SY	
+C	I0SZ	
+C	I0T0	
+C	I0T1	
+C	I0T2	
+C	I0T3	
+C	I0T4	
+C	I0T5	
+C	I0T6	
+C	I0T7	
+C	I0T8	
+C	I0T9	
+C	I0TA	
+C	I0TB	
+C	I0TC	
+C	I0TD	
+C	I0TE	
+C	I0TF	
+C	I0TG	
+C	I0TH	
+C	I0TI	
+C	I0TJ	
+C	I0TK	
+C	I0TL	
+C	I0TM	
+C	I0TN	
+C	I0TO	
+C	I0TP	
+C	I0TQ	
+C	I0TR	
+C	I0TS	
+C	I0TT	
+C	I0TU	
+C	I0TV	
+C	I0TW	
+C	I0TX	
+C	I0TY	
+C	I0TZ	
+C	I0U0	
+C	I0U1	
+C	I0U2	
+C	I0U3	
+C	I0U4	
+C	I0U5	
+C	I0U6	
+C	I0U7	
+C	I0U8	
+C	I0U9	
+C	I0UA	
+C	I0UB	
+C	I0UC	
+C	I0UD	
+C	I0UE	
+C	I0UF	
+C	I0UG	
+C	I0UH	
+C	I0UI	
+C	I0UJ	
+C	I0UK	
+C	I0UL	
+C	I0UM	
+C	I0UN	
+C	I0UO	
+C	I0UP	
+C	I0UQ	
+C	I0UR	
+C	I0US	
+C	I0UT	
+C	I0UU	
+C	I0UV	
+C	I0UW	
+C	I0UX	
+C	I0UY	
+C	I0UZ	
+C	I0V0	
+C	I0V1	
+C	I0V2	
+C	I0V3	
+C	I0V4	
+C	I0V5	
+C	I0V6	
+C	I0V7	
+C	I0V8	
+C	I0V9	
+C	I0VA	
+C	I0VB	
+C	I0VC	
+C	I0VD	
+C	I0VE	
+C	I0VF	
+C	I0VG	
+C	I0VH	
+C	I0VI	
+C	I0VJ	
+C	I0VK	
+C	I0VL	
+C	I0VM	
+C	I0VN	
+C	I0VO	
+C	I0VP	
+C	I0VQ	
+C	I0VR	
+C	I0VS	
+C	I0VT	
+C	I0VU	
+C	I0VV	
+C	I0VW	
+C	I0VX	
+C	I0VY	
+C	I0VZ	
+C	I0W0	
+C	I0W1	
+C	I0W2	
+C	I0W3	
+C	I0W4	
+C	I0W5	
+C	I0W6	
+C	I0W7	
+C	I0W8	
+C	I0W9	
+C	I0WA	
+C	I0WB	
+C	I0WC	
+C	I0WD	
+C	I0WE	
+C	I0WF	
+C	I0WG	
+C	I0WH	
+C	I0WI	
+C	I0WJ	
+C	I0WK	
+C	I0WL	
+C	I0WM	
+C	I0WN	
+C	I0WO	
+C	I0WP	
+C	I0WQ	
+C	I0WR	
+C	I0WS	
+C	I0WT	
+C	I0WU	
+C	I0WV	
+C	I0WW	
+C	I0WX	
+C	I0WY	
+C	I0WZ	
+C	I0X0	
+C	I0X1	
+C	I0X2	
+C	I0X3	
+C	I0X4	
+C	I0X5	
+C	I0X6	
+C	I0X7	
+C	I0X8	
+C	I0X9	
+C	I0XA	
+C	I0XB	
+C	I0XC	
+C	I0XD	
+C	I0XE	
+C	I0XF	
+C	I0XG	
+C	I0XH	
+C	I0XI	
+C	I0XJ	
+C	I0XK	
+C	I0XL	
+C	I0XM	
+C	I0XN	
+C	I0XO	
+C	I0XP	
+C	I0XQ	
+C	I0XR	
+C	I0XS	
+C	I0XT	
+C	I0XU	
+C	I0XV	
+C	I0XW	
+C	I0XX	
+C	I0XY	
+C	I0XZ	
+C	I0Y0	
+C	I0Y1	
+C	I0Y2	
+C	I0Y3	
+C	I0Y4	
+C	I0Y5	
+C	I0Y6	
+C	I0Y7	
+C	I0Y8	
+C	I0Y9	
+C	I0YA	
+C	I0YB	
+C	I0YC	
+C	I0YD	
+C	I0YE	
+C	I0YF	
+C	I0YG	
+C	I0YH	
+C	I0YI	
+C	I0YJ	
+C	I0YK	
+C	I0YL	
+C	I0YM	
+C	I0YN	
+C	I0YO	
+C	I0YP	
+C	I0YQ	
+C	I0YR	
+C	I0YS	
+C	I0YT	
+C	I0YU	
+C	I0YV	
+C	I0YW	
+C	I0YX	
+C	I0YY	
+C	I0YZ	
+C	I0Z0	
+C	I0Z1	
+C	I0Z2	
+C	I0Z3	
+C	I0Z4	
+C	I0Z5	
+C	I0Z6	
+C	I0Z7	
+C	I0Z8	
+C	I0Z9	
+C	I0ZA	
+C	I0ZB	
+C	I0ZC	
+C	I0ZD	
+C	I0ZE	
+C	I0ZF	
+C	I0ZG	
+C	I0ZH	
+C	I0ZI	
+C	I0ZJ	
+C	I0ZK	
+C	I0ZL	
+C	I0ZM	
+C	I0ZN	
+C	I0ZO	
+C	I0ZP	
+C	I0ZQ	
+C	I0ZR	
+C	I0ZS	
+C	I0ZT	
+C	I0ZU	
+C	I0ZV	
+C	I0ZW	
+C	I0ZX	
+C	I0ZY	
+C	I0ZZ	
+C	I100	
+C	I101	
+C	I102	
+C	I103	
+C	I104	
+C	I105	
+C	I106	
+C	I107	
+C	I108	
+C	I109	
+C	I10A	
+C	I10B	
+C	I10C	
+C	I10D	
+C	I10E	
+C	I10F	
+C	I10G	
+C	I10H	
+C	I10I	
+C	I10J	
+C	I10K	
+C	I10L	
+C	I10M	
+C	I10N	
+C	I10O	
+C	I10P	
+C	I10Q	
+C	I10R	
+C	I10S	
+C	I10T	
+C	I10U	
+C	I10V	
+C	I10W	
+C	I10X	
+C	I10Y	
+C	I10Z	
+C	I110	
+C	I111	
+C	I112	
+C	I113	
+C	I114	
+C	I115	
+C	I116	
+C	I117	
+C	I118	
+C	I119	
+C	I11A	
+C	I11B	
+C	I11C	
+C	I11D	
+C	I11E	
+C	I11F	
+C	I11G	
+C	I11H	
+C	I11I	
+C	I11J	
+C	I11K	
+C	I11L	
+C	I11M	
+C	I11N	
+C	I11O	
+C	I11P	
+C	I11Q	
+C	I11R	
+C	I11S	
+C	I11T	
+C	I11U	
+C	I11V	
+C	I11W	
+C	I11X	
+C	I11Y	
+C	I11Z	
+C	I120	
+C	I121	
+C	I122	
+C	I123	
+C	I124	
+C	I125	
+C	I126	
+C	I127	
+C	I128	
+C	I129	
+C	I12A	
+C	I12B	
+C	I12C	
+C	I12D	
+C	I12E	
+C	I12F	
+C	I12G	
+C	I12H	
+C	I12I	
+C	I12J	
+C	I12K	
+C	I12L	
+C	I12M	
+C	I12N	
+C	I12O	
+C	I12P	
+C	I12Q	
+C	I12R	
+C	I12S	
+C	I12T	
+C	I12U	
+C	I12V	
+C	I12W	
+C	I12X	
+C	I12Y	
+C	I12Z	
+C	I130	
+C	I131	
+C	I132	
+C	I133	
+C	I134	
+C	I135	
+C	I136	
+C	I137	
+C	I138	
+C	I139	
+C	I13A	
+C	I13B	
+C	I13C	
+C	I13D	
+C	I13E	
+C	I13F	
+C	I13G	
+C	I13H	
+C	I13I	
+C	I13J	
+C	I13K	
+C	I13L	
+C	I13M	
+C	I13N	
+C	I13O	
+C	I13P	
+C	I13Q	
+C	I13R	
+C	I13S	
+C	I13T	
+C	I13U	
+C	I13V	
+C	I13W	
+C	I13X	
+C	I13Y	
+C	I13Z	
+C	I140	
+C	I141	
+C	I142	
+C	I143	
+C	I144	
+C	I145	
+C	I146	
+C	I147	
+C	I148	
+C	I149	
+C	I14A	
+C	I14B	
+C	I14C	
+C	I14D	
+C	I14E	
+C	I14F	
+C	I14G	
+C	I14H	
+C	I14I	
+C	I14J	
+C	I14K	
+C	I14L	
+C	I14M	
+C	I14N	
+C	I14O	
+C	I14P	
+C	I14Q	
+C	I14R	
+C	I14S	
+C	I14T	
+C	I14U	
+C	I14V	
+C	I14W	
+C	I14X	
+C	I14Y	
+C	I14Z	
+C	I150	
+C	I151	
+C	I152	
+C	I153	
+C	I154	
+C	I155	
+C	I156	
+C	I157	
+C	I158	
+C	I159	
+C	I15A	
+C	I15B	
+C	I15C	
+C	I15D	
+C	I15E	
+C	I15F	
+C	I15G	
+C	I15H	
+C	I15I	
+C	I15J	
+C	I15K	
+C	I15L	
+C	I15M	
+C	I15N	
+C	I15O	
+C	I15P	
+C	I15Q	
+C	I15R	
+C	I15S	
+C	I15T	
+C	I15U	
+C	I15V	
+C	I15W	
+C	I15X	
+C	I15Y	
+C	I15Z	
+C	I160	
+C	I161	
+C	I162	
+C	I163	
+C	I164	
+C	I165	
+C	I166	
+C	I167	
+C	I168	
+C	I169	

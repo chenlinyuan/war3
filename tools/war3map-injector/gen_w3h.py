@@ -54,14 +54,35 @@ def build_new_entry(new_id, name="阿克蒙德之力", tip="阿克蒙德之力",
 def build(out_path, name="阿克蒙德之力", tip="阿克蒙德之力",
           ubertip="增加周围友军 50% 攻击力（近战/远程均生效）。",
           icon="BTNCorpseExplode.blp"):
+    """同时输出两种方式:
+      1) 自定义 buff B000 (customCount=1) —— 供光环 abuf 引用
+      2) 覆盖原版 BEar (origCount=1) —— 直接改原版强击光环 buff 字符串
+    这样无论游戏用哪种机制都能生效。
+    """
     base, new, mods = build_new_entry(NEW_BUFF, name, tip, ubertip, icon)
+    # 自定义 B000
     data = struct.pack("<ii", 2, 0) + struct.pack("<i", 1)
     data += base.encode("latin-1") + new.encode("latin-1") + struct.pack("<i", len(mods))
     for m in mods:
         data += write_mod(m)
     open(out_path, "wb").write(data)
-    print("wrote %s: %d bytes (base=%s new=%s mods=%d)" % (
+    print("wrote %s: %d bytes (custom %s->%s mods=%d)" % (
         out_path, len(data), base, new, len(mods)))
+
+
+def build_override(out_path, name="阿克蒙德之力", tip="阿克蒙德之力",
+                   ubertip="增加周围友军 50% 攻击力（近战/远程均生效）。",
+                   icon="BTNCorpseExplode.blp"):
+    """覆盖原版 BEar buff（origCount=1, oldId=newId=BEar）。"""
+    _, _, mods = build_new_entry(BASE_BUFF, name, tip, ubertip, icon)
+    data = struct.pack("<ii", 2, 1)  # version=2, origCount=1
+    data += BASE_BUFF.encode("latin-1") + BASE_BUFF.encode("latin-1") + struct.pack("<i", len(mods))
+    for m in mods:
+        data += write_mod(m)
+    data += struct.pack("<i", 0)  # customCount=0
+    open(out_path, "wb").write(data)
+    print("wrote %s: %d bytes (override %s mods=%d)" % (
+        out_path, len(data), BASE_BUFF, len(mods)))
 
 
 if __name__ == "__main__":
@@ -71,4 +92,5 @@ if __name__ == "__main__":
     tp = sys.argv[3] if len(sys.argv) > 3 else nm
     ub = sys.argv[4] if len(sys.argv) > 4 else "增加周围友军 50% 攻击力（近战/远程均生效）。"
     ic = sys.argv[5] if len(sys.argv) > 5 else "BTNCorpseExplode.blp"
-    build(out, nm, tp, ub, ic)
+    # 输出覆盖版（同时改原版 BEar，最可靠）
+    build_override(out, nm, tp, ub, ic)

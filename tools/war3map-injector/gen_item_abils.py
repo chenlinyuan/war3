@@ -63,8 +63,6 @@ def build_attack_entry(new_id, percent, name="阿克蒙德之力",
         mod("aart", 3, 0, 0, icon),
         mod("arar", 3, 0, 0, icon),
         mod("alev", 0, 0, 0, 1),
-        # 关联自定义 buff B000（光环的提示/名称来自 buff）
-        mod("abuf", 3, 0, 0, "B000"),
         # 数据字段: Ear1 = 攻击力加成百分比 (unreal, 0.5 = +50%)
         mod("Ear1", 2, 1, 1, float(percent)),
         # Ear2 = 近战加成开关 (bool, 1=开启)

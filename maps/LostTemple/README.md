@@ -2,6 +2,40 @@
 
 在官方对战地图 **Lost Temple (4)** 上注入装备搜索/添加系统。
 
+## 阿克蒙德之手（自定义装备）
+
+在 Lost Temple 上新增了一件自定义装备 **阿克蒙德之手**（物品 ID `I000`）：
+
+| 属性 | 值 |
+| --- | --- |
+| 基础物品 | `gcel`（加速手套 Gloves of Haste） |
+| 攻击力 | +500（技能 `A001`，基于 `AIat`） |
+| 攻击速度 | +100%（技能 `A002`，基于 `AIsx`） |
+| 主动技能 | 死亡之指（技能 `A000`，秒杀目标单位，1,000,000 伤害，快捷键 F） |
+| 图标 | `BTNCorpseExplode.blp` |
+| 分类 | Artifact，等级 8，售价 1000 |
+
+**生成/注入流程**：
+
+```powershell
+# 1. 生成物品 w3t（基础物品 gcel，技能 A001,A002,A000）
+python tools/war3map-injector/gen_w3t.py tools/war3map-injector/_hand.w3t
+
+# 2. 生成物品技能 w3a（攻击力 A001 + 攻击速度 A002）
+python tools/war3map-injector/gen_item_abils.py tools/war3map-injector/_hand_abil.w3a 500 1.0
+
+# 3. 合并技能 w3a（死亡之指 A000 + 致命一击 Azcr + A001 + A002）
+python tools/war3map-injector/merge_w3a.py tools/war3map-injector/_lt_hand.w3a `
+    tools/war3map-injector/_lt_both.w3a tools/war3map-injector/_hand_abil.w3a
+
+# 4. 注入脚本 + w3a + w3t（用 HKE「添加/替换文件」）
+python tools/war3map-injector/inject_map.py "maps/LostTemple/LostTemple_ft_hand.w3x" scripts/item-browser
+python tools/war3map-injector/inject_file.py "maps/LostTemple/LostTemple_ft_hand.w3x" tools/war3map-injector/_lt_hand.w3a war3map.w3a
+python tools/war3map-injector/inject_file.py "maps/LostTemple/LostTemple_ft_hand.w3x" tools/war3map-injector/_hand.w3t war3map.w3t
+```
+
+游戏内使用：`additem I000` 或 `additem 阿克蒙德之手`。
+
 ## 文件
 
 | 文件 | 说明 |

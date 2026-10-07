@@ -57,7 +57,7 @@ def write_mod(m):
 def build_new_entry(new_id, name="阿克蒙德之手",
                     tip="阿克蒙德之手",
                     ubertip="增加英雄 50% 攻击力与 100% 攻击速度。|n主动使用：死亡之指（秒杀目标单位）。",
-                    desc="增加英雄攻击力与攻击速度，可主动释放死亡之指。",
+                    desc="增加英雄 50% 攻击力与 100% 攻击速度，可主动释放死亡之指。",
                     icon=ICON, abilities=ABILITY_LIST,
                     base_id=DEFAULT_BASE, level=8, gold=1000, hp=75,
                     class_="Artifact", hotkey="F"):

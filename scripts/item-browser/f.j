@@ -1243,15 +1243,13 @@ endfunction
 // 给选中单位开启暴击（添加被动技能图标）
 function IB_CritEnable takes player p returns nothing
     local unit u = IB_GetSelectedUnit(p)
-    local integer lvl
     if u == null then
         call IB_SkillMessage(p, "请先选中一个英雄/单位")
         return
     endif
     call UnitAddAbility(u, ib_critAbility)
     call UnitMakeAbilityPermanent(u, true, ib_critAbility)
-    set lvl = GetUnitAbilityLevel(u, ib_critAbility)
-    call IB_SkillMessage(p, "已给 " + GetUnitName(u) + " 添加【致命一击】技能（技能栏）等级=" + I2S(lvl))
+    // 添加成功不提示（保持界面干净）
     set u = null
 endfunction
 
@@ -1631,15 +1629,13 @@ endfunction
 // 给选中单位添加「死亡之指」技能（技能栏图标）
 function IB_FingerAddAbility takes player p returns nothing
     local unit u = IB_GetSelectedUnit(p)
-    local integer lvl
     if u == null then
         call IB_FingerMessage(p, "请先选中一个英雄/单位")
         return
     endif
     call UnitAddAbility(u, ib_fingerAbility)
     call UnitMakeAbilityPermanent(u, true, ib_fingerAbility)
-    set lvl = GetUnitAbilityLevel(u, ib_fingerAbility)
-    call IB_FingerMessage(p, "已给 " + GetUnitName(u) + " 添加【死亡之指】技能（技能栏）等级=" + I2S(lvl))
+    // 添加成功不提示（保持界面干净）
     set u = null
 endfunction
 

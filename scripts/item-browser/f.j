@@ -860,6 +860,22 @@ function IB_CritOnAttack takes nothing returns nothing
     set ib_critArmed = true
 endfunction
 
+// 在单位上方显示红色漂浮伤害数字（模拟原版暴击红字）
+function IB_CritShowText takes unit u, real amount returns nothing
+    local texttag tt = CreateTextTag()
+    local real x = GetUnitX(u)
+    local real y = GetUnitY(u)
+    call SetTextTagText(tt, I2S(R2I(amount)), 0.024)
+    call SetTextTagPos(tt, x, y, 60.0)
+    call SetTextTagColor(tt, 255, 0, 0, 255)
+    call SetTextTagVelocity(tt, 0.0, 0.04)
+    call SetTextTagVisibility(tt, true)
+    call SetTextTagFadepoint(tt, 1.5)
+    call SetTextTagLifespan(tt, 2.0)
+    call SetTextTagPermanent(tt, false)
+    set tt = null
+endfunction
+
 // 伤害事件: 若为标记的普攻且攻击者在暴击组中，则掷骰并追加伤害
 function IB_CritOnDamage takes nothing returns nothing
     local unit src = GetEventDamageSource()
@@ -900,10 +916,8 @@ function IB_CritOnDamage takes nothing returns nothing
 
     set ib_critCount = ib_critCount + 1
     set ib_critLastMult = mult
-    // 只在暴击倍率较高时提示，避免刷屏
-    if mult >= 5 then
-        call DisplayTextToPlayer(GetOwningPlayer(src), 0, 0, "|cffff2020[暴击]|r x" + I2S(mult) + "  (" + R2S(dmg) + " + " + R2S(bonus) + ")")
-    endif
+    // 在目标上方跳出红色伤害数字（模拟原版暴击红字）
+    call IB_CritShowText(tgt, dmg + bonus)
 endfunction
 
 // 单位死亡: 从暴击组移除（避免组内积累无效单位）

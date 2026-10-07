@@ -617,6 +617,37 @@ function IB_SkillRemove takes player p, integer abilId returns nothing
     set u = null
 endfunction
 
+// 判断技能是否"受保护"（不展示、不移除）
+// 受保护: 物品技能(AI*)、英雄(AH*)、物品栏(AInv)、攻击(Aatk/Aat1-3)、移动(Amov)、
+//         蝗虫(Aloc)、防御(Adef)、采集(Ahrl) 等核心/被动基础技能。
+function IB_SkillIsProtected takes integer abilId returns boolean
+    local string id = IB_IdStr(abilId)
+    local string p2 = SubString(id, 0, 2)
+    // 物品类技能 (AIxx) —— 物品携带的加成, 不应移除
+    if p2 == "AI" then
+        return true
+    endif
+    // 英雄类技能 (AHxx)
+    if p2 == "AH" then
+        return true
+    endif
+    // 具体核心技能
+    if abilId == 'AInv' or abilId == 'AHer' or abilId == 'Aloc' then
+        return true
+    endif
+    if abilId == 'Adef' or abilId == 'Ahrl' or abilId == 'Amov' or abilId == 'Aatk' then
+        return true
+    endif
+    if abilId == 'Aat1' or abilId == 'Aat2' or abilId == 'Aat3' then
+        return true
+    endif
+    // 物品栏(英雄技能) 常见 ID
+    if abilId == 'AIin' or abilId == 'AInv' then
+        return true
+    endif
+    return false
+endfunction
+
 // 移除技能: 分帧扫描
 function IB_SkillRemStep takes nothing returns nothing
     local integer n = 0
@@ -625,10 +656,13 @@ function IB_SkillRemStep takes nothing returns nothing
         exitwhen ib_skRemIdx >= ib_skillCount or n >= 40
         set name = IB_SkillName(ib_skRemIdx)
         if name == ib_skRemName or IB_StrEqCI(IB_IdStr(ib_skillList[ib_skRemIdx]), ib_skRemName) then
-            set ib_skRemFoundId = ib_skillList[ib_skRemIdx]
+            // 受保护技能不可移除
+            if not IB_SkillIsProtected(ib_skillList[ib_skRemIdx]) then
+                set ib_skRemFoundId = ib_skillList[ib_skRemIdx]
+            endif
             set ib_skRemIdx = ib_skillCount
         elseif ib_skRemFoundId == 0 then
-            if IB_NameMatch(name, ib_skRemName) then
+            if IB_NameMatch(name, ib_skRemName) and not IB_SkillIsProtected(ib_skillList[ib_skRemIdx]) then
                 set ib_skRemFoundId = ib_skillList[ib_skRemIdx]
             endif
         endif
@@ -807,11 +841,11 @@ function IB_ShowRemoveSkillDialog takes player p returns nothing
     set ib_remDlgUnit = u
     set ib_remDlgPlayer = p
     set ib_remDlgCount = 0
-    // 遍历标准技能表，找出单位拥有的技能（最多 12 个）
+    // 遍历标准技能表，找出单位拥有的技能（最多 12 个；跳过受保护技能）
     loop
         exitwhen i >= ib_skillCount or n >= 12
         set aid = ib_skillList[i]
-        if GetUnitAbilityLevel(u, aid) > 0 then
+        if GetUnitAbilityLevel(u, aid) > 0 and not IB_SkillIsProtected(aid) then
             set ib_remDlgAbil[n] = aid
             set nm = ib_skillName[i]
             if StringLength(nm) == 0 then
@@ -865,22 +899,6 @@ endfunction
 
 
 
-// 判断技能是否"危险"（不能移除，否则可能崩溃/破坏单位）
-// 例如: 物品栏(AInv)、英雄(AHer)、蝗虫(Aloc)、防御(Adef)、采集(Ahrl) 等
-function IB_SkillIsProtected takes integer abilId returns boolean
-    // AInv 物品栏 / AHer 英雄 / Aloc 蝗虫 / Adef 防御 / Ahrl 采集 / Amov 移动 / Aatk 攻击
-    if abilId == 'AInv' or abilId == 'AHer' or abilId == 'Aloc' then
-        return true
-    endif
-    if abilId == 'Adef' or abilId == 'Ahrl' or abilId == 'Amov' or abilId == 'Aatk' then
-        return true
-    endif
-    // 攻击/移动类 (Aatk/Aat1..Aat3, Amov 等) 前缀
-    if abilId == 'Aat1' or abilId == 'Aat2' or abilId == 'Aat3' or abilId == 'Aatk' then
-        return true
-    endif
-    return false
-endfunction
 
 //---------------------------------------------------------------------------
 // 移除选中单位的全部技能（分帧遍历技能列表，逐个检测并移除）

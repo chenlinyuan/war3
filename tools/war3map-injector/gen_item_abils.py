@@ -47,13 +47,22 @@ def write_mod(m):
 
 
 def build_attack_entry(new_id, percent, name="强击光环", icon=ICON_ATTACK):
-    """攻击力百分比光环技能（基于 AIar ItemAuraTrueshot）。percent: 0.5 = +50%。"""
+    """攻击力百分比光环技能（基于 AIar ItemAuraTrueshot）。percent: 0.5 = +50%。
+
+    强击光环字段 (AEar 默认值): Ear1=攻击力%(0.1), Ear2=近战开关(0), Ear3=远程开关(1)。
+    原版只对远程生效(Ear2=0,Ear3=1)。这里显式开启近战(Ear2=1)与远程(Ear3=1)，
+    使近战英雄装备时也享受加成。
+    """
     mods = [
         mod("anam", 3, 0, 0, name),
         mod("aart", 3, 0, 0, icon),
         mod("alev", 0, 0, 0, 1),
         # 数据字段: Ear1 = 攻击力加成百分比 (unreal, 0.5 = +50%)
         mod("Ear1", 2, 1, 1, float(percent)),
+        # Ear2 = 近战加成开关 (bool, 1=开启)
+        mod("Ear2", 0, 1, 2, 1),
+        # Ear3 = 远程加成开关 (bool, 1=开启)
+        mod("Ear3", 0, 1, 3, 1),
     ]
     return (BASE_ATTACK, new_id, mods)
 

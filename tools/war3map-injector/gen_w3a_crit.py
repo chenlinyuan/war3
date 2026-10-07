@@ -12,33 +12,23 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_w3a import write_entry
 from gen_w3a_finger import mod, write_mod
 
-BASE = "ACcl"
+BASE = "Aegr"
 ICON = "ReplaceableTextures\\PassiveButtons\\PASBTNCriticalStrike.blp"
 
 
 def build_new_entry(new_id, name="致命一击"):
-    # 基础用 ACcl(连锁闪电, 单位技能) —— 与死亡之指同款, 名称/图标可正常覆盖。
-    # 通过清空 aord(施法命令) + 无目标, 使其成为不可点击的被动图标。
+    # 基础用 Aegr(Elune's Grace, 单位被动技能) —— 纯被动, 无法主动施放。
+    # 覆盖名称/图标/提示; 清零自带闪避(实际暴击由 JASS 执行)。
     mods = [
         mod("anam", 3, 0, 0, name),
         mod("atp1", 3, 1, 0, name + "(被动)"),
-        mod("aub1", 3, 1, 0, "攻击时按概率造成 2~100 倍伤害。"),
+        mod("aub1", 3, 1, 0, "攻击时按概率触发暴击:|n30% x2  12% x3  8% x4  4% x5|n2% x50  1% x100|n(其余不暴击)"),
         mod("aart", 3, 0, 0, ICON),
         mod("arar", 3, 0, 0, ICON),
-        mod("arac", 3, 0, 0, "creeps"),
-        mod("aord", 3, 0, 0, ""),          # 无施法命令 -> 不可主动施放
-        mod("Ncl2", 0, 1, 2, 0),           # 目标类型 = 无
-        mod("Ncl1", 2, 1, 1, 0.0),
-        mod("Ncl3", 0, 1, 3, 0),
-        mod("Ncl4", 2, 1, 4, 0.0),
-        mod("Ncl6", 3, 1, 6, ""),
-        mod("atar", 3, 1, 0, ""),          # 无目标允许
+        mod("arac", 3, 0, 0, "nightelf"),
         mod("alev", 0, 0, 0, 1),
         mod("abpx", 0, 0, 0, 1),
         mod("abpy", 0, 0, 0, 0),
-        mod("acdn", 2, 1, 0, 0.0),
-        mod("amcs", 0, 1, 0, 0),
-        mod("aran", 2, 1, 0, 0.0),
     ]
     return (BASE, new_id, mods)
 

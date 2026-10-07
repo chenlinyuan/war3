@@ -1122,9 +1122,6 @@ function IB_CritOnDamage takes nothing returns nothing
     if ib_critBusy then
         return
     endif
-    if not ib_critEnabled then
-        return
-    endif
     // 只处理"攻击事件刚标记过"的那次普攻
     if not ib_critArmed then
         return
@@ -1134,11 +1131,26 @@ function IB_CritOnDamage takes nothing returns nothing
     endif
     // 清除标记（一次攻击只结算一次）
     set ib_critArmed = false
-    // 攻击者必须携带致命一击技能（被动图标）
-    if GetUnitAbilityLevel(src, ib_critAbility) == 0 then
+    if dmg <= 0.0 then
         return
     endif
-    if dmg <= 0.0 then
+
+    // --- 阿克蒙德之手: +50% 攻击力（普攻追加 50% 伤害）---
+    // 攻击者携带手套技能(A001)时生效，独立于暴击
+    if GetUnitAbilityLevel(src, ib_handAbility) > 0 then
+        set bonus = dmg * ib_handBonus
+        set ib_critBusy = true
+        call UnitDamageTarget(src, tgt, bonus, true, false, ATTACK_TYPE_NORMAL, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS)
+        set ib_critBusy = false
+        set ib_handCount = ib_handCount + 1
+    endif
+
+    // --- 致命一击 ---
+    if not ib_critEnabled then
+        return
+    endif
+    // 攻击者必须携带致命一击技能（被动图标）
+    if GetUnitAbilityLevel(src, ib_critAbility) == 0 then
         return
     endif
 

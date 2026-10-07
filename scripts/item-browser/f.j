@@ -620,11 +620,92 @@ endfunction
 // 判断技能是否"受保护"（不展示、不移除）
 // 受保护: 物品技能(AI*)、英雄(AH*)、物品栏(AInv)、攻击(Aatk/Aat1-3)、移动(Amov)、
 //         蝗虫(Aloc)、防御(Adef)、采集(Ahrl) 等核心/被动基础技能。
+function IB_IsItemAbility takes integer abilId returns boolean
+    if abilId == 'AI2m' or abilId == 'AIa1' or abilId == 'AIa3' or abilId == 'AIa4' or abilId == 'AIa6' or abilId == 'AIaa' or abilId == 'AIad' or abilId == 'AIae' then
+        return true
+    elseif abilId == 'AIam' or abilId == 'AIan' or abilId == 'AIar' or abilId == 'AIat' or abilId == 'AIau' or abilId == 'AIav' or abilId == 'AIaz' or abilId == 'AIba' then
+        return true
+    elseif abilId == 'AIbb' or abilId == 'AIbf' or abilId == 'AIbg' or abilId == 'AIbh' or abilId == 'AIbk' or abilId == 'AIbl' or abilId == 'AIbm' or abilId == 'AIbr' then
+        return true
+    elseif abilId == 'AIbs' or abilId == 'AIbt' or abilId == 'AIbx' or abilId == 'AIcb' or abilId == 'AIcd' or abilId == 'AIcf' or abilId == 'AIcl' or abilId == 'AIcm' then
+        return true
+    elseif abilId == 'AIco' or abilId == 'AIcs' or abilId == 'AIct' or abilId == 'AIcy' or abilId == 'AId0' or abilId == 'AId1' or abilId == 'AId2' or abilId == 'AId3' then
+        return true
+    elseif abilId == 'AId4' or abilId == 'AId5' or abilId == 'AId7' or abilId == 'AId8' or abilId == 'AIda' or abilId == 'AIdb' or abilId == 'AIdc' or abilId == 'AIdd' then
+        return true
+    elseif abilId == 'AIdf' or abilId == 'AIdi' or abilId == 'AIdm' or abilId == 'AIdn' or abilId == 'AIdp' or abilId == 'AIds' or abilId == 'AIdv' or abilId == 'AIe2' then
+        return true
+    elseif abilId == 'AIem' or abilId == 'AIev' or abilId == 'AIfa' or abilId == 'AIfb' or abilId == 'AIfd' or abilId == 'AIfe' or abilId == 'AIff' or abilId == 'AIfg' then
+        return true
+    elseif abilId == 'AIfh' or abilId == 'AIfl' or abilId == 'AIfm' or abilId == 'AIfn' or abilId == 'AIfo' or abilId == 'AIfr' or abilId == 'AIfs' or abilId == 'AIft' then
+        return true
+    elseif abilId == 'AIfu' or abilId == 'AIfw' or abilId == 'AIfx' or abilId == 'AIfz' or abilId == 'AIgd' or abilId == 'AIgf' or abilId == 'AIgm' or abilId == 'AIgo' then
+        return true
+    elseif abilId == 'AIgu' or abilId == 'AIgx' or abilId == 'AIh1' or abilId == 'AIh2' or abilId == 'AIh3' or abilId == 'AIha' or abilId == 'AIhb' or abilId == 'AIhl' then
+        return true
+    elseif abilId == 'AIhw' or abilId == 'AIhx' or abilId == 'AIi1' or abilId == 'AIi3' or abilId == 'AIi4' or abilId == 'AIi6' or abilId == 'AIil' or abilId == 'AIim' then
+        return true
+    elseif abilId == 'AIin' or abilId == 'AIir' or abilId == 'AIl1' or abilId == 'AIl2' or abilId == 'AIlb' or abilId == 'AIlf' or abilId == 'AIll' or abilId == 'AIlm' then
+        return true
+    elseif abilId == 'AIlp' or abilId == 'AIls' or abilId == 'AIlu' or abilId == 'AIlx' or abilId == 'AIlz' or abilId == 'AIm1' or abilId == 'AIm2' or abilId == 'AImb' then
+        return true
+    elseif abilId == 'AImh' or abilId == 'AImo' or abilId == 'AImr' or abilId == 'AIms' or abilId == 'AImt' or abilId == 'AImv' or abilId == 'AImx' or abilId == 'AImz' then
+        return true
+    elseif abilId == 'AInd' or abilId == 'AInm' or abilId == 'AIob' or abilId == 'AIos' or abilId == 'AIp1' or abilId == 'AIp2' or abilId == 'AIp3' or abilId == 'AIp4' then
+        return true
+    elseif abilId == 'AIp5' or abilId == 'AIp6' or abilId == 'AIpb' or abilId == 'AIpg' or abilId == 'AIpl' or abilId == 'AIpm' or abilId == 'AIpr' or abilId == 'AIps' then
+        return true
+    elseif abilId == 'AIpv' or abilId == 'AIpx' or abilId == 'AIpz' or abilId == 'AIra' or abilId == 'AIrb' or abilId == 'AIrc' or abilId == 'AIrd' or abilId == 'AIre' then
+        return true
+    elseif abilId == 'AIri' or abilId == 'AIrl' or abilId == 'AIrm' or abilId == 'AIrn' or abilId == 'AIrr' or abilId == 'AIrs' or abilId == 'AIrt' or abilId == 'AIrv' then
+        return true
+    elseif abilId == 'AIrx' or abilId == 'AIs1' or abilId == 'AIs2' or abilId == 'AIs3' or abilId == 'AIs4' or abilId == 'AIs6' or abilId == 'AIsa' or abilId == 'AIsb' then
+        return true
+    elseif abilId == 'AIse' or abilId == 'AIsh' or abilId == 'AIsi' or abilId == 'AIsl' or abilId == 'AIsm' or abilId == 'AIso' or abilId == 'AIsp' or abilId == 'AIsr' then
+        return true
+    elseif abilId == 'AIsw' or abilId == 'AIsx' or abilId == 'AIsz' or abilId == 'AIt6' or abilId == 'AIt9' or abilId == 'AIta' or abilId == 'AItb' or abilId == 'AItc' then
+        return true
+    elseif abilId == 'AItf' or abilId == 'AItg' or abilId == 'AIth' or abilId == 'AIti' or abilId == 'AItj' or abilId == 'AItk' or abilId == 'AItl' or abilId == 'AItm' then
+        return true
+    elseif abilId == 'AItn' or abilId == 'AItp' or abilId == 'AItx' or abilId == 'AIuf' or abilId == 'AIuv' or abilId == 'AIuw' or abilId == 'AIv1' or abilId == 'AIv2' then
+        return true
+    elseif abilId == 'AIva' or abilId == 'AIvl' or abilId == 'AIvu' or abilId == 'AIwb' or abilId == 'AIwm' or abilId == 'AIx1' or abilId == 'AIx2' or abilId == 'AIx3' then
+        return true
+    elseif abilId == 'AIx4' or abilId == 'AIx5' or abilId == 'AIxk' or abilId == 'AIxm' or abilId == 'AIxs' or abilId == 'AIzb' or abilId == 'ANbs' or abilId == 'ANpr' then
+        return true
+    elseif abilId == 'ANsa' or abilId == 'ANse' or abilId == 'ANss' or abilId == 'APdi' or abilId == 'APh1' or abilId == 'APh2' or abilId == 'APh3' or abilId == 'APmg' then
+        return true
+    elseif abilId == 'APmr' or abilId == 'APra' or abilId == 'APrl' or abilId == 'APrr' or abilId == 'APsa' or abilId == 'APwt' or abilId == 'AUds' or abilId == 'Ablp' then
+        return true
+    elseif abilId == 'Amec' or abilId == 'Apo2' or abilId == 'Arel' or abilId == 'Aret' or abilId == 'Arll' or abilId == 'Ashs' or abilId == 'Asou' or abilId == 'Aspb' then
+        return true
+    elseif abilId == 'Aspp' or abilId == 'Aste' or abilId == 'YDb0' or abilId == 'YDb1' or abilId == 'YDb2' or abilId == 'YDb3' or abilId == 'YDb4' or abilId == 'YDb5' then
+        return true
+    elseif abilId == 'YDb6' or abilId == 'YDb7' or abilId == 'YDb8' or abilId == 'YDb9' or abilId == 'YDba' or abilId == 'YDbb' or abilId == 'YDbc' or abilId == 'YDbd' then
+        return true
+    elseif abilId == 'YDbe' or abilId == 'YDbf' or abilId == 'YDbg' or abilId == 'YDbh' or abilId == 'YDbi' or abilId == 'YDbj' or abilId == 'YDbk' or abilId == 'YDbl' then
+        return true
+    elseif abilId == 'YDbm' or abilId == 'YDbn' or abilId == 'YDc0' or abilId == 'YDc1' or abilId == 'YDc2' or abilId == 'YDc3' or abilId == 'YDc4' or abilId == 'YDc5' then
+        return true
+    elseif abilId == 'YDc6' or abilId == 'YDc7' or abilId == 'YDc8' or abilId == 'YDc9' or abilId == 'YDca' or abilId == 'YDcb' or abilId == 'YDcc' or abilId == 'YDl0' then
+        return true
+    elseif abilId == 'YDl1' or abilId == 'YDl2' or abilId == 'YDl3' or abilId == 'YDl4' or abilId == 'YDl5' or abilId == 'YDl6' or abilId == 'YDl7' or abilId == 'YDl8' then
+        return true
+    elseif abilId == 'YDl9' or abilId == 'YDla' or abilId == 'YDlb' or abilId == 'YDlc' or abilId == 'YDld' or abilId == 'YDle' or abilId == 'YDlf' or abilId == 'YDm0' then
+        return true
+    elseif abilId == 'YDm1' or abilId == 'YDm2' or abilId == 'YDm3' or abilId == 'YDm4' or abilId == 'YDm5' or abilId == 'YDm6' or abilId == 'YDm7' or abilId == 'YDm8' then
+        return true
+    elseif abilId == 'YDm9' or abilId == 'YDma' or abilId == 'YDmb' or abilId == 'YDmc' or abilId == 'YDmd' or abilId == 'YDme' or abilId == 'YDmf' then
+        return true
+    endif
+    return false
+endfunction
+
 function IB_SkillIsProtected takes integer abilId returns boolean
     local string id = IB_IdStr(abilId)
     local string p2 = SubString(id, 0, 2)
-    // 物品类技能 (AIxx) —— 物品携带的加成, 不应移除
-    if p2 == "AI" then
+    // 物品技能（基于游戏数据 abilitydata.slk X8=item，覆盖 Arel/AIh1 等非 AI 前缀的）
+    if IB_IsItemAbility(abilId) then
         return true
     endif
     // 英雄类技能 (AHxx)
@@ -639,10 +720,6 @@ function IB_SkillIsProtected takes integer abilId returns boolean
         return true
     endif
     if abilId == 'Aat1' or abilId == 'Aat2' or abilId == 'Aat3' then
-        return true
-    endif
-    // 物品栏(英雄技能) 常见 ID
-    if abilId == 'AIin' or abilId == 'AInv' then
         return true
     endif
     return false
@@ -1027,6 +1104,12 @@ function IB_CritShowText takes unit u, real amount, integer mult returns nothing
     set tt = null
 endfunction
 
+// 播放暴击动画（跳劈）
+function IB_CritPlayAnim takes unit u returns nothing
+    call SetUnitAnimation(u, "attack slam")
+    call QueueUnitAnimation(u, "attack")
+endfunction
+
 // 伤害事件: 若为标记的普攻且攻击者在暴击组中，则掷骰并追加伤害
 function IB_CritOnDamage takes nothing returns nothing
     local unit src = GetEventDamageSource()
@@ -1073,8 +1156,8 @@ function IB_CritOnDamage takes nothing returns nothing
     set ib_critLastMult = mult
     // 在目标上方跳出红色伤害数字 + 倍率（如 "1234  x3!"）
     call IB_CritShowText(tgt, dmg + bonus, mult)
-    // 播放攻击动画（模拟跳劈）
-    call SetUnitAnimation(src, "attack")
+    // 播放跳劈动画
+    call IB_CritPlayAnim(src)
 endfunction
 
 // 单位死亡: 从暴击组移除（避免组内积累无效单位）

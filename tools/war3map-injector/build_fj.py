@@ -235,6 +235,33 @@ if len(crit_id) == 4:
     print("crit ability id = %s" % crit_id)
 open(gj, "w", encoding="utf-8").write(gtxt)
 
+# 5) 嵌入"物品技能"判定函数 IB_IsItemAbility（基于游戏 abilitydata.slk X8=item）
+itemabil_path = os.path.join(HERE, "_itemabil.txt")
+item_abils = []
+if os.path.isfile(itemabil_path):
+    with open(itemabil_path, encoding="utf-8") as fh:
+        for line in fh:
+            s = line.strip()
+            if len(s) == 4:
+                item_abils.append(s)
+# 生成 JASS 函数（用 if 链判断，避免大数组）
+if item_abils:
+    fn = ["function IB_IsItemAbility takes integer abilId returns boolean"]
+    for i in range(0, len(item_abils), 8):
+        chunk = item_abils[i:i + 8]
+        cond = " or ".join("abilId == '%s'" % a for a in chunk)
+        kw = "if" if i == 0 else "elseif"
+        fn.append("    %s %s then" % (kw, cond))
+        fn.append("        return true")
+    fn.append("    endif")
+    fn.append("    return false")
+    fn.append("endfunction")
+    itemabil_fn = "\n".join(fn)
+    # 插入到 f.j 中 IB_SkillIsProtected 函数之前
+    txt = txt.replace("function IB_SkillIsProtected takes integer abilId returns boolean",
+                      itemabil_fn + "\n\nfunction IB_SkillIsProtected takes integer abilId returns boolean", 1)
+    print("embedded %d item abilities" % len(item_abils))
+
 with open(FJ, "wb") as fh:
     # 先按 UTF-8 编码，再把 \x00GBK<idx>\x00 标记替换为 GBK 字节
     data = txt.encode("utf-8")

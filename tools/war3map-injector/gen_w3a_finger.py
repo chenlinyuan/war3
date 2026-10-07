@@ -55,6 +55,8 @@ def build_new_entry(new_id, cooldown=12.0, mana=100, cast_range=800.0, name="死
         mod("aord", 3, 0, 0, ""),
         # 快捷键 F（同阿克蒙德死亡之指）
         mod("ahky", 3, 0, 0, "F"),
+        # 闪电效果改为 AFOD（红色闪电，同阿克蒙德死亡之指）
+        mod("alig", 3, 0, 0, "AFOD"),
         # 目标类型（关键: Ncl2 是 int，不是字符串！）
         mod("Ncl2", 0, 1, 2, 1),          # 目标类型 = 单位
         mod("Ncl1", 2, 1, 1, 0.0),        # 数据列1

@@ -93,3 +93,6 @@ _yingling_files.txt
 
 # ---- 超大英灵传说地图(753MB, 不入库) ----
 maps/英灵传说*.w3x
+
+# 校验临时文件
+scripts/item-browser/_validate.j

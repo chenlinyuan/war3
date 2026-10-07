@@ -80,6 +80,8 @@ for ci, chunk in enumerate(chunks):
         lines.append("    set ib_itemList[%d] = '%s'" % (idx, iid))
         lines.append('    set ib_itemName[%d] = "%s"' % (idx, jass_escape(nm)))
         lines.append("    set ib_itemCustom[%d] = %d" % (idx, 1 if flag == "C" else 0))
+        # GBK 名称：占位符，稍后替换为 GBK 字节（游戏聊天输入为 GBK）
+        lines.append("    set ib_itemNameGbk[%d] = \"@@IGBK%d@@\"" % (idx, idx))
     lines.append("endfunction")
     chunk_funcs.append("\n".join(lines))
 
@@ -219,6 +221,12 @@ for i, nm in gbk_map.items():
     marker = "\x00GBK%d\x00" % i
     txt = txt.replace("@@GBK%d@@" % i, marker)
 
+# 3b) 物品 GBK 名称占位符 -> 标记
+item_gbk_map = {i: nm for i, (flag, iid, nm) in enumerate(items)}
+for i, nm in item_gbk_map.items():
+    marker = "\x00IGBK%d\x00" % i
+    txt = txt.replace("@@IGBK%d@@" % i, marker)
+
 # 4) 死亡之指 / 致命一击 技能 ID（可用环境变量覆盖，默认 A000/Azcr）
 #    注意: 这两个变量定义在 g.j 中
 finger_id = os.environ.get("IB_FINGER_ABILITY", "A000").strip()
@@ -274,6 +282,13 @@ with open(FJ, "wb") as fh:
         except Exception:
             gbk_bytes = nm.encode("utf-8")
         data = data.replace(("\x00GBK%d\x00" % i).encode("utf-8"), gbk_bytes)
+    # 物品 GBK 名称
+    for i, nm in item_gbk_map.items():
+        try:
+            gbk_bytes = nm.encode("gbk")
+        except Exception:
+            gbk_bytes = nm.encode("utf-8")
+        data = data.replace(("\x00IGBK%d\x00" % i).encode("utf-8"), gbk_bytes)
     fh.write(data)
 
 print("embedded %d items (%d) + %d skills (%d) + %d units (%d) into %s" % (

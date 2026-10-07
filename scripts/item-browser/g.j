@@ -6,6 +6,8 @@
 integer array ib_itemList
 // 物品名称列表（注入时预扫描硬编码，避免依赖 GetObjectName）
 string array ib_itemName
+// 物品名称 GBK 版（游戏聊天输入为 GBK，用于中文匹配）
+string array ib_itemNameGbk
 // 是否自定义物品（1=自定义, 0=原版）
 integer array ib_itemCustom
 integer ib_itemCount = 0

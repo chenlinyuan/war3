@@ -29,13 +29,20 @@ ABILITY_LIST = "A001,A002,A000"
 
 
 def mod(mid, t, a, b, v):
-    """构造一个 mod 元组 (mid, type, level, fieldIndex, value, 0)。"""
+    """构造一个 mod 元组 (mid, type, level, fieldIndex, value, 0)。
+
+    注意: w3t (物品) 的 mod 格式与 w3a (技能) 不同!
+      w3a: modId(4) + type(4) + variation(4) + dataPointer(4) + value + endMarker(4)
+      w3t: modId(4) + type(4) + value + endMarker(4)   ← 只有 1 个字段
+    本函数保留 (mid,t,a,b,v,c) 签名以便复用, 但 write_mod 只写 type。
+    """
     return (mid, t, a, b, v, 0)
 
 
 def write_mod(m):
+    """w3t mod: modId(4) + type(4) + value + endMarker(4)。"""
     mid, t, a, b, v, c = m
-    out = mid.encode("latin-1") + struct.pack("<iii", t, a, b)
+    out = mid.encode("latin-1") + struct.pack("<i", t)
     if t == 0:
         out += struct.pack("<i", v)
     elif t in (1, 2):

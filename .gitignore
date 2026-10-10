@@ -96,3 +96,27 @@ maps/英灵传说*.w3x
 
 # 校验临时文件
 scripts/item-browser/_validate.j
+
+# ---- HKE extracted leftovers in map dirs (regenerated on each inject) ----
+maps/*/war3map.w3a
+maps/*/war3map.w3t
+maps/*/war3map.w3u
+maps/*/war3map.w3h
+maps/*/war3map.w3i
+maps/*/war3map.wct
+maps/*/war3map.wtg
+maps/*/war3map.wts
+maps/*/war3map.doo
+maps/*/war3map.wpm
+maps/*/war3map.shd
+maps/*/war3map.mmp
+maps/*/war3mapmap.blp
+maps/*/war3mapunits.doo
+maps/*/war3mappreview.tga
+# extracted map folder (war3map.w3h etc) - not project content
+maps/LostTemple/LostTemple_wings/
+
+# ---- big local source maps (not project content) ----
+maps/*.w3x
+!maps/LostTemple/*.w3x
+!maps/campaign/*.w3x

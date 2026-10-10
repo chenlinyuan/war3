@@ -11,6 +11,8 @@ import struct, sys, os
 # 基础技能: 连锁闪电 (ACcl) —— 单位技能(X8=unit), 主动、目标敌方单位、可点击。
 # 关键: 必须用"单位技能"(X8=unit)而非"英雄技能"(X8=hero), 否则 UnitAddAbility 后
 #       不会出现在技能栏(英雄技能需 SelectHeroSkill 学习)。
+# 用 ACcl (连锁闪电) 保留红色闪电效果 (alig=AFOD)。
+# 注: ACcl 是"单位技能", 物品栏图标不显示冷却动画 (这是 War3 限制)。
 BASE = "ACcl"
 NEW = "A000"
 
@@ -55,7 +57,7 @@ def build_new_entry(new_id, cooldown=12.0, mana=100, cast_range=800.0, name="死
         mod("aord", 3, 0, 0, ""),
         # 快捷键 F（同阿克蒙德死亡之指）
         mod("ahky", 3, 0, 0, "F"),
-        # 闪电效果改为 AFOD（红色闪电，同阿克蒙德死亡之指）
+        # 闪电效果 AFOD（红色闪电，同阿克蒙德死亡之指）
         mod("alig", 3, 0, 0, "AFOD"),
         # 目标类型（关键: Ncl2 是 int，不是字符串！）
         mod("Ncl2", 0, 1, 2, 1),          # 目标类型 = 单位
@@ -66,6 +68,9 @@ def build_new_entry(new_id, cooldown=12.0, mana=100, cast_range=800.0, name="死
         mod("atar", 3, 1, 0, "air,ground,structure,enemy,neutral"),
         # 等级 1
         mod("alev", 0, 0, 0, 1),
+        # 物品技能标志 (aite=1)
+        mod("aite", 0, 0, 0, 1),
+        mod("aher", 0, 0, 0, 0),
         # 按钮位置
         mod("abpx", 0, 0, 0, 0),
         mod("abpy", 0, 0, 0, 2),

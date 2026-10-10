@@ -9,6 +9,7 @@ War3 mod 制作相关工具汇总。
 - [`脚本开发工具.md`](脚本开发工具.md) — 编程相关工具
 - [`资源工具.md`](资源工具.md) — 模型/贴图/音效工具
 - [`地图脚本注入.md`](地图脚本注入.md) — 向任意地图注入脚本（含加密地图）
+- [`HKE行为实测.md`](HKE行为实测.md) — HkeW3mModifier 的实测行为与踩坑记录
 
 ## 工具总览
 
@@ -33,6 +34,8 @@ War3 mod 制作相关工具汇总。
 | 音效 | Audacity | 音频编辑 |
 | 数据 | War3Net | 编程读写地图 |
 | 数据 | WC3MapTranslator | 格式转换 |
+| 注入 | HkeW3mModifier2.0 | 无视已知 MPQ 加密，脚本/资源注入（本项目唯一可用方案） |
+| 注入 | `tools/war3map-injector/inject_all.py` | 一次会话批量注入脚本 + 对象数据 |
 
 ## 参考
 

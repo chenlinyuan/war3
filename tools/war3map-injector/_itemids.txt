@@ -1,119 +1,28 @@
 S	ckng	国王之冠 +5
 S	modt	死亡面罩
 S	tkno	能量之书
-S	ratf	攻击之爪 +15
-S	rde4	守护指环 +5
-S	ofro	霜冻之球
-S	desc	科勒恩的逃脱匕首
-S	fgdg	恶魔雕像
-S	infs	恶魔岩石
-S	shar	冰冻碎片
-S	sand	操作死尸卷轴
-S	wild	野性护身符
-S	srrc	复活卷轴
-S	odef	黑暗之球
-S	rde3	守护指环 +4
-S	pmna	魔法垂饰
-S	rhth	卡嘉医疗宝石
-S	ssil	沉默权杖
-S	spsh	魔法护盾护身符
-S	sres	恢复卷轴
-S	pdiv	神圣药水
-S	pres	恢复药水
-S	totw	野性护符
-S	fgfh	长钉衣领
-S	fgrd	红龙之卵
-S	fgrg	岩石印记
-S	hcun	灵巧头巾
-S	hval	英勇面具
-S	mcou	勇气勋章
+S	infs	小型核弹
 S	ajen	古之忍耐姜歌
-S	clfm	火焰风衣
-S	ratc	攻击之爪 +12
 S	ward	战歌之鼓
-S	kpin	卡嘉长萧
 S	crys	水晶球
 S	lgdh	毁灭之角
-S	ankh	重生十字章
-S	whwd	治疗守卫
-S	fgsk	死亡之书
-S	wcyc	飓风权杖
-S	hlst	医疗石
-S	mnst	魔法石
-S	belv	奎尔萨拉斯之靴 +6
-S	bgst	巨人力量腰带+6
-S	ciri	法师长袍 +6
-S	lhst	风暴狮角
-S	afac	阿利亚之笛
 S	sbch	天灾骨钟
 S	brac	神秘腰带
 S	rwiz	艺人面罩
-S	pghe	大生命药水
-S	pgma	大魔法药水
-S	pnvu	无敌药水
-S	sror	野兽卷轴
-S	woms	魔法盗取权杖
-S	evtl	闪避护符
-S	penr	能量垂饰
-S	prvt	生命护身符
-S	rat9	攻击之爪 +9
-S	rde2	守护指环 +3
-S	rlif	恢复指环
-S	bspd	速度之靴
-S	rej3	恢复药水
-S	will	幻象权杖
-S	wlsd	闪电护盾权杖
-S	wswd	岗哨守卫
-S	cnob	贵族圆环
-S	gcel	加速手套
-S	rat6	攻击之爪 +6
-S	rde1	守护指环 +2
-S	tdx2	敏捷之书 +2
-S	texp	经验之书
-S	tin2	智力之书 +2
-S	tpow	知识之书
-S	tst2	力量之书 +2
-S	pnvl	较小的无敌药水
-S	clsd	影子风衣
-S	rag1	敏捷便鞋  +3
-S	rin1	智力斗篷 +3
-S	rst1	食人鬼手套 +3
-S	manh	生命手册
-S	tdex	敏捷之书
-S	tint	智力之书
-S	tstr	力量之书
-S	pomn	全知药水
-S	wshs	影子权杖
-S	rej6	大型恢复卷轴
-S	rej5	小型恢复卷轴
-S	rej4	大型恢复药水
-S	ram4	大魔法师指环
-S	dsum	召唤钻石
 S	ofir	火焰之球
 S	ocor	腐蚀之球
 S	oli2	闪电之球
 S	oven	毒液之球
-S	ram3	大魔法师指环
-S	tret	再训练之书
+S	evtl	呼啦圈
 S	tgrh	小型的大厅
-S	rej2	小型恢复药水
-S	gemt	显形宝石
-S	ram2	大魔法师指环
-S	stel	传送权杖
+S	wlsd	闪电护盾权杖
+S	rat6	攻击之爪 +6
 S	stwp	回城卷轴
-S	wneg	否决权杖
-S	sneg	否决权杖
-S	wneu	中和权杖
 S	shea	医疗卷轴
-S	sman	魔法卷轴
-S	rej1	小型恢复药水
-S	pspd	速度药水
 S	dust	尘土之影
-S	ram1	大魔法师指环
-S	pinv	隐形药水
+S	manh	生命手册
 S	phea	生命药水
 S	pman	魔法药水
-S	spro	守护卷轴
 S	hslv	医疗剂
 S	moon	月亮石
 S	shas	速度卷轴
@@ -121,154 +30,373 @@ S	skul	献祭头骨
 S	mcri	机械类的小玩艺
 S	rnec	巫术妖棍
 S	tsct	象牙塔
-S	azhr	埃苏尼之心
-S	bzbe	空瓶
-S	bzbf	盛满泉水的瓶子
-S	ches	奶酪
-S	cnhn	赛纳留斯的号角
-S	glsk	古尔丹之颅
-S	gopr	净化浮雕
-S	k3m1	月亮水晶
-S	k3m2	三月之钥的另外一个部分
-S	k3m3	三月之钥
-S	ktrm	泰瑞纳斯国王的骨灰瓮
-S	kybl	鲜血钥匙
-S	kygh	魔鬼钥匙
-S	kymn	月之钥匙
-S	kysn	太阳钥匙
-S	ledg	吉拉德的帐本
-S	phlt	李维特
-S	sehr	赛瑞诺克斯之心
-S	engs	魔法宝石
-S	sorf	影子之球碎片
-S	gmfr	宝石碎片
-S	jpnt	给吉安娜?普罗德摩尔的便条
-S	shwd	荧光草
-S	skrt	骸骨宝物
-S	thle	雷霆蜥蜴之蛋
-S	sclp	秘密关卡激活
-S	wtlg	怀特之腿
-S	wolg	怀特的另一条腿
-S	mgtk	魔法钥匙串
-S	mort	莫哥林的报告
-S	dphe	雷霆凤凰蛋
-S	dkfw	雷霆水桶
-S	dthb	雷电花芯
-S	fgun	信号枪
-S	lure	怪兽诱捕守卫
-S	olig	闪电之球
-S	amrc	召唤护身符
-S	ccmd	统治权杖
-S	flag	人族旗帜
-S	gobm	地精地雷
-S	gsou	灵魂宝石
-S	nflg	暗夜精灵族旗帜
-S	nspi	魔法免疫项链
-S	oflg	兽族旗帜
 S	pams	抗体药水
-S	pgin	大隐形药水
-S	rat3	攻击之爪 +3
-S	rde0	守护指环 +1
-S	rnsp	优越之戒
-S	soul	灵魂
-S	tels	地精夜视镜
-S	tgxp	超级经验之书
-S	uflg	不死族旗帜
-S	anfg	远古雕像
-S	brag	敏捷腰带
-S	drph	德鲁伊布袋
-S	iwbr	铁树枝干
-S	jdrn	灵巧指环
-S	lnrn	雄狮之戒
-S	mlst	力量之锤
-S	oslo	减速之球
-S	sbok	魔法书
-S	sksh	防护面具
-S	sprn	蜘蛛戒指
-S	tmmt	力量图腾
-S	vddl	巫毒玩偶
 S	spre	保存权杖
-S	sfog	乌云号角
-S	sor1	影子之球 +1
-S	sor2	影子之球 +2
-S	sor3	影子之球 +3
-S	sor4	影子之球 +4
-S	sor5	影子之球 +5
-S	sor6	影子之球 +6
-S	sor7	影子之球 +7
-S	sor8	影子之球 +8
-S	sor9	影子之球 +9
-S	sora	影子之球 +10
-S	fwss	冰霜巨龙头骨护盾
-S	shtm	萨满图腾
-S	esaz	埃苏尼之精髓
-S	btst	战斗标准
-S	tbsm	微型铁匠铺
-S	tfar	微型农场
-S	tlum	微型伐木场
-S	tbar	微型兵营
-S	tbak	微型国王祭坛
-S	gldo	基尔加丹之球
-S	stre	鼓舞权杖
-S	horl	稀有神器
-S	hbth	战舰之舵
-S	blba	剑刃护甲
-S	rugt	神秘手套
-S	frhg	火焰手套
-S	gvsm	法术大师手套
-S	crdt	死亡领主皇冠
-S	arsc	神秘卷轴
-S	scul	邪恶军团卷轴
-S	tmsc	牺牲之书
-S	dtsb	德雷克萨尔魔法书
-S	grsl	灵魂宝物
-S	arsh	芒硝护盾
-S	shdt	死亡领主护盾
-S	shhn	荣誉护盾
-S	shen	施魔护盾
-S	thdm	雷霆蜥蜴钻石
-S	stpg	时钟企鹅
-S	shrs	烤肉
-S	bfhr	血羽之心
-S	cosl	灵魂之球
-S	shcw	萨满利爪
-S	srbd	灼热之刀
-S	frgd	霜冻守卫
-S	envl	魔法小瓶
-S	rump	生锈的矿铲
-S	srtl	瑟拉思尔
-S	stwa	战斧
-S	klmm	远古战斧
-S	rots	海之权杖
-S	axas	先祖权杖
-S	mnsf	心灵权杖
-S	schl	医疗权杖
-S	asbl	刺客佩刀
-S	kgal	麦酒桶
-S	gold	金币
-S	lmbr	木材堆
-S	gfor	防御浮雕
-S	guvi	夜视浮雕
-S	rspl	灵魂锁链神符
-S	rre1	小型复活神符
-S	rre2	大型复活神符
-S	gomn	全知浮雕
-S	rsps	护盾神符
-S	rspd	速度神符
-S	rman	魔法神符
-S	rma2	大型魔法神符
-S	rres	恢复神符
-S	rreb	重生神符
-S	rhe1	小型治疗神符
-S	rhe2	治疗神符
-S	rhe3	大型治疗神符
-S	rdis	驱魔神符
-S	rwat	岗哨神符
-S	pclr	净化药水
+S	lmbr	木柴堆
 S	plcl	小净化药水
-S	silk	蜘蛛丝饰针
-S	vamp	吸血药水
 S	sreg	恢复卷轴
 S	ssan	避难权杖
-S	tcas	小城堡
-C	I000	阿克蒙德之手
+C	I001	捕兽网
+C	I002	散弹枪 (|cffffcc00S|r)
+C	I003	麻醉枪 (|cffffcc00T|r)
+C	I008	夜视镜
+C	I00A	散弹枪 子弹 (2 发)
+C	I00B	麻醉针子弹
+C	I00C	披萨
+C	I00D	可乐
+C	I00F	气息香水
+C	I000	瓦斯
+C	I004	小木材堆
+C	I005	玩具 (有)
+C	I006	篝火自动建造
+C	I007	营火自动建造
+C	I009	帐篷自动建造
+C	I00E	发电厂自动建造
+C	I00G	电墙自动建造
+C	I00H	高档的隐身衣
+C	I00I	放大镜
+C	I00J	望远镜
+C	I00K	小包彩球
+C	I00L	手枪子弹 (7 发)
+C	I00M	手枪
+C	I00N	恐龙治疗药剂
+C	I00O	生物研究笔记
+C	I00P	火力研究笔记
+C	I00Q	机枪
+C	I00R	机枪子弹 (30 发)
+C	I00S	机枪炮
+C	I00T	中型激光
+C	I00V	火焰喷射器
+C	I00W	火箭发射器
+C	I00U	玩具 (无)
+C	I00X	小水弹
+C	I00Y	恐龙蛋
+C	I00Z	普通的隐身衣
+C	I010	篝火自动建造 (3 組)
+C	I011	营火自动建造 (2 组)
+C	I012	电墙自动建造 (3 組)
+C	I013	发电厂自动建造 (3 組)
+C	I014	帐篷自动建造 (2 组)
+C	I015	启动 火焰喷射器
+C	I016	关闭 火焰喷射器
+C	I017	电池
+C	I018	遥控吉普车 (Common)
+C	I019	启动 火箭发射器
+C	I01A	关闭 火箭发射器
+C	I01B	启动 中型激光
+C	I01C	关闭 中型激光
+C	I01D	维修工具包
+C	I01E	重斧
+C	I01F	杀虫剂
+C	I01G	中木材堆
+C	I01H	手枪子弹 (7 发) X4组
+C	I01I	机枪子弹 (30 发) X 4
+C	I01J	散弹枪 子弹 (2 发)X 4
+C	I01K	关闭 双重火焰喷射器
+C	I01L	启动 双重火焰喷射器
+C	I01M	关闭 中型循环激光
+C	I01N	启动 中型循环激光
+C	I01O	关闭 多管火箭发射器
+C	I01P	启动 多管火箭发射器
+C	I01Q	遥控陆战车
+C	I01R	可乐
+C	I01S	捕兽网
+C	I01T	泡泡枪 + 装满泡沫水的瓶子 (稀有)
+C	I01U	机械研究笔记
+C	I01V	突击机枪
+C	I01W	突击机枪子弹 (50 发)
+C	I01X	GPS
+C	I01Y	HeartBeatSensor
+C	I01Z	大水弹
+C	I020	大包彩球
+C	I021	遥控陆战车
+C	I022	遙控吉普車
+C	I023	遙控军陆战车
+C	I024	遙控陆军吉普车
+C	I025	急救包
+C	I026	小恐龙蛋
+C	I027	大恐龙蛋
+C	I028	物理研究笔记
+C	I029	刺花草
+C	I02B	体力果实
+C	I02A	人工塔图纸
+C	I02C	力量+1
+C	I02D	机甲图纸
+C	I02E	铁剑
+C	I02F	爪子
+C	I02G	杀龙剑Lv1
+C	I02H	杀龙剑Lv2
+C	I02I	杀龙剑Lv3
+C	I02J	杀龙剑Lv4
+C	I02K	杀龙剑Lv5
+C	I02L	杀龙剑Lv7
+C	I02M	杀龙剑Lv6
+C	I02N	杀龙剑Lv9
+C	I02O	杀龙剑Lv8
+C	I02P	杀龙剑Lv10
+C	I02R	龙血
+C	I02V	升级武器
+C	I02U	合成-人工塔图纸
+C	I02S	合成-机甲图纸
+C	I02T	武器合成
+C	I02Q	大气息香水
+C	I02W	杀龙剑LvMax（成长）
+C	I02X	龙甲
+C	I02Y	布甲
+C	I02Z	逃脱匕首
+C	I030	专属龙甲（大佬战甲）
+C	I032	杀龙剑LvMax（男爵）
+C	I033	专属龙甲（男爵）
+C	I034	|CffFFFF00敌对战书|r
+C	I035	|CffFFFF00停战协议书|r
+C	I036	复仇之魂
+C	I037	衣服合成
+C	I038	优质龙甲
+C	I039	真龙甲
+C	I03A	小加速手套
+C	I03B	大加速手套
+C	I03C	杀龙剑LvMax(合成)
+C	I03D	玩家荣誉勋章
+C	I03E	玩家荣誉勋章
+C	I03F	玩家荣誉勋章
+C	I03G	玩家荣誉勋章
+C	I03H	玩家荣誉勋章
+C	I03I	|cff00ff00【男爵专属勋章】|r
+C	I03M	大佬荣誉勋章
+C	I03J	大佬荣誉勋章
+C	I03K	大佬荣誉勋章
+C	I03L	大佬荣誉勋章
+C	I03N	大佬荣誉勋章
+C	I03O	大佬荣誉勋章
+C	I03P	神秘陨石
+C	I03Q	大木材堆
+C	I03R	挑衅号角
+C	I03S	杀龙剑LvMax（血饮）
+C	I03T	还魂草
+C	I03U	觉醒草..
+C	I03V	大佬荣誉勋章
+C	I03W	玩家荣誉勋章
+C	I03X	燃烧弹
+C	I03Y	真龙战甲（天子）
+C	I03Z	GPS卫星遥控器（普通）
+C	I040	玩家荣誉勋章
+C	I041	|cff00ff00成年翼龙[坐骑蛋]|r
+C	I042	|cff00ffff成年毒龙[坐骑蛋]|r
+C	I043	|cffff0000成年三角龙[坐骑蛋]|r
+C	I044	|cffffff32伊卡洛斯の剑|r
+C	I045	|cffff0000小霸王龙[坐骑蛋]|r
+C	I046	科勒恩的逃脱匕首
+C	I047	|cfffffc00绝缘攻速手套|r
+C	I048	|cfffffc00豹速之靴|r
+C	I049	|cfffffc00千手精灵手套|r
+C	I04A	|cfffffc00速度手套|r
+C	I04B	|cfffffc00无影手精灵手套|r
+C	I04C	|cfffffc00无影项链|r
+C	I04D	|cfffffc00鹰速之靴|r
+C	I04E	|cfffffc00影子项链|r
+C	I04F	加速手套
+C	I04G	闪避项链
+C	I04H	手套升级
+C	I04I	速度之靴
+C	I04J	项链升级
+C	I04K	靴子升级
+C	I04L	大金币
+C	I04M	大金币
+C	I04N	经验之书
+C	I04O	力量之书 +10
+C	I04P	大魔法药水
+C	I04Q	大生命药水
+C	I04R	抗体药水
+C	I04S	魔法药水
+C	I04T	生命药水
+C	I04U	中魔法药水(100)
+C	I04V	中生命药水(100)
+C	I04W	重生十字章
+C	I04X	|cfffffc00暗夜精灵弓|r
+C	I04Y	|cfffffc00暗夜精灵装|r
+C	I04Z	|cfffffc00暗夜女神之弓r
+C	I050	|cfffffc00钢弓|r
+C	I051	|cfffffc00金弓|r
+C	I052	|cfffffc00精灵女神装|r
+C	I053	|cfffffc00精灵皮装|r
+C	I054	|cfffffc00精灵装|r
+C	I055	|cfffffc00铁弓|r
+C	I056	|cfffffc00铜弓|r
+C	I058	精灵藤装
+C	I059	木弓
+C	I05K	精灵女神的恐怖升级
+C	I05L	再训练之书
+C	I05M	强化基地
+C	I05N	高级装备合成
+C	I05O	高级装备升级
+C	I05Q	精灵弓LV1
+C	I05R	精灵弓LV2
+C	I05S	精灵弓LV3
+C	I05T	精灵弓LV4
+C	I05U	精灵弓LV5
+C	I05V	精灵弓LV6MAX
+C	I05W	雷鸣剑Lv1
+C	I05X	雷鸣剑Lv2
+C	I05Y	雷鸣剑Lv3
+C	I05Z	雷鸣剑Lv4
+C	I060	雷鸣剑Lv5
+C	I061	|cfffffc00雷鸣剑LvMAX|r
+C	I062	真龙甲（天子）LV1
+C	I063	真龙甲（天子）LV2
+C	I064	真龙甲（天子）LV3
+C	I065	真龙甲（天子）LV4
+C	I066	真龙甲（天子）LV5
+C	I067	|cfffffc00真龙甲（天子）LvMAX|r
+C	I057	披萨（100）
+C	I05A	可乐（100）
+C	I05B	|cfffffc00必杀弹LvMAX|r
+C	I05C	必杀弹LV5
+C	I05D	必杀弹LV4
+C	I05E	必杀弹LV3
+C	I05F	必杀弹LV2
+C	I05G	必杀弹LV1
+C	I05H	火魔杖LV1
+C	I05I	火魔杖LV2
+C	I05J	火魔杖LV3
+C	I05P	火魔杖LV4
+C	I068	火魔杖LV5
+C	I069	|cffffff32火魔杖LvMAX|r
+C	I06A	枪弹1号
+C	I06B	枪弹10号
+C	I06C	枪弹6号
+C	I06E	雨魔杖LV1
+C	I06D	雨魔杖LV2
+C	I06F	雨魔杖LV3
+C	I06G	火焰喷射器改良型
+C	I06H	特大原木堆
+C	I06I	|cfffffc00GM专属武器|r
+C	I06J	|CffFFFC00GM专属战甲|r
+C	I06K	|cff00ff00【龙哥专属勋章】|r
+C	I06L	|cff00ff00【老司机专属勋章】|r
+C	I06M	|cff00ff00【七哥专属勋章】|r
+C	I06N	沐浴水枪
+C	I06O	大水弹（大包）
+C	I06P	水弹合成
+C	I06Q	攻击之书
+C	I06U	|Cff00DB31药酒|r
+C	I06W	|CffFF0000测试药酒|r
+C	I06S	|Cff00DB31果酒|r
+C	I06T	红包
+C	I06V	攻击之书+100
+C	I06X	毁灭者机甲
+C	I06R	GPS卫星遥控器（高级）
+C	I06Y	|Cff00DB31兑换-GPS卫星遥控器（高级）|r
+C	I06Z	|Cff00DB31兑换-|r|Cffff8000果实|r
+C	I070	|CffFFFF00兑换-红包|r|Cffff00ff（特殊）|r
+C	I071	|CffFFFF00兑换-机甲图纸|r|Cffff00ff（特殊）|r
+C	I072	兑换套餐（未开放）
+C	I073	|Cff00FF00机械特工|r
+C	I074	|Cff00DB31秘制药剂|r1号
+C	I075	|CffFF8000冲锋战神|r
+C	I076	冲锋战神
+C	I077	|Cff00DB31秘制药剂|r2号
+C	I078	|Cff00DB31秘制药剂|r3号
+C	I079	|Cff00DB31秘制药剂|r4号
+C	I07A	|Cff00DB31秘制药剂|r5号
+C	I07B	|Cff00DB31秘制药剂|r6号
+C	I07C	|Cff00DB31秘制药剂|r7号
+C	I07D	|CffFFFF00兑换-复仇之魂|r|Cffff00ff（特殊）|r
+C	I07E	|CffFFFF00兑换-机械特工|r|Cffff00ff（特殊）|r
+C	I07F	|CffFFFF00兑换-人工塔图纸|r|Cffff00ff（特殊）|r
+C	I07G	|CffFFFF00团圆月饼|r
+C	I07H	|Cff00DB31果酒（1箱）|r
+C	I07I	GPS记录仪
+C	I07J	|CffFFFF00兑换-速度强化|r|Cffff00ff（特殊）|r
+C	I07K	|CffFFFF00兑换-神秘陨石|r|Cffff00ff（特殊）|r
+C	I07L	|CffFFFF00烟花|r
+C	I07M	|CffFFFF00兑换-烟花|r|Cffff00ff（特殊）|r
+C	I07N	烟花
+C	I07O	手电筒
+C	I07P	|Cff00DB31果酒（1箱）|r
+C	I07Q	|Cff00DB31果酒|r
+C	I07R	气息香水
+C	I07S	毁灭者狙击炮
+C	I07T	高级核子火箭炮
+C	I07U	核弹发射塔
+C	I07V	毁灭者MG-36火箭炮
+C	I07W	|cffff0000虎龙[坐骑蛋]|r
+C	I07X	攻击之书+50
+C	I07Y	|cfffffc00真龙甲（天子）LvMAX|r
+C	I07Z	爪子
+C	I080	积分转化成就
+C	I081	成就转化积分
+C	I082	|cff00ff00专属武器（大佬佩剑）|r
+C	I083	|cffff3246【玩家荣誉勋章】|r
+C	I084	护盾
+C	I085	超强杀虫剂
+C	I086	|Cff00DB31战力修复|r药剂1号
+C	I087	|Cff00DB31觉醒草|r
+C	I088	冰封弹
+C	I089	电束弹
+C	I08A	毒气弹
+C	I08B	腐蚀弹
+C	I08C	黑洞弹
+C	I08D	灼烧弹
+C	I08E	震撼弹
+C	I08F	蒸汽弹
+C	I08G	灵魂弹
+C	I08I	魔法炮弹合成
+C	I08H	|Cff00DB31兑换-冰封弹|r
+C	I08J	|Cff00DB31兑换-电束弹|r
+C	I08K	|Cff00DB31兑换-毒气弹|r
+C	I08L	|Cff00DB31兑换-腐蚀弹|r
+C	I08M	|Cff00DB31兑换-黑洞弹|r
+C	I08N	|Cff00DB31兑换-灵魂弹|r
+C	I08O	|Cff00DB31兑换-震撼弹|r
+C	I08P	|Cff00DB31兑换-蒸汽弹|r
+C	I08Q	|Cff00DB31兑换-灼烧弹|r
+C	I08R	攻击之书10
+C	I08S	专属装备（大佬腰带）
+C	I08T	|cff00ff00冰魄剑LvMax|r
+C	I08U	|cfffffc00冰魄剑Lv1|r
+C	I08V	|cfffffc00冰魄剑Lv2|r
+C	I08W	|cfffffc00冰魄剑Lv3|r
+C	I08X	|cfffffc00冰魄剑Lv6|r
+C	I08Y	|cfffffc00冰魄剑Lv4|r
+C	I08Z	|cfffffc00冰魄剑Lv5|r
+C	I090	|cfffffc00冰魄剑Lv7|r
+C	I091	|cfffffc00冰魄剑Lv8|r
+C	I092	|cfffffc00冰魄剑Lv9|r
+C	I093	|cff00ff00震魂剑LvMax|r
+C	I094	|cfffffc00震魂剑Lv8|r
+C	I095	|cfffffc00震魂剑Lv4|r
+C	I096	|cfffffc00震魂剑Lv3|r
+C	I097	|cfffffc00震魂剑Lv2|r
+C	I098	|cfffffc00震魂剑Lv1|r
+C	I099	|cfffffc00震魂剑Lv7|r
+C	I09A	|cfffffc00震魂剑Lv9|r
+C	I09B	|cfffffc00震魂剑Lv6|r
+C	I09C	|cfffffc00震魂剑Lv5|r
+C	I09D	|Cff00DB31战力修复|r药剂2号
+C	I09E	|Cff00DB31特效恐龙药水|r
+C	I09F	|Cff00DB31恐龙药水|r
+C	I09G	小龙香水
+C	I09H	|Cffff0000神秘陨石|r强化+1
+C	I09I	|Cffff0000神秘陨石|r强化+2
+C	I09J	|Cffff0000神秘陨石|r强化+3
+C	I09K	|Cffff0000神秘陨石|r强化Max
+C	I09L	|Cffff0000专属武器（大佬佩剑）|r强化+1
+C	I09M	|Cffff0000专属武器（大佬佩剑）|r强化+2
+C	I09N	|Cffff0000专属武器（大佬佩剑）|r强化+3
+C	I09O	|Cffff0000专属武器（大佬佩剑）|r强化Max
+C	I09P	专属龙甲（大佬战甲）强化+1
+C	I09Q	专属龙甲（大佬战甲）强化+2
+C	I09R	专属龙甲（大佬战甲）强化+3
+C	I09S	|Cffff0000专属龙甲（大佬战甲）|r强化Max
+C	I031	合成-计算机运算图纸
+C	I09T	合成-恐龙基因图纸
+C	I09U	计算机运算图纸
+C	I09V	恐龙基因图纸
+C	I09W	神秘树果实
+C	I09X	神秘树种子
+C	I09Y	|Cff00DB31榴弹发射炮|r
+C	I09Z	榴弹发射 子弹(2 发)
+C	I0A0	榴弹发射 子弹(2 发))X 4组
+C	I0A1	|Cff00DB31坐骑进化药剂|r
+C	I0A2	|Cffff0000神秘树种子|r（大份）
+C	I0A3	|Cff00DB31机械进化药剂|r

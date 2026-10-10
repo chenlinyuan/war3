@@ -21,11 +21,21 @@ DEFAULT_BASE = "gcel"
 DEFAULT_NEW = "I000"
 
 # 图标
-ICON = "ReplaceableTextures\\CommandButtons\\BTNCorpseExplode.blp"
+# 物品图标: 玩家在战役里看中的"火焰手套"图标（原版图标，来自战役 奥尔蒂斯的旧日时光：
+#   火焰手套 = BTNAdvancedUnholyStrength，神秘手套 = BTNSpellSteal）。
+#   "神秘手套"想换的话只改这一行（然后跑 patch_hand_item_icon.py）。
+ICON = "ReplaceableTextures\\CommandButtons\\BTNAdvancedUnholyStrength.blp"
 
-# 技能: A001=攻击力加成(+500), A002=攻击速度加成(+100%), A000=自定义死亡之指(1M伤害)
+# 技能: A001=攻击力加成(+500), A002=攻击速度加成(+100%), A000=自定义死亡之指(主动)
 # 注意: 物品技能必须用逗号分隔。A000/A001/A002 需在 w3a 中定义(本工程注入 _lt_hand.w3a)。
-ABILITY_LIST = "A001,A002,A000"
+#   ⚠ 主动技能必须排在**第一位**: 游戏把物品图标的冷却显示(转圈动画)关联到 iabi 的
+#     第一个技能, 主动技能排后面时用过物品不显示冷却动画(玩家反馈的问题)。
+#     伏魔战记的物品也都是"主动技能在第一位"(如 AIh2,Arll / AIra / AInd)。
+ABILITY_LIST = "A000,A001,A002"
+
+# 物品冷却组 ID。伏魔战记的物品用**真实技能 ID**当冷却组(如 Ahwd/AIhe/AIra),
+# 所以这里也用本物品主动技能的 ID, 而不是自造字符串。
+DEFAULT_COOLDOWN_ID = "A000"
 
 
 def mod(mid, t, a, b, v):
@@ -81,6 +91,8 @@ def build_new_entry(new_id, name="阿克蒙德之手",
         mod("iabi", 3, 0, 0, abilities),
         # 可主动使用（死亡之指）
         mod("iusa", 0, 0, 0, 1),
+        # 冷却组 ID (用真实技能 ID, 见上)
+        mod("icid", 3, 0, 0, DEFAULT_COOLDOWN_ID),
     ]
     return (base_id, new_id, mods)
 

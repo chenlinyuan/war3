@@ -11,14 +11,18 @@
 | --- | --- |
 | `LostTemple_ft_装备技能版.w3x` | 基础注入版（装备/技能/单位/暴击/死亡之指） |
 | `LostTemple_ft_阿克蒙德之手.w3x` | 含自定义装备「阿克蒙德之手」的完整版 |
+| `LostTemple_wings.w3x` | **含翅膀/坐骑系统**（堕落天使之翼 + 火凤凰/蓝龙/黑龙/红龙/青铜龙坐骑，完全照搬伏魔战记参数，坐骑不可选中/不可攻击 + 攻击召唤小龙） |
 
 **工程文件**：`maps/LostTemple/`
 | 文件 | 说明 |
 | --- | --- |
 | `LostTemple_ft.original.w3x` | 原始地图（246,345 字节，**注意：此文件其实已含旧版注入脚本**） |
-| `LostTemple_ft_hand.w3x` | 当前工作地图（含全部改动，347,158 字节） |
+| `LostTemple_ft_hand.w3x` | 工作地图（装备系统，347,158 字节） |
+| `LostTemple_wings.w3x` | **翅膀/坐骑版**（481,613 字节） |
 | `LostTemple_ft.w3x` | 基础注入版 |
 | `README.md` | 详细说明 |
+
+> 翅膀/坐骑系统详见 [`../../docs/翅膀与坐骑系统.md`](../../docs/翅膀与坐骑系统.md)。
 
 ## 二、阿克蒙德之手（自定义装备）
 
@@ -68,17 +72,23 @@
 
 ### 6. HKE 注入工具
 - 工具：`H:\Games\War3\Tools\151个常用脚本\脚本\HKE1.25(5.17美化版）\HKE1.25(5.17美化版）\HkeW3mModifier2.0.exe`
-- 脚本注入：`python tools/war3map-injector/inject_map.py <地图> scripts/item-browser`
-- 任意文件注入：`python tools/war3map-injector/inject_file.py <地图> <源文件> <内部名>`
-- 提取文件：`python tools/war3map-injector/extract_one.py <地图> <内部名>`
-- **用完必须 `taskkill /IM HkeW3mModifier2.0.exe /F`**
+- **一键批量注入（推荐）**：`python tools/war3map-injector/inject_all.py <地图> --script --file <源文件>=<内部名> ...`
+  —— 一次会话完成脚本 + 全部对象数据替换，实测约 30s（旧流程开关 4 次工具、100s+）
+- 校验：`python tools/war3map-injector/verify_inject.py <地图> <源文件>=<内部名>`
+- 旧单步工具（保留可用，不推荐）：`inject_map.py` / `inject_file.py` / `extract_one.py`
+- **不要用 `taskkill /IM`**：会误杀自己开着的 HKE；工具会只结束自己启动的进程，
+  残留时用 `inject_all.py --kill-stale`
+- **不需要点「重压缩」**：替换时地图文件已经写好（详见 docs/06-工具链/HKE行为实测.md）
+- **添加文件前必须点「自定义文件」单选钮**，否则目标名会被强行设为 `war3map.j`
 
 ## 四、工具清单（tools/war3map-injector/）
 
 | 工具 | 用途 |
 | --- | --- |
-| `inject_map.py` | 注入脚本（f.j/g.j/m.j）到地图 |
-| `inject_file.py` | 注入任意内部文件（w3a/w3t/w3h） |
+| `inject_all.py` | **一键批量注入**：一次会话完成脚本 + 任意多个内部文件 |
+| `hke_session.py` | HKE 会话层（一次启动/打开，条件等待，只关自己的进程） |
+| `verify_inject.py` | 注入后校验（标记、调用次数、globals 顺序、逐字节一致） |
+| `inject_map.py` / `inject_file.py` | 旧单步注入（每次调用都完整开关工具，已不推荐） |
 | `extract_one.py` / `extract_to.py` | 提取地图内指定文件 |
 | `extract_all.py` | 解压地图全部文件 |
 | `gen_w3t.py` | 生成物品（war3map.w3t） |
@@ -115,14 +125,16 @@ python tools/war3map-injector/merge_w3a.py tools/war3map-injector/_lt_hand.w3a `
     tools/war3map-injector/_lt_both.w3a tools/war3map-injector/_hand_abil.w3a
 python tools/war3map-injector/gen_w3h.py tools/war3map-injector/_hand_buff.w3h
 
-# 3. 注入（脚本 → w3a → w3t → w3h）
-python tools/war3map-injector/inject_map.py "maps/LostTemple/LostTemple_ft_hand.w3x" scripts/item-browser
-python tools/war3map-injector/inject_file.py "maps/LostTemple/LostTemple_ft_hand.w3x" tools/war3map-injector/_lt_hand.w3a war3map.w3a
-python tools/war3map-injector/inject_file.py "maps/LostTemple/LostTemple_ft_hand.w3x" tools/war3map-injector/_hand.w3t war3map.w3t
-python tools/war3map-injector/inject_file.py "maps/LostTemple/LostTemple_ft_hand.w3x" tools/war3map-injector/_hand_buff.w3h war3map.w3h
+# 3. 注入 + 部署：一次会话干完（旧写法是 4 条命令 = 开关 4 次 HKE）
+python tools/war3map-injector/inject_all.py "maps/LostTemple/LostTemple_ft_hand.w3x" --script `
+    --file tools/war3map-injector/_lt_hand.w3a=war3map.w3a `
+    --file tools/war3map-injector/_hand.w3t=war3map.w3t `
+    --file tools/war3map-injector/_hand_buff.w3h=war3map.w3h `
+    --deploy "LostTemple_ft_阿克蒙德之手.w3x"
 
-# 4. 部署
-python tools/war3map-injector/deploy_mod.py "maps/LostTemple/LostTemple_ft_hand.w3x" "LostTemple_ft_阿克蒙德之手.w3x"
+# 4. 校验（另开会话，逐字节比对）
+python tools/war3map-injector/verify_inject.py "maps/LostTemple/LostTemple_ft_hand.w3x" `
+    tools/war3map-injector/_hand.w3t=war3map.w3t
 ```
 
 ## 七、伏魔战记翅膀/坐骑系统（初步调研）

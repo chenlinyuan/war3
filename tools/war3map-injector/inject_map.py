@@ -217,17 +217,22 @@ def open_map_via_button(main, map_path):
     b = find_child(main, "TButton", "打开地图")
     if not b:
         raise RuntimeError("未找到『打开地图』按钮")
-    click_real(b[0])
-    time.sleep(2)
-    handle_popups()
     dlg = None
-    for _ in range(20):
-        for dh, dt in list_dialogs():
-            dlg = dh
-            break
+    for attempt in range(3):
+        click_real(b[0])
+        time.sleep(2)
+        handle_popups()
+        for _ in range(30):
+            for dh, dt in list_dialogs():
+                dlg = dh
+                break
+            if dlg:
+                break
+            time.sleep(0.5)
         if dlg:
             break
-        time.sleep(0.5)
+        print("    重试打开对话框 (%d/3)" % (attempt + 1))
+        time.sleep(1)
     if not dlg:
         raise RuntimeError("未出现文件选择对话框")
     edit = find_child(dlg, "Edit")

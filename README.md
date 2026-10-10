@@ -57,14 +57,26 @@ additem 吸血面罩      → 给选中英雄添加装备
 一键注入：
 
 ```powershell
-python tools/war3map-injector/inject_map.py "maps/LostTemple/LostTemple.w3m" scripts/item-browser
+# 脚本 + 对象数据一次会话完成（旧流程要开关 4 次 HKE）
+python tools/war3map-injector/inject_all.py "maps/LostTemple/LostTemple_ft_hand.w3x" --script `
+    --file tools/war3map-injector/_lt_hand.w3a=war3map.w3a `
+    --file tools/war3map-injector/_hand.w3t=war3map.w3t `
+    --file tools/war3map-injector/_hand_buff.w3h=war3map.w3h
+
+# 只装脚本的图（如战役章节）
+python tools/war3map-injector/inject_all.py "maps/campaign/chapter1.w3x" --script
 ```
 
 ### 🛠 地图脚本注入工具
 
-支持**加密/保护地图**的脚本注入，基于 HkeW3mModifier2.0 + Python 自动化。
+支持**加密/保护地图**的脚本与对象数据注入，基于 HkeW3mModifier2.0 + Python 自动化。
+
+入口是 `inject_all.py`：启动一次 HKE、打开一次地图，连续完成"脚本 + 任意多个内部文件"
+替换，再关一次工具。旧的 `inject_map.py` / `inject_file.py` 已不推荐使用
+（每次调用都要完整开关工具）。
 
 详见 [`tools/war3map-injector/README.md`](tools/war3map-injector/README.md)。
+踩坑记录见 [`docs/06-工具链/HKE行为实测.md`](docs/06-工具链/HKE行为实测.md)。
 
 ## 仓库约定
 

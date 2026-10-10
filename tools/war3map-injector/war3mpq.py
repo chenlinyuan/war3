@@ -84,8 +84,10 @@ def _hash_string(name, hash_type):
     seed1 = 0x7FED7FED
     seed2 = 0xEEEEEEEE
     for ch in name:
-        ch = CRYPT_TABLE[(hash_type << 8) + ch]
-        seed1 = (ch ^ (seed1 + seed2)) & 0xFFFFFFFF
+        # ⚠ 标准 Storm 哈希: 第二步用的是"原始字符值"，不是查表后的值。
+        #   2026-10-10 修正 —— 原来写成用查表值, 于是**所有按名字查找都失败**
+        #   (hash('(hash table)', FILE_KEY) 应为 0x3FDD5D13, 错实现给 0x559A0BD7)。
+        seed1 = (CRYPT_TABLE[(hash_type << 8) + ch] ^ (seed1 + seed2)) & 0xFFFFFFFF
         seed2 = (ch + seed1 + seed2 + (seed2 << 5) + 3) & 0xFFFFFFFF
     return seed1
 
@@ -94,7 +96,10 @@ def _decrypt(data, key):
     """MPQ 解密（原地）。"""
     seed1 = key & 0xFFFFFFFF
     seed2 = 0xEEEEEEEE
-    result = bytearray(data)
+    # 长度不是 4 的倍数时先补零，否则 struct.unpack_from 会越界
+    #   (2026-10-10: 压缩扇区常见这种情况)
+    pad = (-len(data)) % 4
+    result = bytearray(data + b"\x00" * pad)
     for i in range(0, len(result), 4):
         seed2 = (seed2 + CRYPT_TABLE[0x400 + (seed1 & 0xFF)]) & 0xFFFFFFFF
         chunk = struct.unpack_from("<I", result, i)[0]
@@ -102,7 +107,7 @@ def _decrypt(data, key):
         struct.pack_into("<I", result, i, plain)
         seed1 = (((~seed1 << 0x15) + 0x11111111) | (seed1 >> 0x0B)) & 0xFFFFFFFF
         seed2 = (plain + seed2 + (seed2 << 5) + 3) & 0xFFFFFFFF
-    return bytes(result)
+    return bytes(result[: len(data)])
 
 
 def _encrypt(data, key):
@@ -302,18 +307,41 @@ class MPQArchive:
             # 读取扇区偏移表
             offset_table_size = (num_sectors + 1) * 4
             table = raw[:offset_table_size]
+            cand_tables = []
             if flags & MPQ_FILE_ENCRYPTED:
-                table = _decrypt(table, key - 1)
-            offsets = list(struct.unpack("<%dI" % (num_sectors + 1), table[: offset_table_size]))
+                cand_tables.append(_decrypt(table, key - 1))
+            cand_tables.append(table)   # 有些存档的偏移表其实是明文
+            offsets = None
+            for cand in cand_tables:
+                vals = list(struct.unpack("<%dI" % (num_sectors + 1), cand[: offset_table_size]))
+                # 合理性检查: 第一项=表长度, 单调不减, 末项接近压缩总长
+                if vals[0] != offset_table_size:
+                    continue
+                if any(vals[i] > vals[i + 1] for i in range(len(vals) - 1)):
+                    continue
+                if vals[-1] > info.csize or vals[-1] + 64 < info.csize:
+                    continue
+                offsets = vals
+                break
+            if offsets is None:
+                offsets = list(struct.unpack("<%dI" % (num_sectors + 1),
+                                             cand_tables[0][: offset_table_size]))
 
             result = bytearray()
             for i in range(num_sectors):
                 start = offsets[i]
-                end = offsets[i + 1]
+                # 最后一个扇区的结束位置: 优先用压缩总长(fsize 边界更可靠)。
+                #   有的工具(如 HKE)写的最后一项 offset 是坏的 -> 会丢尾巴,
+                #   表现为"提取出来的图/文件总是差最后一截"。
+                end = offsets[i + 1] if i + 1 < num_sectors else info.csize
+                if end is None or end <= start or end > info.csize:
+                    end = info.csize
                 sector = raw[start:end]
                 if flags & MPQ_FILE_ENCRYPTED:
                     sector = _decrypt(sector, (key + i) & 0xFFFFFFFF)
-                if flags & COMPRESSION_MASK and len(sector) < sector_size:
+                if flags & COMPRESSION_MASK:
+                    # 不管长度, 先试着解压 —— 有些存档的"未压缩扇区"长度也小于
+                    # sector_size, 只看长度会漏解压 (_decompress 失败会原样返回)。
                     sector = _decompress(sector, sector_size)
                 result += sector
             return bytes(result[: info.fsize])
@@ -355,14 +383,44 @@ def _looks_like_block_table(data, size):
 
 
 def _decompress(data, expected_size):
+    # WC3 官方的 MPQ 里，压缩扇区**开头有一个压缩类型字节**:
+    #   0x02 = zlib/deflate, 0x08 = PKWARE, 0x10 = bzip2
+    #   (2026-10-10 补上 —— 之前没处理这个字节, 于是解压全部失败、只能拿到压缩数据,
+    #    表现为"从 war3.mpq 里提出来的 blp 不是 BLP: b'\x02x\x9c...'"。)
+    if data:
+        tag = data[0]
+        if tag == 0x02:
+            # 用 decompressobj: 尾段缺失时也能解出前面大部分(否则整段解压会抛异常,
+            #   我们就只能拿到压缩数据 -> "not a BLP: b'\x02x\x9c...'")
+            for wbits in (15, -15):
+                try:
+                    obj = zlib.decompressobj(wbits)
+                    out = obj.decompress(data[1:])
+                    if len(out) > 0:
+                        return out
+                except Exception:
+                    pass
+        elif tag == 0x10:
+            try:
+                import bz2
+
+                return bz2.decompress(data[1:])
+            except Exception:
+                pass
     # zlib
     try:
-        return zlib.decompress(data)
+        obj = zlib.decompressobj()
+        out = obj.decompress(data)
+        if out:
+            return out
     except Exception:
         pass
     # zlib raw
     try:
-        return zlib.decompress(data, -15)
+        obj = zlib.decompressobj(-15)
+        out = obj.decompress(data)
+        if out:
+            return out
     except Exception:
         pass
     # bzip2

@@ -1,6 +1,15 @@
-A000	死亡之指
-A001	攻击力加成
-A002	攻击速度加成
+A00B	Gas
+A00E	HappyMeal2(Mana)
+A00J	Pepsi
+A011	WeaponChangerOff
+A01K	Matter Cells
+A01L	WeaponChangerOn
+A01S	Pepsi(InJeep)
+A072	能增加魔法恢复速度的物品 (100)
+A073	能增加魔法恢复速度的物品 (250)
+A074	能增加魔法恢复速度的物品 (400)
+A0BL	积分清0道具
+A0BM	成就清0道具
 AAns	收费
 ACac	命令光环
 ACad	操纵死尸
@@ -795,7 +804,6 @@ Awrg	战争践踏
 Awrh	战争践踏
 Awrp	传送门技能
 Awrs	战争践踏
-Azcr	致命一击
 Bdbb	吸取生命值和魔法值（附加）
 Bdbl	吸取生命（附加）
 Bdbm	吸取魔法（附加）

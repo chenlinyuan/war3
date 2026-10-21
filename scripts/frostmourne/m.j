@@ -1,0 +1,1 @@
+call FR_Init()

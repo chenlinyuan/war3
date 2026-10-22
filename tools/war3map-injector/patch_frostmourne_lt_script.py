@@ -66,7 +66,8 @@ def patch(path):
         b"function IB_IsItemAbility takes integer abilId returns boolean\r\n"
         b"    if abilId == 'AI2m'",
         b"function IB_IsItemAbility takes integer abilId returns boolean\r\n"
-        b"    if abilId == 'A105' or abilId == 'A106' or abilId == 'A107' then\r\n"
+        b"    if abilId == 'A105' or abilId == 'A106' or abilId == 'A107' or "
+        b"abilId == 'A108' or abilId == 'A109' then\r\n"
         b"        return true\r\n"
         b"    elseif abilId == 'AI2m'",
         "item ability protection")

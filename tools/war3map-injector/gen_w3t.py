@@ -24,7 +24,7 @@ DEFAULT_NEW = "I000"
 # 物品图标: 玩家在战役里看中的"火焰手套"图标（原版图标，来自战役 奥尔蒂斯的旧日时光：
 #   火焰手套 = BTNAdvancedUnholyStrength，神秘手套 = BTNSpellSteal）。
 #   "神秘手套"想换的话只改这一行（然后跑 patch_hand_item_icon.py）。
-ICON = "ReplaceableTextures\\CommandButtons\\BTNAdvancedUnholyStrength.blp"
+ICON = "ReplaceableTextures\\CommandButtons\\BTNSpellSteal.blp"
 
 # 技能: A001=攻击力加成(+500), A002=攻击速度加成(+100%), A000=自定义死亡之指(主动)
 # 注意: 物品技能必须用逗号分隔。A000/A001/A002 需在 w3a 中定义(本工程注入 _lt_hand.w3a)。

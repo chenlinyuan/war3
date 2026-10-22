@@ -1,0 +1,141 @@
+{
+  "hero": "暗影猎手",
+  "profile": "lt",
+  "source_map": "H:\\Games\\War3\\Maps\\mod\\ChengHai_3c_692.w3x",
+  "source_unit": "Oshd",
+  "unit": "H0S1",
+  "aliases": [
+    "Oshd",
+    "sh",
+    "xiaoy",
+    "shadowhunter"
+  ],
+  "units": {
+    "Oshd": "H0S1",
+    "nanb": "nanb",
+    "zmar": "zmar",
+    "osp1": "osp1",
+    "osp2": "osp2",
+    "osp3": "osp3",
+    "osp4": "osp4",
+    "hpxe": "hpxe",
+    "owyv": "owyv",
+    "otbr": "otbr"
+  },
+  "abilities": [
+    {
+      "source": "AOhw",
+      "base": "AOhw",
+      "id": "A0S1",
+      "name": "医疗波",
+      "levels": 10
+    },
+    {
+      "source": "AOhx",
+      "base": "AOhx",
+      "id": "A0S2",
+      "name": "妖术",
+      "levels": 10
+    },
+    {
+      "source": "AOsw",
+      "base": "AUcs",
+      "id": "A0S3",
+      "name": "毒蛇守卫",
+      "levels": 10
+    },
+    {
+      "source": "AOvd",
+      "base": "AOvd",
+      "id": "A0S4",
+      "name": "巫毒",
+      "levels": 2
+    },
+    {
+      "source": "A02R",
+      "base": "ANcl",
+      "id": "A0S5",
+      "name": "远祖祝福",
+      "levels": 1
+    },
+    {
+      "source": "Amgl",
+      "base": "Amgl",
+      "id": "A0S6",
+      "name": "弹射之刃",
+      "levels": 1
+    },
+    {
+      "source": "AInv",
+      "base": "AInv",
+      "id": "A0S7",
+      "name": "英雄物品栏",
+      "levels": 1
+    },
+    {
+      "source": "AChx",
+      "base": "AOhx",
+      "id": "A0S8",
+      "name": "群体妖术",
+      "levels": 10
+    },
+    {
+      "source": "A044",
+      "base": "AOhw",
+      "id": "A0S9",
+      "name": "医疗精灵",
+      "levels": 1
+    },
+    {
+      "source": "A045",
+      "base": "AOcl",
+      "id": "A0SA",
+      "name": "闪电精灵",
+      "levels": 1
+    },
+    {
+      "source": "Aegr",
+      "base": "AIdd",
+      "id": "A0SB",
+      "name": "元素抗体",
+      "levels": 1
+    }
+  ],
+  "stats": {
+    "unitBalanceID": "Oshd",
+    "AGI": "42",
+    "AGIplus": "3.3",
+    "bldtm": "55",
+    "bountydice": "1",
+    "bountyplus": "549",
+    "bountysides": "1",
+    "collision": "32.0",
+    "defType": "hero",
+    "defUp": "6.0",
+    "goldcost": "200",
+    "goldRep": "425",
+    "HP": "600",
+    "INT": "40",
+    "INTplus": "3.2",
+    "level": "5",
+    "lumberbountyplus": "1",
+    "mana0": "100",
+    "manaN": "150",
+    "nsight": "800",
+    "preventPlace": "_",
+    "Primary": "AGI",
+    "regenHP": "1.2",
+    "regenMana": "0.3",
+    "regenType": "always",
+    "reptm": "55",
+    "requirePlace": "_",
+    "sight": "1800",
+    "spd": "300",
+    "stockMax": "1",
+    "STR": "41",
+    "STRplus": "3.2",
+    "tilesets": "*",
+    "upgrades": "Rusf,Rehs"
+  },
+  "icon_files": []
+}

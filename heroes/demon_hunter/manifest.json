@@ -1,0 +1,128 @@
+{
+  "hero": "恶魔猎手",
+  "profile": "lt",
+  "source_map": "H:\\Games\\War3\\Maps\\mod\\ChengHai_3c_692.w3x",
+  "source_unit": "Edem",
+  "unit": "H0D1",
+  "aliases": [
+    "Edem",
+    "dh",
+    "demonhunter",
+    "emls"
+  ],
+  "units": {
+    "Edem": "H0D1",
+    "Edmm": "H0D2",
+    "hgyr": "hgyr",
+    "hmtt": "hmtt"
+  },
+  "abilities": [
+    {
+      "source": "A017",
+      "base": "AHdr",
+      "id": "A0D1",
+      "name": "法力燃烧",
+      "levels": 10
+    },
+    {
+      "source": "ACcl",
+      "base": "AOcl",
+      "id": "A0D2",
+      "name": "意念漩涡",
+      "levels": 10
+    },
+    {
+      "source": "AEev",
+      "base": "AEev",
+      "id": "A0D3",
+      "name": "闪避",
+      "levels": 10
+    },
+    {
+      "source": "AEme",
+      "base": "AEme",
+      "id": "A0D4",
+      "name": "变身",
+      "levels": 2
+    },
+    {
+      "source": "A024",
+      "base": "Atau",
+      "id": "A0D5",
+      "name": "恶魔气息",
+      "levels": 1
+    },
+    {
+      "source": "Afak",
+      "base": "Afak",
+      "id": "A0D6",
+      "name": "恶魔之力",
+      "levels": 1
+    },
+    {
+      "source": "AInv",
+      "base": "AInv",
+      "id": "A0D7",
+      "name": "英雄物品栏",
+      "levels": 1
+    },
+    {
+      "source": "ACsm",
+      "base": "AHdr",
+      "id": "A0D8",
+      "name": "法力燃烧",
+      "levels": 10
+    },
+    {
+      "source": "A053",
+      "base": "Amls",
+      "id": "A0D9",
+      "name": "意念漩涡",
+      "levels": 1
+    },
+    {
+      "source": "AOls",
+      "base": "AUls",
+      "id": "A0DA",
+      "name": "蝗虫群",
+      "levels": 1
+    }
+  ],
+  "stats": {
+    "unitBalanceID": "Edem",
+    "AGI": "45",
+    "AGIplus": "3.3",
+    "bldtm": "55",
+    "bountydice": "1",
+    "bountyplus": "549",
+    "bountysides": "1",
+    "collision": "32.0",
+    "defType": "hero",
+    "defUp": "6.0",
+    "goldcost": "200",
+    "goldRep": "425",
+    "HP": "600",
+    "INT": "35",
+    "INTplus": "3.2",
+    "level": "5",
+    "lumberbountyplus": "1",
+    "mana0": "100",
+    "manaN": "150",
+    "nsight": "800",
+    "preventPlace": "_",
+    "Primary": "AGI",
+    "regenHP": "1.2",
+    "regenMana": "0.3",
+    "regenType": "always",
+    "reptm": "55",
+    "requirePlace": "_",
+    "sight": "1800",
+    "spd": "330",
+    "stockMax": "1",
+    "STR": "43",
+    "STRplus": "3.2",
+    "tilesets": "*",
+    "upgrades": "Rowd,Reuv"
+  },
+  "icon_files": []
+}

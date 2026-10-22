@@ -1,0 +1,125 @@
+{
+  "hero": "剑圣",
+  "profile": "lt_blade",
+  "source_map": "H:\\Games\\War3\\Maps\\mod\\ChengHai_3c_692.w3x",
+  "source_unit": "Obla",
+  "unit": "H0B1",
+  "aliases": [
+    "Obla",
+    "blademaster",
+    "blade",
+    "bm",
+    "js",
+    "jiansheng",
+    "huorenjiansheng",
+    "火刃剑圣"
+  ],
+  "units": {
+    "Obla": "H0B1",
+    "hgry": "h0B2",
+    "hmtt": "hmtt",
+    "ohun": "h0B3"
+  },
+  "abilities": [
+    {
+      "source": "AOwk",
+      "base": "AOwk",
+      "id": "A0B1",
+      "name": "疾风跳砍",
+      "levels": 10
+    },
+    {
+      "source": "AOmi",
+      "base": "AOmi",
+      "id": "A0B2",
+      "name": "双重镜像",
+      "levels": 10
+    },
+    {
+      "source": "AOcr",
+      "base": "AOcr",
+      "id": "A0B3",
+      "name": "致命一击",
+      "levels": 10
+    },
+    {
+      "source": "AOww",
+      "base": "AOww",
+      "id": "A0B4",
+      "name": "闪电剑刃",
+      "levels": 2
+    },
+    {
+      "source": "ANsh",
+      "base": "AOsh",
+      "id": "A0B5",
+      "name": "闪电冲刺",
+      "levels": 1
+    },
+    {
+      "source": "ACff",
+      "base": "Afae",
+      "id": "A0B6",
+      "name": "利刃破甲",
+      "levels": 1
+    },
+    {
+      "source": "A02T",
+      "base": "AUcs",
+      "id": "A0B7",
+      "name": "剑刃闪电",
+      "levels": 1
+    },
+    {
+      "source": "A038",
+      "base": "AHtc",
+      "id": "A0B8",
+      "name": "辅助单位雷霆一击",
+      "levels": 2
+    },
+    {
+      "source": "AIil",
+      "base": "AIil",
+      "id": "A0B9",
+      "name": "镜像幻影",
+      "levels": 1
+    }
+  ],
+  "stats": {
+    "unitBalanceID": "Obla",
+    "AGI": "46",
+    "AGIplus": "3.3",
+    "bldtm": "55",
+    "bountydice": "1",
+    "bountyplus": "549",
+    "bountysides": "1",
+    "collision": "32.0",
+    "defType": "hero",
+    "defUp": "6.0",
+    "goldcost": "200",
+    "goldRep": "425",
+    "HP": "600",
+    "INT": "35",
+    "INTplus": "3.2",
+    "level": "5",
+    "lumberbountyplus": "1",
+    "mana0": "100",
+    "manaN": "150",
+    "nsight": "800",
+    "preventPlace": "_",
+    "Primary": "AGI",
+    "regenHP": "1.2",
+    "regenMana": "0.3",
+    "regenType": "always",
+    "reptm": "55",
+    "requirePlace": "_",
+    "sight": "1800",
+    "spd": "320",
+    "stockMax": "1",
+    "STR": "42",
+    "STRplus": "3.2",
+    "tilesets": "*",
+    "upgrades": "Rura,Reht"
+  },
+  "icon_files": []
+}

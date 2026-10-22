@@ -1,0 +1,190 @@
+{
+  "hero": "火魔",
+  "profile": "lt_fire",
+  "source_map": "H:\\Games\\War3\\Maps\\mod\\ChengHai_3c_692.w3x",
+  "source_unit": "Nfir",
+  "unit": "H0F1",
+  "aliases": [
+    "Nfir",
+    "firelord",
+    "fl",
+    "huomo",
+    "huoyanjumo",
+    "火魔",
+    "火焰巨魔"
+  ],
+  "units": {
+    "Nfir": "H0F1",
+    "nlv1": "n0F1",
+    "nlv2": "n0F2",
+    "nmpe": "n0F3",
+    "ospw": "o0F1",
+    "nech": "n0F4",
+    "hgyr": "h0F1"
+  },
+  "abilities": [
+    {
+      "source": "ANso",
+      "base": "ANso",
+      "id": "A0F1",
+      "name": "灵魂燃烧",
+      "levels": 10
+    },
+    {
+      "source": "ANlm",
+      "base": "ANlm",
+      "id": "A0F2",
+      "name": "召唤炎魔",
+      "levels": 10
+    },
+    {
+      "source": "ANic",
+      "base": "ANic",
+      "id": "A0F3",
+      "name": "燃灰",
+      "levels": 10
+    },
+    {
+      "source": "A041",
+      "base": "AHfs",
+      "id": "A0F4",
+      "name": "火山爆发",
+      "levels": 2
+    },
+    {
+      "source": "A020",
+      "base": "ANcl",
+      "id": "A0F5",
+      "name": "炎之绞杀",
+      "levels": 1
+    },
+    {
+      "source": "A00V",
+      "base": "Aspb",
+      "id": "A0F6",
+      "name": "炎魔天赋",
+      "levels": 1
+    },
+    {
+      "source": "A00W",
+      "base": "Absk",
+      "id": "A0F7",
+      "name": "火焰护甲",
+      "levels": 1
+    },
+    {
+      "source": "AInv",
+      "base": "AInv",
+      "id": "A0F8",
+      "name": "英雄物品栏",
+      "levels": 1
+    },
+    {
+      "source": "A00U",
+      "base": "Assk",
+      "id": "A0F9",
+      "name": "石化皮肤",
+      "levels": 1
+    },
+    {
+      "source": "ANvc",
+      "base": "ANvc",
+      "id": "A0FA",
+      "name": "FL15",
+      "levels": 2
+    },
+    {
+      "source": "A04N",
+      "base": "ANso",
+      "id": "A0FB",
+      "name": "灵魂燃烧",
+      "levels": 1
+    },
+    {
+      "source": "Abu3",
+      "base": "Abur",
+      "id": "A0FC",
+      "name": "自爆",
+      "levels": 1
+    },
+    {
+      "source": "ANef",
+      "base": "ANef",
+      "id": "A0FD",
+      "name": "熔炼",
+      "levels": 1
+    },
+    {
+      "source": "AIsr",
+      "base": "AIsr",
+      "id": "A0FE",
+      "name": "神秘腰带",
+      "levels": 1
+    },
+    {
+      "source": "A039",
+      "base": "AHds",
+      "id": "A0FF",
+      "name": "神圣护甲",
+      "levels": 1
+    },
+    {
+      "source": "Amls",
+      "base": "Amls",
+      "id": "A0F0",
+      "name": "空中锁镣",
+      "levels": 1
+    },
+    {
+      "source": "Amin",
+      "base": "Amin",
+      "id": "A0G1",
+      "name": "自动引爆",
+      "levels": 1
+    },
+    {
+      "source": "Adtg",
+      "base": "Atru",
+      "id": "A0G2",
+      "name": "-真实视域-",
+      "levels": 1
+    }
+  ],
+  "stats": {
+    "unitBalanceID": "Nfir",
+    "AGI": "44",
+    "AGIplus": "3.3",
+    "bldtm": "55",
+    "bountydice": "1",
+    "bountyplus": "549",
+    "bountysides": "1",
+    "collision": "32.0",
+    "defType": "hero",
+    "defUp": "6.0",
+    "goldcost": "200",
+    "goldRep": "425",
+    "HP": "600",
+    "INT": "35",
+    "INTplus": "3.2",
+    "level": "5",
+    "lumberbountyplus": "1",
+    "mana0": "100",
+    "manaN": "150",
+    "nsight": "800",
+    "preventPlace": "_",
+    "Primary": "AGI",
+    "regenHP": "1.2",
+    "regenMana": "0.3",
+    "regenType": "always",
+    "reptm": "55",
+    "requirePlace": "_",
+    "sight": "1800",
+    "spd": "320",
+    "stockMax": "1",
+    "STR": "44",
+    "STRplus": "3.2",
+    "tilesets": "*",
+    "upgrades": "Ruwb,Rgfo"
+  },
+  "icon_files": []
+}

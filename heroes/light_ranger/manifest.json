@@ -1,0 +1,131 @@
+{
+  "hero": "光明游侠",
+  "profile": "lt_ls3c",
+  "source_map": "H:\\Games\\War3\\Maps\\mod\\ChengHai_3c_692.w3x",
+  "source_unit": "Hvwd",
+  "unit": "H0L1",
+  "aliases": [
+    "Hvwd",
+    "lightranger",
+    "ls",
+    "gmyx",
+    "guangmingyouxia"
+  ],
+  "units": {
+    "Hvwd": "H0L1",
+    "nskk": "nskk",
+    "emtg": "emtg",
+    "hrtt": "hrtt"
+  },
+  "abilities": [
+    {
+      "source": "ANsi",
+      "base": "ANsi",
+      "id": "A0L1",
+      "name": "沉默魔法",
+      "levels": 10
+    },
+    {
+      "source": "A015",
+      "base": "ANrc",
+      "id": "A0L2",
+      "name": "混乱箭雨",
+      "levels": 10
+    },
+    {
+      "source": "ANdr",
+      "base": "AHdr",
+      "id": "A0L3",
+      "name": "生命汲取",
+      "levels": 10
+    },
+    {
+      "source": "A029",
+      "base": "ANst",
+      "id": "A0L4",
+      "name": "穿梭冰箭",
+      "levels": 2
+    },
+    {
+      "source": "ACc3",
+      "base": "AUcs",
+      "id": "A0L5",
+      "name": "重影冰箭",
+      "levels": 1
+    },
+    {
+      "source": "A02M",
+      "base": "ANch",
+      "id": "A0L6",
+      "name": "符咒",
+      "levels": 1
+    },
+    {
+      "source": "A01A",
+      "base": "Afrb",
+      "id": "A0L7",
+      "name": "霜冻呼吸",
+      "levels": 1
+    },
+    {
+      "source": "AInv",
+      "base": "AInv",
+      "id": "A0L8",
+      "name": "英雄物品栏",
+      "levels": 1
+    },
+    {
+      "source": "ACc2",
+      "base": "AUcs",
+      "id": "A0L9",
+      "name": "冲击波",
+      "levels": 5
+    },
+    {
+      "source": "A00X",
+      "base": "ANin",
+      "id": "A0LA",
+      "name": "混乱箭矢",
+      "levels": 1
+    }
+  ],
+  "stats": {
+    "unitBalanceID": "Hvwd",
+    "AGI": "45",
+    "AGIplus": "3.3",
+    "bldtm": "55",
+    "bountydice": "1",
+    "bountyplus": "549",
+    "bountysides": "1",
+    "collision": "32.0",
+    "defType": "hero",
+    "defUp": "6.0",
+    "goldcost": "200",
+    "goldRep": "425",
+    "HP": "600",
+    "INT": "37",
+    "INTplus": "3.2",
+    "level": "5",
+    "lumberbountyplus": "1",
+    "mana0": "100",
+    "manaN": "150",
+    "nsight": "800",
+    "preventPlace": "_",
+    "Primary": "AGI",
+    "regenHP": "1.2",
+    "regenMana": "0.3",
+    "regenType": "always",
+    "reptm": "55",
+    "requirePlace": "_",
+    "sight": "1800",
+    "spd": "350",
+    "stockMax": "1",
+    "STR": "41",
+    "STRplus": "3.2",
+    "tilesets": "*",
+    "upgrades": "Ruex,Resc"
+  },
+  "icon_files": [
+    "ReplaceableTextures\\CommandButtons\\BTNLS15.blp"
+  ]
+}

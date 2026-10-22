@@ -210,6 +210,150 @@ function FR_GroundAuraStep takes nothing returns nothing
     call EnumItemsInRect(fr_world, null, function FR_EnumGroundItem)
 endfunction
 
+function FR_SoulAbility takes integer block returns integer
+    if block == 0 then
+        return 'A130'
+    elseif block == 1 then
+        return 'A131'
+    elseif block == 2 then
+        return 'A132'
+    elseif block == 3 then
+        return 'A133'
+    elseif block == 4 then
+        return 'A134'
+    elseif block == 5 then
+        return 'A135'
+    elseif block == 6 then
+        return 'A136'
+    elseif block == 7 then
+        return 'A137'
+    elseif block == 8 then
+        return 'A138'
+    elseif block == 9 then
+        return 'A139'
+    elseif block == 10 then
+        return 'A140'
+    elseif block == 11 then
+        return 'A141'
+    endif
+    return 0
+endfunction
+
+function FR_SetSoulBurden takes unit u, integer value returns nothing
+    local integer bit = 0
+    local integer abil
+    loop
+        exitwhen bit >= 12
+        set abil = FR_SoulAbility(bit)
+        if ModuloInteger(value, 2) == 1 then
+            if GetUnitAbilityLevel(u, abil) == 0 then
+                call UnitAddAbility(u, abil)
+                call UnitMakeAbilityPermanent(u, true, abil)
+            endif
+        elseif GetUnitAbilityLevel(u, abil) > 0 then
+            call UnitRemoveAbility(u, abil)
+        endif
+        set value = value / 2
+        set bit = bit + 1
+    endloop
+endfunction
+
+function FR_ShowSoulDrain takes unit u returns nothing
+    local texttag tt = CreateTextTag()
+    call SetTextTagText(tt, "灵魂被吞噬 -50 最大生命", 0.024)
+    call SetTextTagPosUnit(tt, u, 110.0)
+    call SetTextTagColor(tt, 190, 100, 255, 255)
+    call SetTextTagVelocity(tt, 0.0, 0.035)
+    call SetTextTagPermanent(tt, false)
+    call SetTextTagLifespan(tt, 1.8)
+    call SetTextTagFadepoint(tt, 1.2)
+    call SetTextTagVisibility(tt, GetLocalPlayer() == GetOwningPlayer(u))
+    set tt = null
+endfunction
+
+function FR_TrySoulDrain takes unit u returns nothing
+    local integer key
+    local integer total
+    local real oldMax
+    local real newMax
+    if u == null or not UnitHasItemOfTypeBJ(u, FR_ITEM_ID) then
+        return
+    endif
+    if GetRandomReal(0.0, 1.0) >= FR_SOUL_CHANCE then
+        return
+    endif
+    set oldMax = GetUnitState(u, UNIT_STATE_MAX_LIFE)
+    if oldMax <= I2R(FR_SOUL_DRAIN) then
+        return
+    endif
+    set key = GetHandleId(u)
+    set total = LoadInteger(fr_soul_table, key, 0) + 1
+    if total >= 4096 then
+        return
+    endif
+    call FR_SetSoulBurden(u, total)
+    set newMax = GetUnitState(u, UNIT_STATE_MAX_LIFE)
+    if oldMax - newMax < 49.0 then
+        return
+    endif
+    call SaveInteger(fr_soul_table, key, 0, total)
+    call FR_ShowSoulDrain(u)
+endfunction
+
+function FR_Unfreeze takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer timerKey = GetHandleId(t)
+    local integer unitKey = LoadInteger(fr_freeze_timer_table, timerKey, 1)
+    local unit u = LoadUnitHandle(fr_freeze_timer_table, timerKey, 0)
+    if u != null and GetUnitTypeId(u) != 0 then
+        call PauseUnit(u, false)
+        call SetUnitTimeScale(u, 1.0)
+    endif
+    call FlushChildHashtable(fr_freeze_table, unitKey)
+    call FlushChildHashtable(fr_freeze_timer_table, timerKey)
+    call DestroyTimer(t)
+    set u = null
+    set t = null
+endfunction
+
+function FR_FreezeAir takes unit u, real duration returns nothing
+    local integer unitKey
+    local integer timerKey
+    local timer t
+    if u == null or (not IsUnitType(u, UNIT_TYPE_FLYING) and not IsUnitType(u, UNIT_TYPE_STRUCTURE)) then
+        return
+    endif
+    set unitKey = GetHandleId(u)
+    if HaveSavedHandle(fr_freeze_table, unitKey, 0) then
+        set t = LoadTimerHandle(fr_freeze_table, unitKey, 0)
+    else
+        set t = CreateTimer()
+        set timerKey = GetHandleId(t)
+        call SaveTimerHandle(fr_freeze_table, unitKey, 0, t)
+        call SaveUnitHandle(fr_freeze_timer_table, timerKey, 0, u)
+        call SaveInteger(fr_freeze_timer_table, timerKey, 1, unitKey)
+        call PauseUnit(u, true)
+        call SetUnitTimeScale(u, 0.0)
+    endif
+    call TimerStart(t, duration, false, function FR_Unfreeze)
+    set t = null
+endfunction
+
+function FR_CanAffect takes unit caster, unit target returns boolean
+    local integer ownerId
+    if caster == null or target == null then
+        return false
+    endif
+    if IsUnitEnemy(target, GetOwningPlayer(caster)) then
+        return true
+    endif
+    if not IsUnitType(target, UNIT_TYPE_STRUCTURE) then
+        return false
+    endif
+    set ownerId = GetPlayerId(GetOwningPlayer(target))
+    return ownerId == PLAYER_NEUTRAL_PASSIVE or ownerId == PLAYER_NEUTRAL_AGGRESSIVE
+endfunction
+
 function FR_OnSpell takes nothing returns nothing
     local unit caster
     local group g
@@ -217,6 +361,7 @@ function FR_OnSpell takes nothing returns nothing
     local real x
     local real y
     local real bonus
+    local real freeze_duration
     if GetSpellAbilityId() != FR_SPELL_ID then
         return
     endif
@@ -228,15 +373,27 @@ function FR_OnSpell takes nothing returns nothing
         set caster = null
         return
     endif
+    call FR_TrySoulDrain(caster)
     call TriggerSleepAction(0.05)
     set g = CreateGroup()
     call GroupEnumUnitsInRange(g, x, y, FR_SPELL_RADIUS, null)
     loop
         set target = FirstOfGroup(g)
         exitwhen target == null
-        if target != caster and IsUnitAliveBJ(target) and IsUnitEnemy(target, GetOwningPlayer(caster)) then
+        if target != caster and IsUnitAliveBJ(target) and FR_CanAffect(caster, target) then
+            if IsUnitType(target, UNIT_TYPE_STRUCTURE) then
+                call FR_FreezeAir(target, 5.0)
+            endif
             if not IsUnitType(target, UNIT_TYPE_MAGIC_IMMUNE) then
                 call UnitDamageTarget(caster, target, bonus, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_MAGIC, WEAPON_TYPE_WHOKNOWS)
+                if IsUnitType(target, UNIT_TYPE_FLYING) then
+                    if IsUnitType(target, UNIT_TYPE_HERO) then
+                        set freeze_duration = 3.0
+                    else
+                        set freeze_duration = 5.0
+                    endif
+                    call FR_FreezeAir(target, freeze_duration)
+                endif
             endif
         endif
         call GroupRemoveUnit(g, target)
@@ -254,6 +411,9 @@ function FR_Init takes nothing returns nothing
     set fr_inited = true
     set fr_slow_group = CreateGroup()
     set fr_slow_table = InitHashtable()
+    set fr_soul_table = InitHashtable()
+    set fr_freeze_table = InitHashtable()
+    set fr_freeze_timer_table = InitHashtable()
     set fr_slow_timer = CreateTimer()
     call TimerStart(fr_slow_timer, 0.10, true, function FR_SlowStep)
     set fr_world = GetWorldBounds()

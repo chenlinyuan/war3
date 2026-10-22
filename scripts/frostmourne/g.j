@@ -8,6 +8,9 @@ trigger fr_pickup_trigger = null
 group fr_slow_group = null
 hashtable fr_slow_table = null
 timer fr_slow_timer = null
+hashtable fr_soul_table = null
+hashtable fr_freeze_table = null
+hashtable fr_freeze_timer_table = null
 integer fr_ground_count = 0
 item array fr_ground_items
 integer array fr_ground_keys
@@ -25,3 +28,5 @@ real FR_SPELL_STAT_MULT = 4.0
 real FR_SLOW_FACTOR = 0.35
 real FR_SLOW_DURATION = 4.0
 real FR_SLOW_HERO_DURATION = 2.0
+real FR_SOUL_CHANCE = 0.25
+integer FR_SOUL_DRAIN = 50

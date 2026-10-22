@@ -1,0 +1,35 @@
+{
+  "name": "霜之哀伤",
+  "item": "I105",
+  "abilities": [
+    "A105",
+    "A106",
+    "A107",
+    "A108",
+    "A109",
+    "A130",
+    "A131",
+    "A132",
+    "A133",
+    "A134",
+    "A135",
+    "A136",
+    "A137",
+    "A138",
+    "A139",
+    "A140",
+    "A141"
+  ],
+  "objects": {
+    "item": "item.w3t",
+    "ability": "ability.w3a"
+  },
+  "scripts": "scripts/frostmourne",
+  "assets": {
+    "Frostmourne.mdx": "war3campImported\\Frostmourne.mdx",
+    "Frostmourne10.blp": "Frostmourne10.blp",
+    "Frostmourne100.blp": "Frostmourne100.blp",
+    "IceStompRaised.mdx": "war3campImported\\IceStompRaised.mdx",
+    "Rune-Blue-Aura_Raised20.mdx": "war3campImported\\Rune-Blue-Aura_Raised20.mdx"
+  }
+}

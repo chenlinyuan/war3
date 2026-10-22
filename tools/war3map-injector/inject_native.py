@@ -50,6 +50,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("map")
     ap.add_argument("--script", action="append", default=[], metavar="DIR")
+    ap.add_argument("--base-script",
+                    help="使用额外的 war3map.j 作为脚本基底（用于先打补丁再合模块）")
     ap.add_argument("--file", action="append", default=[], metavar="SRC=内部名")
     ap.add_argument("--store", action="append", default=[], metavar="内部名",
                     help="该内部文件原样存储(不压缩)。战役 .w3n 的章节地图必须这样写")
@@ -77,11 +79,14 @@ def main():
     # --- 脚本 ---
     if script_dirs:
         print("== 组装脚本 ==")
-        ar = W.MPQArchive(map_path)
-        try:
-            orig = ar.read_file("war3map.j")
-        finally:
-            ar.close()
+        if args.base_script:
+            orig = open(os.path.abspath(args.base_script), "rb").read()
+        else:
+            ar = W.MPQArchive(map_path)
+            try:
+                orig = ar.read_file("war3map.j")
+            finally:
+                ar.close()
         if not orig:
             raise SystemExit("地图里读不到 war3map.j（壳化/加密图？）")
         if not args.skip_clash_check:

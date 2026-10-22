@@ -65,7 +65,11 @@ def expand_hash_table(ar, hash_tbl, incoming_names, load_limit=0.70):
         for name in incoming_names
     }
     required = len(live_pairs | incoming_pairs)
-    if required <= len(hash_tbl) * load_limit:
+    # Existing entries are looked up by their current slot. Never rehash a
+    # readable archive unless continuing to append would actually run out of
+    # empty slots, since protected maps often contain unlisted internal names
+    # that cannot be reconstructed safely.
+    if required < len(hash_tbl):
         return hash_tbl, len(hash_tbl)
 
     # listfile() intentionally omits MPQ-internal names.

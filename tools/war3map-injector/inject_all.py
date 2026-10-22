@@ -38,6 +38,7 @@
 
 import argparse
 import os
+import re
 import shutil
 import sys
 import time
@@ -74,11 +75,29 @@ def count_endglobals(data):
     return n
 
 
-def assemble_script(orig, script_dir):
-    gj = open(os.path.join(script_dir, "g.j"), "rb").read()
-    fj = open(os.path.join(script_dir, "f.j"), "rb").read()
-    mj = open(os.path.join(script_dir, "m.j"), "rb").read()
+def assemble_script(orig, script_dirs):
+    """按顺序把多个模块（每个目录 = g.j + f.j + m.j）拼成一份脚本。
+
+    多个模块能共存的前提是它们**不重名**：物品浏览器用 `IB_*`/`ib_*`，
+    翅膀/坐骑用 `WG_*`/`wg_*`，互不干扰。
+    """
+    if isinstance(script_dirs, str):
+        script_dirs = [script_dirs]
+    gj = b"\n\n".join(open(os.path.join(d, "g.j"), "rb").read() for d in script_dirs)
+    fj = b"\n\n".join(open(os.path.join(d, "f.j"), "rb").read() for d in script_dirs)
+    mj = b"\n\n".join(open(os.path.join(d, "m.j"), "rb").read() for d in script_dirs)
     return ism.build_script(orig, gj, fj, mj)
+
+
+def entry_points(script_dirs):
+    """从各模块的 m.j 里读出入口函数名（`call XXX()`）。"""
+    out = []
+    for d in script_dirs:
+        txt = open(os.path.join(d, "m.j"), "rb").read().decode("utf-8", "replace")
+        for m in re.finditer(r"call\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)", txt):
+            if m.group(1) not in out:
+                out.append(m.group(1))
+    return out
 
 
 def deploy(src, dest_name):
@@ -92,7 +111,9 @@ def main():
         description="一次 HKE 会话完成全部注入", add_help=True)
     ap.add_argument("map", help="地图文件 (.w3x/.w3m/.w3n)")
     ap.add_argument("--script", nargs="?", const=DEFAULT_SCRIPT_DIR,
-                    default=None, help="注入脚本目录（默认 scripts/item-browser）")
+                    default=None, action="append",
+                    help="注入脚本目录（默认 scripts/item-browser）；可重复给出多个模块，"
+                         "按顺序拼接（物品浏览器 IB_* / 翅膀 WG_* 互不重名）")
     ap.add_argument("--no-script", action="store_true", help="不注入脚本")
     ap.add_argument("--file", action="append", default=[],
                     metavar="SRC[=内部名]", help="替换地图内部文件，可重复")
@@ -132,12 +153,13 @@ def main():
             sess.close()
         return 0
 
-    script_dir = os.path.abspath(args.script) if args.script else None
+    script_dirs = [os.path.abspath(d) for d in args.script] if args.script else []
     if args.no_script:
-        script_dir = None
-    if script_dir and not os.path.isfile(os.path.join(script_dir, "f.j")):
-        print("脚本目录里没有 f.j: %s" % script_dir)
-        return 1
+        script_dirs = []
+    for d in script_dirs:
+        if not os.path.isfile(os.path.join(d, "f.j")):
+            print("脚本目录里没有 f.j: %s" % d)
+            return 1
 
     files = []
     for spec in args.file:
@@ -148,12 +170,14 @@ def main():
             return 1
         files.append((src, internal))
 
-    if not script_dir and not files:
+    if not script_dirs and not files:
         print("没有指定任何操作。用 --script 注入脚本，或用 --file 替换文件。")
         return 1
 
     print("地图      : %s" % map_path)
-    print("脚本      : %s" % (script_dir or "(不注入)"))
+    print("脚本      : %s" % (", ".join(script_dirs) if script_dirs else "(不注入)"))
+    if script_dirs:
+        print("脚本入口  : %s" % ", ".join(entry_points(script_dirs)))
     for src, internal in files:
         print("替换      : %s -> %s" % (os.path.basename(src), internal))
     if args.dry_run:
@@ -182,7 +206,7 @@ def main():
         listing = sess.analyze()
 
         # ---------------- 脚本 ----------------------------------------
-        if script_dir:
+        if script_dirs:
             mode = args.script_mode
             if mode == "auto":
                 orig = sess.extract("war3map.j")
@@ -192,27 +216,32 @@ def main():
             else:
                 orig = sess.extract("war3map.j")
             if mode == "native":
-                if count_endglobals(orig) > 1:
-                    print("警告      : 该图有 %d 处 endglobals，HKE 原生注入会插入多份，"
-                          "建议改用 --script-mode manual" % count_endglobals(orig))
-                sess.inject_script_native(script_dir)
-                # HKE 把 g.j 插到 globals 块最前面；若地图以 constant 声明开头，
-                # 我们的非 constant 变量就排在 constant 之前 -> JASS 编译失败。
-                # 原来要再开一次工具跑 fix_globals_order.py，这里顺手做掉。
-                if not args.no_verify:
-                    data = sess.extract("war3map.j")
-                    fixed, changed = fgo.fix_order(data.decode("latin-1"))
-                    if changed:
-                        rp = os.path.join(HERE, "_rep", "war3map.j")
-                        os.makedirs(os.path.dirname(rp), exist_ok=True)
-                        with open(rp, "wb") as fh:
-                            fh.write(fixed.encode("latin-1"))
-                        sess.replace(rp, "war3map.j")
-                        print("globals   : 已把自定义变量移到 constant 之后（原需再开一次工具）")
-                    else:
-                        print("globals   : 顺序本来就正确")
-            else:
-                new = assemble_script(orig, script_dir)
+                if len(script_dirs) > 1:
+                    print("注意      : native 模式一次只支持一个脚本模块，改用手动拼接")
+                    mode = "manual"
+                else:
+                    src_dir = script_dirs[0]
+                    if count_endglobals(orig) > 1:
+                        print("警告      : 该图有 %d 处 endglobals，HKE 原生注入会插入多份，"
+                              "建议改用 --script-mode manual" % count_endglobals(orig))
+                    sess.inject_script_native(src_dir)
+                    # HKE 把 g.j 插到 globals 块最前面；若地图以 constant 声明开头，
+                    # 我们的非 constant 变量就排在 constant 之前 -> JASS 编译失败。
+                    # 原来要再开一次工具跑 fix_globals_order.py，这里顺手做掉。
+                    if not args.no_verify:
+                        data = sess.extract("war3map.j")
+                        fixed, changed = fgo.fix_order(data.decode("latin-1"))
+                        if changed:
+                            rp = os.path.join(HERE, "_rep", "war3map.j")
+                            os.makedirs(os.path.dirname(rp), exist_ok=True)
+                            with open(rp, "wb") as fh:
+                                fh.write(fixed.encode("latin-1"))
+                            sess.replace(rp, "war3map.j")
+                            print("globals   : 已把自定义变量移到 constant 之后（原需再开一次工具）")
+                        else:
+                            print("globals   : 顺序本来就正确")
+            if mode == "manual":
+                new = assemble_script(orig, script_dirs)
                 rep = os.path.join(HERE, "_rep")
                 os.makedirs(rep, exist_ok=True)
                 rp = os.path.join(rep, "war3map.j")
@@ -225,14 +254,28 @@ def main():
                 if not args.no_verify:
                     try:
                         got = sess.extract("war3map.j")
-                        calls = got.count(b"call IB_Init()")
-                        has_def = b"IB_Init" in got
-                        print("脚本校验  : %d 字节, IB_Init 定义=%s, 调用=%d 处"
-                              % (len(got), has_def, calls))
-                        if not has_def or calls != 1:
+                        # 校验目标是"注入的每个模块到底进没进脚本"：逐个入口函数
+                        #   （物品浏览器 IB_Init / 翅膀坐骑 WG_Init）都要有定义 + 调用。
+                        missing_entries = []
+                        for name in entry_points(script_dirs):
+                            n_def = got.count(name.encode())
+                            # 入口可能直接 `call XXX()`，也可能包在 0 秒定时器里
+                            #   `... false, function XXX)`
+                            n_call = (got.count(b"call " + name.encode() + b"()")
+                                      + got.count(b"function " + name.encode() + b")"))
+                            if n_def and n_call:
+                                print("脚本校验  : %s 定义=%d, 调用=%d 处"
+                                      % (name, n_def, n_call))
+                            else:
+                                missing_entries.append("%s(定义=%d 调用=%d)"
+                                                       % (name, n_def, n_call))
+                        if not missing_entries:
+                            print("脚本校验  : %d 字节, 全部入口就位" % len(got))
+                        else:
                             ok = False
-                            notes.append("脚本校验不通过（定义=%s 调用=%d）"
-                                         % (has_def, calls))
+                            notes.append("脚本校验不通过: %s" % ", ".join(missing_entries))
+                            print("脚本校验  : %d 字节, 缺入口 %s"
+                                  % (len(got), ", ".join(missing_entries)))
                     except hk.HkeError as e:
                         print("脚本校验  : 跳过（%s）" % e)
                         notes.append("脚本校验被跳过")

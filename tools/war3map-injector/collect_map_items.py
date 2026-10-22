@@ -92,7 +92,8 @@ def main():
     items = parse_w3t(w3t, wts) if os.path.isfile(w3t) else []
     print("map custom items:", len(items))
 
-    p = os.path.join(HERE, "_itemids.txt")
+    base_dir = os.environ.get("IB_BASE_DIR") or HERE
+    p = os.path.join(base_dir, "_itemids.txt")
     lines = open(p, encoding="utf-8").read().splitlines()
     existing = set()
     for ln in lines:

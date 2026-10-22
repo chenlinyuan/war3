@@ -198,7 +198,7 @@ def main():
     print("standard (creatable):", len(std_out))
     print("custom (creatable):", len(cus_out))
 
-    out = os.path.join(HERE, "_itemids.txt")
+    out = os.path.join(os.environ.get("IB_BASE_DIR") or HERE, "_itemids.txt")
     with open(out, "w", encoding="utf-8") as fh:
         for iid, nm in std_out:
             fh.write("S\t%s\t%s\n" % (iid, nm))

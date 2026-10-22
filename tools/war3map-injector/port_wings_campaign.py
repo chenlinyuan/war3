@@ -103,7 +103,7 @@ def merge_chapter_objects(chapter, objdir, mapping):
 def obj_list(a):
     return CAMPAIGN_OBJ if getattr(a, "no_hand", False) else CAMPAIGN_OBJ_HAND
 # 打包时要一起写回、但不是"合并"出来的文件
-EXTRA_PACK_FILES = ["war3campaign.wts"]
+EXTRA_PACK_FILES = ["war3campaign.w3f", "war3campaign.wts"]
 DEFAULT_CFG = "wings_config_campaign"
 
 
@@ -287,31 +287,74 @@ def cmd_objects(a):
 # ---------------------------------------------------------------------------
 def cmd_name(a):
     import re
+    import struct
     base = os.path.join(os.path.abspath(a.work), "base")
-    wts = os.path.join(base, "war3campaign.wts")
-    if not os.path.exists(wts):
-        print("  ! 没有 war3campaign.wts，跳过改名")
+    wts_path = os.path.join(base, "war3campaign.wts")
+    w3f_path = os.path.join(base, "war3campaign.w3f")
+    if not os.path.exists(wts_path) or not os.path.exists(w3f_path):
+        print("  ! 缺少 war3campaign.wts/w3f，跳过改名")
         return 0
-    raw = open(wts, "rb").read()
+
+    prefix = getattr(a, "prefix", "alas ")
+    w3f = open(w3f_path, "rb").read()
+    if len(w3f) < 13:
+        print("  ! war3campaign.w3f 太短，跳过改名")
+        return 0
+    try:
+        struct.unpack_from("<iii", w3f, 0)
+    except struct.error:
+        print("  ! war3campaign.w3f 头部无效，跳过改名")
+        return 0
+    name_start = 12
+    name_end = w3f.find(b"\0", name_start)
+    if name_end < 0:
+        print("  ! war3campaign.w3f 战役名未终止，跳过改名")
+        return 0
+    raw_name = w3f[name_start:name_end]
+
+    raw_wts = open(wts_path, "rb").read()
     enc = "utf-8"
     try:
-        text = raw.decode("utf-8")
+        text = raw_wts.decode("utf-8")
     except UnicodeDecodeError:
         enc = "gbk"
-        text = raw.decode("gbk")
-    suffix = a.suffix or "（翅膀版）"
-    # w3f 里第一个 TRIGSTR 就是战役名
-    m = re.search(r"STRING 8\s*\r?\n\{(.*?)\}", text, re.S)
-    if not m:
-        print("  ! wts 里找不到 STRING 8（战役名），跳过")
+        text = raw_wts.decode("gbk")
+
+    def has_prefix(value):
+        return re.match(r"^\s*alas(?:\s|$)", value, re.I) is not None
+
+    ref_text = raw_name.decode(enc, "replace")
+    ref = re.fullmatch(r"\s*TRIGSTR_(\d+)\s*", ref_text, re.I)
+    if ref:
+        number = int(ref.group(1))
+        m = re.search(
+            r"(STRING\s+%d\s*\r?\n\{)(.*?)(\})" % number,
+            text,
+            re.I | re.S,
+        )
+        if not m:
+            print("  ! wts 里找不到 w3f 引用的 STRING %d，跳过" % number)
+            return 0
+        body = m.group(2)
+        lead_len = len(body) - len(body.lstrip())
+        lead, value = body[:lead_len], body[lead_len:]
+        if has_prefix(value):
+            print("战役显示名已带 alas 前缀，跳过")
+            return 0
+        new_body = lead + prefix + value
+        text = text[:m.start(2)] + new_body + text[m.end(2):]
+        open(wts_path, "wb").write(text.encode(enc))
+        print("战役显示名 STRING %d -> %s" % (number, (prefix + value).strip()))
         return 0
-    if suffix in m.group(1):
-        print("战役名已经带后缀了，跳过")
+
+    literal = ref_text.strip()
+    if has_prefix(literal):
+        print("战役显示名已带 alas 前缀，跳过")
         return 0
-    new = m.group(1).rstrip() + suffix
-    text = text[:m.start(1)] + new + text[m.end(1):]
-    open(wts, "wb").write(text.encode(enc))
-    print("战役名 -> %r（%s）" % (new.strip(), enc))
+    new_name = (prefix + literal).encode("utf-8")
+    w3f = w3f[:name_start] + new_name + w3f[name_end:]
+    open(w3f_path, "wb").write(w3f)
+    print("战役显示名 -> %s" % (prefix + literal).strip())
     return 0
 
 
@@ -463,6 +506,7 @@ def cmd_pack(a):
     for internal in sorted(store):
         args += ["--store", internal]
     P.run(args)
+    prefix_hm3w_name(out, getattr(a, "prefix", "alas "))
     # 读回逐字节校验
     print("\n打包校验（读回 .w3n 和本地文件逐字节比对）：")
     ar = W.MPQArchive(out)
@@ -481,6 +525,47 @@ def cmd_pack(a):
         ar.close()
     print("\n输出战役:", out)
     return 1 if bad else 0
+
+
+def prefix_hm3w_name(path, prefix):
+    """Patch the HM3W display name used by the custom-campaign list."""
+    import re
+
+    with open(path, "rb") as f:
+        block = bytearray(f.read(512))
+    if bytes(block[:4]) != b"HM3W":
+        print("   HM3W 头不存在，跳过战役列表显示名")
+        return
+    try:
+        nul = block.index(0, 8)
+    except ValueError:
+        print("   HM3W 名未终止，跳过战役列表显示名")
+        return
+    old = bytes(block[8:nul]).decode("utf-8", "replace")
+    color = re.match(r"^(\|[cC][0-9a-fA-F]{8})(.*)$", old, re.S)
+    visible = color.group(2) if color else old
+    if re.match(r"^\s*alas(?:\s|$)", visible, re.I):
+        print("   HM3W 显示名已带 alas 前缀")
+        return
+    if color:
+        new = color.group(1) + " " + prefix.strip() + " " + color.group(2).lstrip()
+    else:
+        new = prefix + old.lstrip()
+
+    # Keep all non-zero metadata following the name string inside the 512-byte
+    # HM3W header, then rebuild the zero padding.
+    tail_end = max(
+        (i + 1 for i, value in enumerate(block[nul + 1:], nul + 1) if value),
+        default=nul + 1,
+    )
+    tail = bytes(block[nul + 1:tail_end])
+    out = b"HM3W" + bytes(block[4:8]) + new.encode("utf-8") + b"\0" + tail
+    if len(out) > 512:
+        raise SystemExit("HM3W 显示名超过 512 字节: %r" % new)
+    out += b"\0" * (512 - len(out))
+    with open(path, "r+b") as f:
+        f.write(out)
+    print("   战役列表显示名: %r -> %r" % (old, new))
 
 
 def cmd_all(a):
@@ -518,7 +603,8 @@ def main():
                        help="战役自己已经有阿克蒙德之手时用（不重复添加那件装备）")
         s.add_argument("--only")
         s.add_argument("--force", action="store_true")
-        s.add_argument("--suffix", default="（翅膀版）")
+        s.add_argument("--prefix", default="alas ",
+                       help="战役列表中的显示名前缀")
     s = sub.add_parser("pack")
     s.add_argument("campaign")
     s.add_argument("--work", required=True)

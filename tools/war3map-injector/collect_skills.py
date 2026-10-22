@@ -117,7 +117,7 @@ def main():
         print("地图 w3a 技能:", len(names))
 
     # 输出
-    out = os.path.join(HERE, "_skillids.txt")
+    out = os.path.join(os.environ.get("IB_BASE_DIR") or HERE, "_skillids.txt")
     with open(out, "w", encoding="utf-8") as fh:
         for sid in sorted(names):
             fh.write("%s\t%s\n" % (sid, names[sid]))

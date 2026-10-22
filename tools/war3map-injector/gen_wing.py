@@ -20,6 +20,9 @@ CRITICAL 要点:
 import struct, sys, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+CFG = __import__(os.environ.get("WINGS_CONFIG", "wings_config"))   # 移植到别的图时可用 WINGS_CONFIG=<别的配置模块名>
+C = CFG.COMMON                      # 通用数值
 
 # ---------------------------------------------------------------------------
 # 图标
@@ -35,62 +38,59 @@ BTN_DRAGON_K = "ReplaceableTextures\\CommandButtons\\BTNBlackDragon.blp"
 BTN_DRAGON_R = "ReplaceableTextures\\CommandButtons\\BTNRedDragon.blp"
 
 # ---------------------------------------------------------------------------
-# 技能 ID 规划 (W 前缀避免冲突)
-#   翅膀本体 (挂翅膀模型):
-WING_MAIN = "W000"      # 堕落天使之翼 (WingOfTheLucifer)
-WING_SERAPH = "W020"    # 炽天使之翼 (FWIND)
-WING_DEMON = "W021"     # 恶魔之翼 (DoomgGuardWings)
-#   翅膀"基础加速" (三件共有; 物品版移速加成, 固定值)
-WING_SPEED = "W002"          # 移动速度 +100                     (AIms + Imvb)
-#   翅膀光环 / 被动 —— 全部是**单位版**技能(不能用物品版: 物品技能放进魔法书里不生效),
-#   它们被塞进下面每件翅膀的"隐藏魔法书"(脚本添加并 SetPlayerAbilityAvailable 隐藏),
-#   所以既生效又**不占英雄技能栏**:
-WING_AURA_UNHOLY = "W070"    # 邪恶光环: 友军 移速+20%、每秒回血+30  (AUau + Uau1/Uau2)
-WING_AURA_VAMP = "W071"      # 吸血光环: 友军 吸血+40%               (AUav + Uav1)
-WING_EVASION = "W072"        # 闪避 30%                             (AEev + Eev1)
-WING_AURA_BRILL = "W073"     # 辉煌光环: 友军 魔法恢复+300%          (AHab + Hab1)
-WING_AURA_HEAL = "W074"      # 治疗光环(真正回血): 每秒按最大生命的 3%   (Aoar + Oar1)
-#   = 巫医"治疗守卫"的再生光环: 数值是"按最大生命百分比/秒", 换地图也通用。
-WING_AURA_SHOW = "W079"      # 治疗光环(展示专用, 0 效果): 只为挂 buff 图标  (AOae)
-#   = 耐久光环做底, 两个数值都 0(移速/攻速), **不碰生命恢复机制**;
-#     buff 用本图没人用的原版 `Babr`(由 war3map.w3h 改名"治疗光环"+图标) —— 见 W074 说明。
-WING_REBIRTH = "W075"        # 重生(原版 Reincarnation)              (AOre + Ore1/acdn)
-WING_AURA_COMMAND = "W076"   # 命令光环: 友军 攻击力+50%             (ACac + Cac1/Ear2/Ear3)
-WING_AURA_ENDUR = "W077"     # 耐久光环: 友军 攻击速度+40%           (AOae + Oae1/Oae2)
-WING_CRIT = "W078"           # 致命一击: 35% 概率 3 倍伤害            (AOcr + Ocr1/Ocr2)
-#   三本"隐藏魔法书" (脚本按需给英雄加上并隐藏; 一本书装一件翅膀的全部光环/被动)
-WING_BOOK_FALLEN = "W080"    # 堕落天使之书: W070,W071,W072
-WING_BOOK_SERAPH = "W081"    # 炽天使之书:   W073,W074,W079        (3 个)
-WING_BOOK_SERAPH2 = "W084"   # 炽天使之书2:  W075(重生)             (另开一本)
-#   ⚠ 2026-10-10 第十一轮: 重生(AOre) 在 W081 里排第 4 个之后就**不生效了**
-#     (玩家实测: 加了"展示光环"当第 3 个, 重生被挤到第 4 → 重生失效)。
-#     实测证据指向"一本魔法书里只有前 3 个技能会真正挂到单位上"这个上限 ——
-#     所以把重生单独放进第二本小书, 两本都 ≤3 个。
-WING_BOOK_DEMON = "W082"     # 恶魔之书:     W076,W077,W078
-#   翅膀主动技能 (都用游戏自带"物品版"技能, 任何地图都能用; 必须是物品 iabi 的第一项):
-WING_ACT_INVUL = "W022"      # 暗影庇护: 6 秒无敌                    (AIvu + adur/ahdu)
-WING_ACT_TELE = "W023"       # 群体传送: 自身 + 700 内友军一起传送     (AHmt + aare)
-WING_ACT_BLINK = "W024"      # 闪烁: 最远 1300                       (AIbk + Ebl1)
-#   坐骑挂载技能 (被动 AIlf + 模型, 放在"骑乘中物品"的 iabi 里 → 模型挂到持有者, 且不占技能栏):
-MOUNT_PHOENIX = "W040"  # 火凤凰
-MOUNT_BLUE = "W041"     # 蓝龙
-MOUNT_BLACK = "W042"    # 黑龙
-MOUNT_RED = "W043"      # 红龙
-#   蛋使用技能 (主动 AIha, 无模型, 放在"蛋"的 iabi 里 → 可点击使用):
-EGG_USE_PHOENIX = "W060"
-EGG_USE_BLUE = "W061"
-EGG_USE_BLACK = "W062"
-EGG_USE_RED = "W063"
-EGG_USE_BRONZE = "W064"
-#   取消骑乘技能 (主动 AIha, 无模型, 放在"骑乘中物品"的 iabi 里):
-MOUNT_DISMOUNT = "W050"      # 取消骑乘 (放在"骑乘中物品"的 iabi, 点击使用)
+# 技能 ID —— 全部从 wings_config.py 取（移植时用 pick_ids.py 自动挑空闲 ID）
+WING_MAIN = CFG.ABIL["wing_model_fallen"]
+WING_SERAPH = CFG.ABIL["wing_model_seraph"]
+WING_DEMON = CFG.ABIL["wing_model_demon"]
+WING_SPEED = CFG.ABIL["wing_speed"]
+WING_AURA_UNHOLY = CFG.ABIL["aura_unholy"]
+WING_AURA_VAMP = CFG.ABIL["aura_vamp"]
+WING_EVASION = CFG.ABIL["evasion"]
+WING_AURA_BRILL = CFG.ABIL["aura_brill"]
+WING_AURA_HEAL = CFG.ABIL["aura_heal"]
+WING_AURA_SHOW = CFG.ABIL["aura_show"]
+WING_REBIRTH = CFG.ABIL["rebirth"]
+WING_AURA_COMMAND = CFG.ABIL["aura_command"]
+WING_AURA_ENDUR = CFG.ABIL["aura_endur"]
+WING_CRIT = CFG.ABIL["crit"]
+WING_BOOK_FALLEN = CFG.ABIL["book_fallen"]
+WING_BOOK_SERAPH = CFG.ABIL["book_seraph"]
+WING_BOOK_SERAPH2 = CFG.ABIL["book_seraph2"]
+WING_BOOK_DEMON = CFG.ABIL["book_demon"]
+WING_ACT_INVUL = CFG.ABIL["act_invul"]
+WING_ACT_TELE = CFG.ABIL["act_tele"]
+WING_ACT_BLINK = CFG.ABIL["act_blink"]
+WING_BOOK_STAR = CFG.ABIL["book_star"]
+STAR_SPEED = CFG.ABIL["star_speed"]
+WING_ACT_ASHFALL = CFG.ABIL["act_ashfall"]
+WING_SPELL_SHIELD = CFG.ABIL["spell_shield"]
+MOUNT_PHOENIX = CFG.ABIL["mount_model_phoenix"]
+MOUNT_BLUE = CFG.ABIL["mount_model_blue"]
+MOUNT_BLACK = CFG.ABIL["mount_model_black"]
+MOUNT_RED = CFG.ABIL["mount_model_red"]
+EGG_USE_PHOENIX = CFG.ABIL["egg_use_phoenix"]
+EGG_USE_BLUE = CFG.ABIL["egg_use_blue"]
+EGG_USE_BLACK = CFG.ABIL["egg_use_black"]
+EGG_USE_RED = CFG.ABIL["egg_use_red"]
+EGG_USE_BRONZE = CFG.ABIL["egg_use_bronze"]
+MOUNT_DISMOUNT = CFG.ABIL["dismount"]
 
-# 坐骑模型路径 (来自 unitui.slk, 加 .mdx 扩展名)
-MOUNT_MODEL_PHOENIX = "units\\human\\phoenix\\phoenix.mdx"
-MOUNT_MODEL_BLUE = "units\\creeps\\AzureDragon\\AzureDragon.mdx"
-MOUNT_MODEL_BLACK = "units\\creeps\\BlackDragon\\BlackDragon.mdx"
-MOUNT_MODEL_RED = "units\\creeps\\RedDragon\\RedDragon.mdx"
-MOUNT_MODEL_BRONZE = "units\\creeps\\BronzeDragon\\BronzeDragon.mdx"
+# 坐骑模型路径（来自 wings_config 的 MOUNTS 表；.mdx 是 unitui.slk 的模型路径 + 扩展名）
+#   ⚠ 不能直接 CFG.mount_by_key("phoenix")：配置里 `MOUNTS = []`（--mounts none）时会抛
+#     KeyError —— 而"不带坐骑"是现在移植的默认档位。这里查不到就返回空串，
+#     下面用到它们的地方只在 `if CFG.MOUNTS:` 里。
+def _mount_model(key):
+    for _m in CFG.MOUNTS:
+        if _m["key"] == key:
+            return _m["model"] + ".mdx"
+    return ""
+
+
+MOUNT_MODEL_PHOENIX = _mount_model("phoenix")
+MOUNT_MODEL_BLUE = _mount_model("blue")
+MOUNT_MODEL_BLACK = _mount_model("black")
+MOUNT_MODEL_RED = _mount_model("red")
+MOUNT_MODEL_BRONZE = _mount_model("bronze")
 
 
 def mod(mid, t, level, col, val):
@@ -186,28 +186,51 @@ def build_use_mods():
     ]
 
 
+def book_mods(key, which="book"):
+    """隐藏魔法书的 mod：技能表 + order id + **Min/Max Spells**。
+
+    ⚠ 2026-10-15 查明的坑：`Aspb`（魔法书）基对象的 **Min/Max Spells 默认是 3/3**
+      （DataC1 / DataD1 = 3），引擎只把技能表里**前 3 个**授予单位 —— 项目里那条
+      "一本魔法书最多 3 个"的旧记录就是这个默认值造成的，**不是引擎硬上限**。
+      燃烧之怒 194213 里作者的书（A6FF）显式写了 **12/12**，6 条技能全部生效
+      （玩家实测 6 条属性都在）。这里统一按配置写满，
+      以后书里想装几条都不会再被悄悄截断。
+    """
+    field = "book_abils" if which == "book" else "book2_abils"
+    return [
+        mod("spb1", 3, 1, 1, ",".join(CFG.wing_by_key(key)[field])),
+        mod("spb5", 3, 1, 5, "spellbook"),
+        mod("spb3", 0, 1, 3, C["book_min_spells"]),
+        mod("spb4", 0, 1, 4, C["book_max_spells"]),
+    ]
+
+
 def build(out_path):
     entries = []
 
     # === 翅膀本体 (只负责"挂翅膀模型"; 物品技能, 不上技能栏) ===
-    entries.append(ability_entry(
-        WING_MAIN, "AIlf", "[翅膀]堕落天使之翼", BTN_LIFE,
-        extra_mods=build_wing_mods("WingOfTheLucifer.MDX", 0),
-    ))
-    entries.append(ability_entry(
-        WING_SERAPH, "AIlf", "[翅膀]炽天使之翼", BTN_LIFE,
-        extra_mods=build_wing_mods("FWIND.MDX", 0),
-    ))
-    entries.append(ability_entry(
-        WING_DEMON, "AIlf", "[翅膀]恶魔之翼", BTN_LIFE,
-        extra_mods=build_wing_mods("DoomgGuardWings.mdx", 0),
-    ))
+    #   真翅膀 3 件 + 「试穿」用翅膀（只挂模型，玩家用来挑外观）
+    for _w in (list(CFG.WINGS) + list(getattr(CFG, "TEST_WINGS", []))
+               + list(getattr(CFG, "TEST_ARTS", []))):
+        entries.append(ability_entry(
+            _w["model_abil"], "AIlf", "[翅膀]" + _w["name"], CFG.ICONS["wing_abil"],
+            # hp_bonus: 星魂之力用它把"+1000 生命"和"模型挂件"做在同一个技能里
+            extra_mods=build_wing_mods(_w["model"], _w.get("hp_bonus", 0),
+                                       _w.get("attach", "chest")),
+        ))
 
     # === 基础加速 (三件共有; 物品技能) ===
     entries.append(ability_entry(
         WING_SPEED, "AIms", "[翅膀]移动速度 +100", BTN_BOOTS,
-        extra_mods=[mod("Imvb", 0, 1, 1, 100)],
+        extra_mods=[mod("Imvb", 0, 1, 1, C["wing_speed_bonus"])],
     ))
+    # 「试穿」用的加速 (只有 +90，和真翅膀区分开)
+    if getattr(CFG, "TEST_WINGS", None):
+        entries.append(ability_entry(
+            CFG.ABIL["wing_speed_test"], "AIms",
+            "[试穿]移动速度 +%d" % int(C.get("wing_speed_test_bonus", 90)), BTN_BOOTS,
+            extra_mods=[mod("Imvb", 0, 1, 1, C["wing_speed_test_bonus"])],
+        ))
 
     # === 光环 / 被动: 单位版技能, 放进下面的"隐藏魔法书"里 ===
     # (用物品版 AIa* 放进魔法书不生效, 必须用单位版 AUau/AUav/AEev/AHab/Aoar/AOre/ACac/AOae/AOcr)
@@ -215,9 +238,9 @@ def build(out_path):
     entries.append(ability_entry(
         WING_AURA_UNHOLY, "AUau", "[光环]邪恶: 移速+20% 回血+30", BTN_REGEN,
         extra_mods=[
-            mod("Uau1", 2, 1, 1, 0.20),
-            mod("Uau2", 2, 1, 2, 30.0),
-            mod("aare", 2, 1, 0, 700.0),
+            mod("Uau1", 2, 1, 1, C["aura_unholy_speed"]),
+            mod("Uau2", 2, 1, 2, C["aura_unholy_regen"]),
+            mod("aare", 2, 1, 0, C["aura_radius"]),
         ],
         item_ability=False,
     ))
@@ -225,23 +248,23 @@ def build(out_path):
     entries.append(ability_entry(
         WING_AURA_VAMP, "AUav", "[光环]吸血 +40%", BTN_DRAGON_R,
         extra_mods=[
-            mod("Uav1", 2, 1, 1, 0.40),
-            mod("aare", 2, 1, 0, 700.0),
+            mod("Uav1", 2, 1, 1, C["aura_vamp"]),
+            mod("aare", 2, 1, 0, C["aura_radius"]),
         ],
         item_ability=False,
     ))
     # 闪避: Eev1 = 闪避概率
     entries.append(ability_entry(
         WING_EVASION, "AEev", "闪避 30%", BTN_BRACER,
-        extra_mods=[mod("Eev1", 2, 1, 1, 0.30)],
+        extra_mods=[mod("Eev1", 2, 1, 1, C["evasion"])],
         item_ability=False,
     ))
     # 辉煌光环: Hab1 = 魔法恢复倍数
     entries.append(ability_entry(
         WING_AURA_BRILL, "AHab", "[光环]魔法恢复 +300%", BTN_MANA,
         extra_mods=[
-            mod("Hab1", 2, 1, 1, 3.0),
-            mod("aare", 2, 1, 0, 700.0),
+            mod("Hab1", 2, 1, 1, C["aura_brill"]),
+            mod("aare", 2, 1, 0, C["aura_radius"]),
         ],
         item_ability=False,
     ))
@@ -256,13 +279,15 @@ def build(out_path):
     entries.append(ability_entry(
         WING_AURA_HEAL, "Aoar", "[光环]每秒回复最大生命 3%", BTN_REGEN,
         extra_mods=[
-            mod("Oar1", 2, 1, 1, 0.03),
+            mod("Oar1", 2, 1, 1, C["aura_heal_pct"]),
             # Oar2 = "按最大生命的百分比" 开关, 原版 Aoar 就是 1 —— 显式写出来,
             #   免得自定义技能没继承到(第八轮补)。
             mod("Oar2", 0, 1, 2, 1),
-            mod("aare", 2, 1, 0, 700.0),
-            mod("atar", 3, 1, 0, "air,ground,organic,vuln,invu,friend,allies,self"),
-            mod("abuf", 3, 1, 0, "Boar"),
+            mod("aare", 2, 1, 0, C["aura_radius"]),
+            mod("atar", 3, 1, 0, C["aura_targets"]),
+            # 2026-10-15 起用**自定义** buff（底子 Boar）：不覆盖原版 Boar，
+            #   免得地图里别的"治疗守卫"也跟着改名。
+            mod("abuf", 3, 1, 0, CFG.BUFFS["heal_native"]),
         ],
         item_ability=False,
     ))
@@ -281,9 +306,9 @@ def build(out_path):
         extra_mods=[
             mod("Oae1", 2, 1, 1, 0.0),
             mod("Oae2", 2, 1, 2, 0.0),
-            mod("aare", 2, 1, 0, 700.0),
-            mod("atar", 3, 1, 0, "air,ground,organic,vuln,invu,friend,allies,self"),
-            mod("abuf", 3, 1, 0, "Babr"),
+            mod("aare", 2, 1, 0, C["aura_radius"]),
+            mod("atar", 3, 1, 0, C["aura_targets"]),
+            mod("abuf", 3, 1, 0, CFG.BUFFS["heal_show"]),
         ],
         item_ability=False,
     ))
@@ -291,21 +316,21 @@ def build(out_path):
     entries.append(ability_entry(
         WING_REBIRTH, "AOre", "重生", BTN_LIFE,
         extra_mods=[
-            mod("Ore1", 2, 1, 1, 3.0),
-            mod("acdn", 2, 1, 0, 150.0),
+            mod("Ore1", 2, 1, 1, C["rebirth_delay"]),
+            mod("acdn", 2, 1, 0, C["rebirth_cd"]),
         ],
         tip="重生",
-        ubertip="阵亡 3 秒后自动复活。|n冷却 150 秒。",
+        ubertip="阵亡 %d 秒后自动复活。|n冷却 %d 秒。" % (C["rebirth_delay"], C["rebirth_cd"]),
         item_ability=False,
     ))
     # 命令光环 (原版就有): Cac1 = 攻击力%; Ear2/Ear3 = 近战/远程开关
     entries.append(ability_entry(
         WING_AURA_COMMAND, "ACac", "[光环]命令: 攻击力 +50%", BTN_BRACER,
         extra_mods=[
-            mod("Cac1", 2, 1, 1, 0.50),
+            mod("Cac1", 2, 1, 1, C["aura_command"]),
             mod("Ear2", 0, 1, 2, 1),
             mod("Ear3", 0, 1, 3, 1),
-            mod("aare", 2, 1, 0, 700.0),
+            mod("aare", 2, 1, 0, C["aura_radius"]),
         ],
         item_ability=False,
     ))
@@ -313,9 +338,9 @@ def build(out_path):
     entries.append(ability_entry(
         WING_AURA_ENDUR, "AOae", "[光环]攻击速度 +40%", BTN_BOOTS,
         extra_mods=[
-            mod("Oae1", 2, 1, 1, 0.0),
-            mod("Oae2", 2, 1, 2, 0.40),
-            mod("aare", 2, 1, 0, 700.0),
+            mod("Oae1", 2, 1, 1, C["aura_endur_speed"]),
+            mod("Oae2", 2, 1, 2, C["aura_endur_attack"]),
+            mod("aare", 2, 1, 0, C["aura_radius"]),
         ],
         item_ability=False,
     ))
@@ -329,133 +354,320 @@ def build(out_path):
     entries.append(ability_entry(
         WING_CRIT, "AOcr", "致命一击 35% x3", BTN_DRAGON_K,
         extra_mods=[
-            mod("Ocr1", 2, 1, 1, 35.0),
-            mod("Ocr2", 2, 1, 2, 3.0),
+            mod("Ocr1", 2, 1, 1, C["crit_chance"]),
+            mod("Ocr2", 2, 1, 2, C["crit_multiplier"]),
         ],
         item_ability=False,
     ))
 
     # === 三本"隐藏魔法书" (脚本按需加到英雄身上并 SetPlayerAbilityAvailable 隐藏) ===
-    #   spb1 = 书里的技能列表, spb5 = 命令字符串(必须是 "spellbook")
+    #   spb1 = 书里的技能列表, spb5 = 命令字符串(必须是 "spellbook"),
+    #   spb3/spb4 = Min/Max Spells（**不写满就只授予前 3 个**，见 book_mods 的说明）
     entries.append(ability_entry(
         WING_BOOK_FALLEN, "Aspb", "[书]堕落天使", BTN_MANA,
-        extra_mods=[
-            mod("spb1", 3, 1, 1, "W070,W071,W072"),
-            mod("spb5", 3, 1, 5, "spellbook"),
-        ],
+        extra_mods=book_mods("fallen"),
         item_ability=False,
     ))
     entries.append(ability_entry(
         WING_BOOK_SERAPH, "Aspb", "[书]炽天使", BTN_MANA,
-        extra_mods=[
-            # 两个光环都在书里(玩家定的方案):
-            #   W074 = 真正按最大生命百分比/秒回血(治疗守卫那套, 玩家实测有效)
-            #   W079 = 展示专用光环(数值≈0), 作用只是把 buff 挂上 → 状态栏有图标
-            #   (第八轮一度把 W074 挂到坐骑单位上试"载体", 已回退: 治疗是翅膀的效果,
-            #    不该依赖坐骑)
-            mod("spb1", 3, 1, 1, "W073,W074,W079"),
-            mod("spb5", 3, 1, 5, "spellbook"),
-        ],
+        # 书里 = 辉煌光环 + 治疗光环 + 展示光环(+ 重生, 见下面 book2 的说明)
+        extra_mods=book_mods("seraph"),
         item_ability=False,
     ))
-    # 炽天使第二本小书: 只装重生(避免被"一本最多 3 个"的上限挤掉)
-    entries.append(ability_entry(
-        WING_BOOK_SERAPH2, "Aspb", "[书]炽天使2", BTN_MANA,
-        extra_mods=[
-            mod("spb1", 3, 1, 1, "W075"),
-            mod("spb5", 3, 1, 5, "spellbook"),
-        ],
-        item_ability=False,
-    ))
+    # 第二本小书只在配置里还留着 book2 时才生成。
+    #   （2026-10-15 之后炽天使不再需要它：Min/Max Spells 写满后一本书就能装 4 条，
+    #     重生已经并回主书；这条分支留给别的图/别的配置继续用。）
+    if CFG.wing_by_key("seraph")["book2_abils"]:
+        entries.append(ability_entry(
+            WING_BOOK_SERAPH2, "Aspb", "[书]炽天使2", BTN_MANA,
+            extra_mods=book_mods("seraph", "book2"),
+            item_ability=False,
+        ))
     entries.append(ability_entry(
         WING_BOOK_DEMON, "Aspb", "[书]恶魔", BTN_MANA,
-        extra_mods=[
-            mod("spb1", 3, 1, 1, "W076,W077,W078"),
-            mod("spb5", 3, 1, 5, "spellbook"),
-        ],
+        extra_mods=book_mods("demon"),
         item_ability=False,
     ))
+    # 「星魂之力」的移速：**顶满**（玩家 2026-10-15 改的需求）
+    #   其它三件翅膀共用 W002（+100）；这件单独一条，数值写满 = 引擎速度上限 522。
+    #   ⚠ 原来的 [星魂]全属性 +20（W087）/ 魔法上限 +500（W088）已按玩家要求删除，
+    #     所以那把隐藏魔法书现在是个**空书**（物品技能列表里没有它们）。
+    entries.append(ability_entry(
+        STAR_SPEED, "AIms", "[星魂]移动速度 顶满", BTN_BOOTS,
+        extra_mods=[mod("Imvb", 0, 1, 1, C["star_speed_bonus"])],
+    ))
+    # 星魂之力现在**不需要**魔法书了（全属性/魔法上限那两条已删）——
+    #   和"第二本小书"一样，配置里还有内容才生成这本书。
+    if CFG.wing_by_key("star")["book_abils"]:
+        entries.append(ability_entry(
+            WING_BOOK_STAR, "Aspb", "[书]星魂之力", BTN_MANA,
+            extra_mods=book_mods("star"),
+            item_ability=False,
+        ))
 
     # === 通用主动技能 (物品技能: 点物品使用, 冷却转圈显示在物品图标上) ===
     entries.append(ability_entry(
         WING_ACT_INVUL, "AIvu", "暗影庇护", BTN_LIFE,
         extra_mods=[
-            mod("adur", 2, 1, 0, 6.0),
-            mod("ahdu", 2, 1, 0, 6.0),
-            mod("acdn", 2, 1, 0, 50.0),
+            mod("adur", 2, 1, 0, C["act_invul_dur"]),
+            mod("ahdu", 2, 1, 0, C["act_invul_dur"]),
+            mod("acdn", 2, 1, 0, C["act_invul_cd"]),
         ],
         tip="暗影庇护(|cffffcc00D|r)",
-        ubertip="6 秒内免疫所有伤害。|n冷却 50 秒。",
+        ubertip="%d 秒内免疫所有伤害。|n冷却 %d 秒。" % (C["act_invul_dur"], C["act_invul_cd"]),
     ))
     # 群体传送: 必须用英雄版 AHmt(点地面); 物品版 AImt 是"指向友军单位"的, 点地面无效
     entries.append(ability_entry(
         WING_ACT_TELE, "AHmt", "群体传送", BTN_MANA,
         extra_mods=[
-            mod("aare", 2, 1, 0, 700.0),
-            mod("acdn", 2, 1, 0, 60.0),
+            mod("aare", 2, 1, 0, C["aura_radius"]),
+            mod("acdn", 2, 1, 0, C["act_tele_cd"]),
         ],
         tip="群体传送(|cffffcc00T|r)",
-        ubertip="把自身与周围 700 范围内的友军一起传送到地图上任意可见位置。|n冷却 60 秒。",
+        ubertip="把自身与周围 %d 范围内的友军一起传送到地图上任意可见位置。|n冷却 %d 秒。" % (
+            C["aura_radius"], C["act_tele_cd"]),
     ))
     entries.append(ability_entry(
         WING_ACT_BLINK, "AIbk", "闪烁", BTN_BOOTS,
         extra_mods=[
-            mod("Ebl1", 2, 1, 1, 1300.0),
-            mod("acdn", 2, 1, 0, 12.0),
+            mod("Ebl1", 2, 1, 1, C["act_blink_range"]),
+            mod("acdn", 2, 1, 0, C["act_blink_cd"]),
         ],
         tip="闪烁(|cffffcc00B|r)",
-        ubertip="瞬间移动到指定地点(最远 1300)。|n冷却 12 秒。",
+        ubertip="瞬间移动到指定地点(最远 %d)。|n冷却 %d 秒。" % (
+            C["act_blink_range"], C["act_blink_cd"]),
+    ))
+    # 「星魂之力」的主动：灰烬雷暴（照抄 194213 里阿克蒙德的 A6V0）
+    #   底子 ANcl = 游戏自带的"通道(Channel)"假技能：**本身没有任何原生效果**，
+    #   全靠脚本演 —— 作者的 A6V0 就是这么做的，下面的数据照抄他那一份：
+    #     Ncl1 = 1.0  Follow Through Time
+    #     Ncl2 = 2    Data - Target Type（点目标）
+    #     Ncl3 = 3    Data - Options（Visible 1 + Targeting Image 2）★ 少了它点不出来
+    #     Ncl4 = 1.0  Art Duration
+    #     Ncl5 = 0    Disable Other Abilities
+    #     Ncl6 = 'parasiteon'  Base Order ID
+    #   另外：施法距离 900 / AoE 指示圈 300（都照抄 A6V0 的 aran / aare）。
+    #   伤害、回血、减速、二阶全部由 f.j 的 WG_OnAshFall 施加（技能本体不做事）。
+    entries.append(ability_entry(
+        WING_ACT_ASHFALL, "ANcl", "灰烬雷暴", CFG.ICONS["star"],
+        extra_mods=[
+            mod("Ncl1", 2, 1, 1, 1.0),
+            mod("Ncl2", 0, 1, 2, 2),
+            mod("Ncl3", 0, 1, 3, 3),
+            mod("Ncl4", 2, 1, 4, 1.0),
+            mod("Ncl5", 0, 1, 5, 0),
+            mod("Ncl6", 3, 1, 6, "parasiteon"),
+            mod("aord", 3, 0, 0, "replenish"),
+            # 三处美术字段原图都清空了（Channel 本体不演任何特效，全交给脚本）
+            mod("acat", 3, 0, 0, ""),
+            mod("aeat", 3, 0, 0, ""),
+            mod("atat", 3, 0, 0, ""),
+            mod("aran", 2, 1, 0, C["ash_range"]),
+            mod("aare", 2, 1, 0, 300.0),
+            mod("acdn", 2, 1, 0, C["ash_cd"]),
+            mod("amcs", 0, 1, 0, C["ash_mana"]),
+        ],
+        tip="灰烬雷暴(|cffffcc00S|r)",
+        ubertip="在目标区域召来多重灰烬雷暴：%g 内的敌人受到 %d+最高属性*%g 混沌伤害、"
+                "减速 8 秒，自身回复 %d+最高属性*%g 生命；1 秒后自动接二阶"
+                "（火箭 %d 次 × %d+最高属性*%g）。|n冷却 %d 秒、耗魔 %d。" % (
+                    C["ash_radius"], int(C["ash_damage"]), C["ash_stat_mult"],
+                    int(C["ash_heal"]), C["ash_heal_stat_mult"],
+                    int(C["ash_wave_count"]), int(C["ash_wave_damage"]), C["ash_wave_stat_mult"],
+                    int(C["ash_cd"]), int(C["ash_mana"])),
+    ))
+    # 灰烬雷暴的两件"马甲技能"：由隐身假单位施放（字段/数值照抄战役里的 A6V1 / A617）
+    #   ① 雷霆一击（AHtc）＝ 一阶的"减速"那一环，照抄 A6V1「雷霆一击-阿克马甲专用」：
+    #      500 范围、减速 0.6（8 秒）、无耗魔、目标 organic；Htc1 的 5 点伤害是原图留的，
+    #      真正的一阶伤害在脚本里给。acat='' = 马甲不可见，别放施法特效；
+    #      abuf 指向**照抄 B642「灰烬之电」**的自定义 buff（三个挂点特效就是"被雷劈中"的样子）。
+    entries.append(ability_entry(
+        CFG.ABIL["ash_thunder"], "AHtc", "雷霆一击-灰烬雷暴", CFG.ICONS["star"],
+        extra_mods=[
+            mod("Htc1", 2, 1, 1, 5.0),
+            mod("Htc2", 2, 1, 2, 500.0),
+            mod("Htc3", 2, 1, 3, 0.6),
+            mod("Htc4", 2, 1, 4, 0.6),
+            mod("aare", 2, 1, 0, 500.0),
+            mod("ahdu", 2, 1, 0, 8.0),
+            mod("adur", 2, 1, 0, 8.0),
+            mod("amcs", 0, 1, 0, 0),
+            mod("acat", 3, 0, 0, ""),
+            mod("abuf", 3, 1, 0, CFG.BUFFS["ash_slow"]),
+            mod("arlv", 0, 0, 0, 10),
+            mod("atar", 3, 1, 0, "ground,air,organic"),
+        ],
+        item_ability=False,
+    ))
+    #   ② 集群火箭（ANcs）＝ 二阶的视觉，照抄 A617「火箭群阿克马甲」：
+    #      Ncs1 = 单发伤害（原图写 2，真正的伤害由脚本按"最高属性"给）、
+    #      Ncs2 = 出弹间隔 0.5 秒（配合技能时长 ≈ 3 发，正好对应原图"最多 3 次伤害"）、
+    #      Ncs3 = 导弹数量、Ncs4 = 伤害上限、amat = 弹道模型。
+    #      ⚠ Ncs3 是**导弹数量**（不是伤害！置 0 就没有火箭了）。
+    entries.append(ability_entry(
+        CFG.ABIL["ash_rockets"], "ANcs", "火箭群-灰烬雷暴", CFG.ICONS["star"],
+        extra_mods=[
+            mod("amat", 3, 0, 0, C["ash_fx_missile"]),
+            mod("Ncs1", 2, 1, 1, 2.0),
+            mod("Ncs2", 2, 1, 2, 0.5),
+            mod("Ncs3", 0, 1, 3, 25),
+            mod("Ncs4", 2, 1, 4, 999999.0),
+            mod("acdn", 2, 1, 0, 2.0),
+            mod("amcs", 0, 1, 0, 0),
+            mod("aran", 2, 1, 0, 99999.0),
+            mod("amsp", 0, 0, 0, 1000),
+            mod("amac", 2, 0, 0, 0.0),
+            mod("aare", 2, 1, 0, 450.0),
+            mod("atar", 3, 1, 0, "ground,enemies,structure,air"),
+        ],
+        item_ability=False,
+    ))
+    # 「星魂之力」的被动：**献祭**（原版献祭口径：只烧敌人、不烧魔免、不烧建筑）。
+    #   ⚠ 2026-10-17 玩家实测的坑：原来挂的是游戏原生 Spell Shield(`ANss`)，它**带冷却**，
+    #     一触发就把**物品的可用状态**占住 → 主动技能（点物品使用）点不出来。
+    #     现在底子换成 `ANim`（永久献祭）+ **冷却 0** → 不会再锁物品；
+    #     **伤害全部由脚本给**（按最高属性算，见 f.j 的 WG_OnImmolation），
+    #     所以这里把 `aare` 压到 1.0 —— 原生那点固定伤害等于打不到人（单位中心距最小也有几十），
+    #     而"脚底火焰"的观感照旧（施法者特效与 aare 无关）。
+    #   它是**物品技能**（item=1），必须放在物品的 iabi 里（放魔法书里不生效）。
+    entries.append(ability_entry(
+        #   底子 = **`AIcf`（火焰风衣 / Cloak of Flames）**：物品 `clfm` 用的就是它，
+        #   原版范围 160 / 每 1 秒一跳，效果就是"英雄被火焰包围"。范围/频率由脚本接管。
+        #   ⚠ 别再写 `ANim`（1.24 不存在，会崩）或 `AImo`（那是怪兽诱捕守卫，会插一根守卫）。
+        WING_SPELL_SHIELD, "AIcf", "[星魂]献祭", CFG.ICONS["star"],
+        extra_mods=[
+            mod("acdn", 2, 1, 0, 0.0),          # 冷却 0：没有冷却就不会锁物品
+            mod("aare", 2, 1, 0, 1.0),          # 原生伤害"关掉"（脚本按 500 码自己算）
+            mod("atar", 3, 1, 0, "ground,enemies,air"),
+        ],
+        tip="献祭(|cffffcc00被动|r)",
+        ubertip="500 码内的敌人每 0.5 秒受到最高属性×0.5 的魔法伤害"
+                "（不吃魔法免疫、不打建筑，伤害由装备脚本结算）。",
+    ))
+    # 阿克蒙德之手的「重击」：概率触发额外伤害 + 眩晕（放物品的技能列表里，被动生效）。
+    #   基对象 AHbh = 山丘之王-重击；字段与数值照抄燃烧之怒里的物品版重击
+    #   （A6AE「重击600 8%」：alev=1 / aher=0 / Hbh1=概率% / Hbh3=伤害），
+    #   眩晕时长用原生值（非英雄 2 秒 / 英雄 1 秒，原图也没改）。
+    if int(C.get("hand_bash_chance", 0)) > 0:
+        entries.append(ability_entry(
+            CFG.HAND["bash"], "AHbh", "[手]重击", CFG.ICONS["akmond"],
+            # alev=1 / aher=0 / aite=1 由 ability_entry 统一写好了，这里只补两个数据字段
+            extra_mods=[
+                mod("Hbh1", 2, 1, 1, float(C["hand_bash_chance"])),
+                mod("Hbh3", 2, 1, 3, float(C["hand_bash_damage"])),
+            ],
+            tip="重击(|cffffcc00被动|r)",
+            ubertip="攻击时 %d%% 概率造成 %d 点额外伤害并眩晕。" % (
+                int(C["hand_bash_chance"]), int(C["hand_bash_damage"])),
+        ))
+
+    # === 阿克蒙德之手的主动「死亡之指」（2026-10-15 晚：改用**官方那条技能**当底子）===
+    #   底子 = `ANfd` = 官方「Finger of Death」，**就是战役里阿克蒙德用的那条**
+    #     （游戏数据里它的 `EditorSuffix` 写着 `(Archimonde)`）。从官方数据读到的字段：
+    #       Art             = ReplaceableTextures\CommandButtons\BTNCorpseExplode.blp
+    #       Targetart       = Abilities\Spells\Demon\DemonBoltImpact\DemonBoltImpact.mdl
+    #       LightningEffect = AFOD   ← **引擎自己画**这条红闪电，锚在单位身上（脚本画会偏）
+    #       Data - Graphic Delay / Duration / Damage = Nfd1 / Nfd2 / Nfd3（官方 Damage = 500）
+    #       Targets Allowed = 官方是"非英雄"（剧情用），我们加上 hero/enemy/neutral
+    #   ⚠ 为什么不再用 Channel：Channel 没有真的"目标许可表"（点得到自己/友军），而且
+    #     它**不画闪电**，只能脚本用 AddLightningEx 自己画 —— 一旦"单位坐标 ≠ 显示位置"
+    #     闪电就会画歪（玩家实测两次）。ANfd 的闪电是引擎画的，位置永远对；
+    #     目标表 `atar` 也是真字段（能限制成"只点敌人、能点英雄"）。
+    #   ⚠ 官方 ANfd 的 Damage 是 500，我们**置 0**，伤害改由脚本按最高属性算（f.j 的 WG_OnFinger）。
+    #   ⚠ 7 档必须**逐档**把 AbilityData 类字段写全（含 Nfd1/Nfd2/Nfd3/atar/aran），
+    #     否则第 2 档往后会回退到基对象 ANfd 的默认值（Nfd3=500 → 白送一次官方伤害）；
+    #     `alig`/`ahky`/`atat`/`aefs` 是 Profile 全局字段 → 写 lv=0 就够。
+    finger_lv = CFG.finger_level_table(C)
+    finger_atar = "air,ground,hero,nonhero,ancient,nonancient,structure,enemy,neutral"
+    finger_mods = [
+        mod("ahky", 3, 0, 0, "F"),      # 热键字母（官方也是 F）
+        mod("alig", 3, 0, 0, str(C.get("finger_lightning", "AFOD"))),  # 引擎画这条闪电
+        # Art - Target = 官方那条用的命中爆点
+        mod("atat", 3, 0, 0, r"Abilities\Spells\Demon\DemonBoltImpact\DemonBoltImpact.mdl"),
+        mod("acat", 3, 0, 0, ""),       # 官方没有 caster / effect art
+        mod("aeat", 3, 0, 0, ""),
+        # Art - Effect Sound = 引擎的 **sound label**（不是文件路径，由引擎自己解析）。
+        #   官方 ANfd 没有声音字段（静音），这个是玩家要求加的。
+        #   可选的 label 见 UI\SoundInfo\AbilitySounds.slk，例如
+        #   SoulPreservation(恶魔系) / BanishCaster / ImpaleCast / StormEarthFireSound。
+        mod("aefs", 3, 0, 0, str(C.get("finger_sound_label", "SoulPreservation"))),
+    ]
+    for i, (cd, mana) in enumerate(finger_lv, start=1):
+        # 目标许可表（真字段）：能打英雄/建筑/敌人，能打中立（小野怪）；不含自己/友军
+        finger_mods.append(mod("atar", 3, i, 0, finger_atar))
+        finger_mods.append(mod("aran", 2, i, 0, C["finger_range"]))
+        finger_mods.append(mod("Nfd1", 2, i, 1, 0.25))  # Graphic Delay（官方值）
+        finger_mods.append(mod("Nfd2", 2, i, 2, 1.0))   # Graphic Duration（官方值）
+        finger_mods.append(mod("Nfd3", 2, i, 3, 0.0))   # Damage = 0（伤害由脚本按最高属性给）
+        finger_mods.append(mod("acdn", 2, i, 0, cd))
+        finger_mods.append(mod("amcs", 0, i, 0, mana))
+        finger_mods.append(mod("atp1", 3, i, 0, "死亡之指(|cffffcc00F|r)"))
+        finger_mods.append(mod("aub1", 3, i, 0,
+                               "对英雄造成 最高属性×%g 的混沌伤害，非英雄单位翻倍（×%g）；"
+                               "无视护甲与魔法免疫。|n冷却 %g 秒、耗魔 %d。"
+                               % (C["finger_dmg_hero_mult"], C["finger_dmg_other_mult"],
+                                  cd, mana)))
+    entries.append(ability_entry(
+        CFG.HAND["finger"], "ANfd", "死亡之指", CFG.ICONS["akmond"],
+        extra_mods=finger_mods, levels=len(finger_lv),
     ))
 
-    # === 坐骑挂载技能 (被动 AIlf + 模型, 放在"骑乘中物品"的 iabi → 模型挂到持有者, 不占技能栏) ===
-    entries.append(ability_entry(
-        MOUNT_PHOENIX, "AIlf", "[坐骑]火凤凰", BTN_PHOENIX,
-        extra_mods=build_mount_mods(MOUNT_MODEL_PHOENIX),
-    ))
-    entries.append(ability_entry(
-        MOUNT_BLUE, "AIlf", "[坐骑]蓝龙", BTN_DRAGON_B,
-        extra_mods=build_mount_mods(MOUNT_MODEL_BLUE),
-    ))
-    entries.append(ability_entry(
-        MOUNT_BLACK, "AIlf", "[坐骑]黑龙", BTN_DRAGON_K,
-        extra_mods=build_mount_mods(MOUNT_MODEL_BLACK),
-    ))
-    entries.append(ability_entry(
-        MOUNT_RED, "AIlf", "[坐骑]红龙", BTN_DRAGON_R,
-        extra_mods=build_mount_mods(MOUNT_MODEL_RED),
-    ))
+    # === 坐骑相关技能（挂载 / 蛋使用 / 取消骑乘）===
+    #   ⚠ 2026-10-15 玩家要求：**以后移植默认不带坐骑系统**（战役配置里 `MOUNTS = []`）。
+    #     所以这一整块（连同下面 gen_wing_item 的蛋/骑乘中物品、gen_w3u 的坐骑单位）
+    #     都按 `CFG.MOUNTS` 是否为空来决定生成与否：坐骑表为空 -> 一条坐骑技能都不生成。
+    #     JASS 那边的坐骑代码会随之变成空转（`wg_eggCount = 0`，所有循环都不进），
+    #     不用改脚本。
+    if CFG.MOUNTS:
+        # 挂载技能 (被动 AIlf + 模型, 放在"骑乘中物品"的 iabi → 模型挂到持有者, 不占技能栏)
+        entries.append(ability_entry(
+            MOUNT_PHOENIX, "AIlf", "[坐骑]火凤凰", BTN_PHOENIX,
+            extra_mods=build_mount_mods(MOUNT_MODEL_PHOENIX),
+        ))
+        entries.append(ability_entry(
+            MOUNT_BLUE, "AIlf", "[坐骑]蓝龙", BTN_DRAGON_B,
+            extra_mods=build_mount_mods(MOUNT_MODEL_BLUE),
+        ))
+        entries.append(ability_entry(
+            MOUNT_BLACK, "AIlf", "[坐骑]黑龙", BTN_DRAGON_K,
+            extra_mods=build_mount_mods(MOUNT_MODEL_BLACK),
+        ))
+        entries.append(ability_entry(
+            MOUNT_RED, "AIlf", "[坐骑]红龙", BTN_DRAGON_R,
+            extra_mods=build_mount_mods(MOUNT_MODEL_RED),
+        ))
 
-    # === 蛋使用技能 (主动 AIha, 无模型, 放在"蛋"的 iabi → 可点击使用) ===
-    entries.append(ability_entry(
-        EGG_USE_PHOENIX, "AIha", "[蛋]使用火凤凰蛋", BTN_EGG,
-        extra_mods=build_use_mods(),
-    ))
-    entries.append(ability_entry(
-        EGG_USE_BLUE, "AIha", "[蛋]使用蓝龙蛋", BTN_EGG,
-        extra_mods=build_use_mods(),
-    ))
-    entries.append(ability_entry(
-        EGG_USE_BLACK, "AIha", "[蛋]使用黑龙蛋", BTN_EGG,
-        extra_mods=build_use_mods(),
-    ))
-    entries.append(ability_entry(
-        EGG_USE_RED, "AIha", "[蛋]使用红龙蛋", BTN_EGG,
-        extra_mods=build_use_mods(),
-    ))
-    entries.append(ability_entry(
-        EGG_USE_BRONZE, "AIha", "[蛋]使用青铜龙蛋", BTN_EGG,
-        extra_mods=build_use_mods(),
-    ))
+        # 蛋使用技能 (主动 AIha, 无模型, 放在"蛋"的 iabi → 可点击使用)
+        entries.append(ability_entry(
+            EGG_USE_PHOENIX, "AIha", "[蛋]使用火凤凰蛋", BTN_EGG,
+            extra_mods=build_use_mods(),
+        ))
+        entries.append(ability_entry(
+            EGG_USE_BLUE, "AIha", "[蛋]使用蓝龙蛋", BTN_EGG,
+            extra_mods=build_use_mods(),
+        ))
+        entries.append(ability_entry(
+            EGG_USE_BLACK, "AIha", "[蛋]使用黑龙蛋", BTN_EGG,
+            extra_mods=build_use_mods(),
+        ))
+        entries.append(ability_entry(
+            EGG_USE_RED, "AIha", "[蛋]使用红龙蛋", BTN_EGG,
+            extra_mods=build_use_mods(),
+        ))
+        entries.append(ability_entry(
+            EGG_USE_BRONZE, "AIha", "[蛋]使用青铜龙蛋", BTN_EGG,
+            extra_mods=build_use_mods(),
+        ))
 
-    # === 取消骑乘技能 (主动 AIha, 无模型, 放在"骑乘中物品"的 iabi) ===
-    # 曾经改成"英雄技能(ANcl/Channel)"想对齐伏魔战记的 A0CD, 但 Channel 在命令栏里
-    # 显示的是基础技能名"通魔", 而且 Follow Through/Disable Other Abilities 会让英雄
-    # 卸下后卡住不动。改成物品方案更稳: 骑乘时给一件"骑乘中"物品, 点它卸下,
-    # 丢掉它也会自动卸下 (见 WG_OnDropItem)。
-    entries.append(ability_entry(
-        MOUNT_DISMOUNT, "AIha", "[坐骑]取消骑乘", BTN_EGG,
-        extra_mods=build_use_mods(),
-    ))
+        # 取消骑乘技能 (主动 AIha, 无模型, 放在"骑乘中物品"的 iabi)
+        # 曾经改成"英雄技能(ANcl/Channel)"想对齐伏魔战记的 A0CD, 但 Channel 在命令栏里
+        # 显示的是基础技能名"通魔", 而且 Follow Through/Disable Other Abilities 会让英雄
+        # 卸下后卡住不动。改成物品方案更稳: 骑乘时给一件"骑乘中"物品, 点它卸下,
+        # 丢掉它也会自动卸下 (见 WG_OnDropItem)。
+        entries.append(ability_entry(
+            MOUNT_DISMOUNT, "AIha", "[坐骑]取消骑乘", BTN_EGG,
+            extra_mods=build_use_mods(),
+        ))
 
     data = struct.pack("<ii", 2, 0) + struct.pack("<i", len(entries))
     for old, new, mods in entries:

@@ -24,6 +24,8 @@ import sys
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+CFG = __import__(os.environ.get("WINGS_CONFIG", "wings_config"))   # 移植到别的图时可用 WINGS_CONFIG=<别的配置模块名>
 
 # 字段类型: 0=int, 1=real, 2=unreal, 3=string
 # 单位字段 ID (来自 unitmetadata.slk, useUnit=1):
@@ -116,36 +118,58 @@ MOUNTS = [
 
 def build(out_path, foot=True):
     """生成 w3u。foot=True 用 movetp=foot (完全同伏魔战记); False 用 fly。"""
+    # 坐骑表 / 数值全部来自 wings_config.py（换图只改配置）
+    mc = CFG.MOUNT_COMMON
+    def add(mods, mid, val):
+        """写一个字段；**值是 None = 不写这个字段**（等于继承原版单位的值）。
+
+        战役/剧情图里"坐骑的伤害按原版来"就是把这些项设成 None：
+        `dmg_base` / `atk_type` / `splash` / `armor` / `shadow` / `speed` /
+        `targets` / `race` / `regen_type` / `move_height`。
+        """
+        if val is None:
+            return
+        mods.append(m(mid, val))
+
     entries = []
-    for (base, new, model, sound, defty, abil, mvheight, turnrate, deathtime,
-         mscale, ussc, splash) in MOUNTS:
+    for md in CFG.MOUNTS:
+        base, new, model, sound = md["base"], md["unit"], md["model"], md["sound"]
+        defty, abil, mvheight = md["def_type"], md["abil"], md["move_height"]
+        turnrate, deathtime = md["turn_rate"], md["death_time"]
+        mscale, ussc = md["usca"], md["ussc"]
+        splash = mc.get("splash")
         mods = [
             m("umdl", model),
             m("usca", mscale),
             m("ussc", ussc),
             # 不占人口 (龙基础单位是一个 8 人口的爬虫单位)
-            m("ufoo", 0),
-            # 溅射只打敌人 (基础龙类的溅射目标表里没有 enemy -> 会溅到英雄)
-            m("ua1p", splash),
-            # 攻击力 / 攻击类型 (对齐伏魔战记: 350 + chaos)
-            m("ua1b", MOUNT_DMG_BASE),
-            m("ua1t", MOUNT_ATK_TYPE),
-            # 每秒回血 (覆盖凤凰的 -25, 否则约 50 秒后坐骑自己掉血死)
-            m("uhpr", MOUNT_HP_REGEN),
-            # 技能列表: 空字符串也要写 (表示"没有技能"; 伏魔战记的黑龙/红龙就是空的)
+            m("ufoo", mc.get("food", 0)),
+        ]
+        # 下面这些走 add(): 配置里写 None 就"不覆盖 = 继承原版单位的值"
+        #   (溅射只打敌人: 基础龙类的溅射目标表里没有 enemy -> 会溅到骑士)
+        add(mods, "ua1p", splash)                # 溅射目标表
+        add(mods, "ua1b", mc.get("dmg_base"))    # 攻击力基数
+        add(mods, "ua1t", mc.get("atk_type"))    # 攻击类型
+        # 每秒回血（凤凰必须写：原版 -25/秒，约 50 秒会自己掉死）；
+        # 单个坐骑可以用 MOUNTS[i]["hp_regen"] 覆盖 MOUNT_COMMON 的值。
+        add(mods, "uhpr", md.get("hp_regen", mc.get("hp_regen")))
+        # 技能列表: 空字符串也要写 (表示"没有技能"; 伏魔战记的黑龙/红龙就是空的)
+        mods += [
             m("uabi", abil),
             m("uble", 0.15),
             m("ushw", 300.0),
             m("ushh", 300.0),
             m("usnd", sound),
-            m("uarm", "Flesh"),
-            m("ushu", "ShadowFlyer"),
-            m("udty", defty),
-            m("uhrt", "always"),
-            m("urac", "orc"),
-            m("utar", "air"),
-            m("umvt", "foot" if foot else "fly"),
-            m("umvh", mvheight),
+        ]
+        add(mods, "uarm", mc.get("armor"))       # 护甲类型
+        add(mods, "ushu", mc.get("shadow"))      # 阴影
+        mods.append(m("udty", defty))
+        add(mods, "uhrt", mc.get("regen_type"))  # 回血类型
+        add(mods, "urac", mc.get("race"))        # 种族
+        add(mods, "utar", mc.get("targets"))     # 可攻击目标
+        mods.append(m("umvt", "foot" if foot else "fly"))
+        add(mods, "umvh", mvheight)              # 移动高度
+        mods += [
             m("umvf", 90.0),
             m("umvr", turnrate),
             m("uprw", 61.0),
@@ -158,11 +182,32 @@ def build(out_path, foot=True):
         ]
         entries.append(write_entry(base, new, mods))
 
+    # --- 隐身"马甲"单位（灰烬雷暴专用；照抄燃烧之怒里的 e60C / e641）---
+    #   底子 = wisp `ewsp`；模型名故意写成非法名 '.mdl' → **不可见**；
+    #   Aloc（无碰撞/隐藏）+ Avul（无敌）= 经典马甲；不占人口、无音效无阴影。
+    DUMMY_MODS = [
+        ("unam", 3, "马甲技能专用"), ("umdl", 3, ".mdl"), ("uhpm", 0, 500000),
+        ("umvt", 3, "fly"), ("upgr", 3, ""), ("ubui", 3, ""), ("uabi", 3, "Aloc,Avul"),
+        ("utyp", 3, ""), ("utar", 3, ""), ("umpm", 0, 100000), ("umpr", 2, 1000.0),
+        ("umpi", 0, 99999), ("uhpr", 2, 1000.0), ("uhrt", 3, "always"), ("ufoo", 0, 0),
+        ("usid", 0, 1800), ("usin", 0, 1800), ("ufle", 0, 0), ("uhom", 0, 1),
+        ("udef", 2, 1000.0), ("umvs", 0, 522), ("umvh", 2, 10.0), ("ucol", 2, 0.0),
+        ("uico", 3, r"ReplaceableTextures\CommandButtons\BTNSkink.blp"),
+        ("umxp", 1, 0.0), ("umxr", 1, 0.0), ("uimz", 2, 0.0), ("ulpz", 2, 0.0),
+        ("uerd", 1, 0.0),
+    ]
+    dummy_count = 0
+    for _key in ("dummy_thunder", "dummy_rockets"):
+        if _key in CFG.UNITS:
+            entries.append(write_entry("ewsp", CFG.UNITS[_key], DUMMY_MODS))
+            dummy_count += 1
+
     data = struct.pack("<ii", 2, 0) + struct.pack("<i", len(entries))
     for e in entries:
         data += e
     open(out_path, "wb").write(data)
-    print("wrote", out_path, len(data), "bytes,", len(entries), "mounts")
+    print("wrote", out_path, len(data), "bytes,", len(entries), "units (%d mounts + %d dummies)"
+          % (len(entries) - dummy_count, dummy_count))
 
 
 if __name__ == "__main__":

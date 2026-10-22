@@ -285,6 +285,10 @@ class MPQArchive:
             return None
         if not (info.flags & MPQ_FILE_EXISTS):
             return None
+        # 空文件（例如 units\itemfunc.txt = 0 字节）直接返回空串：
+        #   否则扇区偏移表解析会在长度为 0 的缓冲上 unpack 报错。
+        if info.fsize == 0:
+            return b""
 
         self.file.seek(self.header_offset + info.offset)
         raw = self.file.read(info.csize)
@@ -297,7 +301,10 @@ class MPQArchive:
             data = raw
             if flags & MPQ_FILE_ENCRYPTED:
                 data = _decrypt(data, key - 1)
-            if flags & COMPRESSION_MASK:
+            # 只有"存下来的比原始短"才是压缩块；长度相等 = 原样存储。
+            #   (2026-10-11: 无条件试着解压会把原样扇区当 deflate 解出垃圾 ——
+            #    _decompress 的 raw-deflate 分支在随机数据上也能吐出几个字节)。
+            if flags & COMPRESSION_MASK and len(data) < info.fsize:
                 data = _decompress(data, info.fsize)
             return data[: info.fsize]
         else:
@@ -340,9 +347,13 @@ class MPQArchive:
                 if flags & MPQ_FILE_ENCRYPTED:
                     sector = _decrypt(sector, (key + i) & 0xFFFFFFFF)
                 if flags & COMPRESSION_MASK:
-                    # 不管长度, 先试着解压 —— 有些存档的"未压缩扇区"长度也小于
-                    # sector_size, 只看长度会漏解压 (_decompress 失败会原样返回)。
-                    sector = _decompress(sector, sector_size)
+                    # ⚠ 比较对象是"这个扇区的原始长度"，不是 sector_size：
+                    #   末尾扇区本来就短。stored == 原始长度 → 原样存储，不能解压。
+                    want = min(sector_size, info.fsize - i * sector_size)
+                    if len(sector) < want:
+                        dec = _decompress(sector, want)
+                        if dec and len(dec) >= want:
+                            sector = dec
                 result += sector
             return bytes(result[: info.fsize])
 
@@ -400,6 +411,22 @@ def _decompress(data, expected_size):
                         return out
                 except Exception:
                     pass
+            # ⚠ HKE 写出的扇区: **deflate 数据是对的, 但尾部 4 字节 adler 校验是坏的**
+            #   (StormLib 只解到"声明的长度"为止、从不校验 adler -> 游戏能正常读;
+            #    Python 的 zlib 会抛 "incorrect data check" 而一个字节都拿不到)。
+            #   截掉尾部再解, 就能拿到完整数据。
+            #   (2026-10-10: 修好这个之后, 才能完整读回 HKE 注入过的地图做校验。)
+            for wbits in (15, -15):
+                for cut in (4, 8):
+                    if len(data) <= cut + 1:
+                        continue
+                    try:
+                        obj = zlib.decompressobj(wbits)
+                        out = obj.decompress(data[1:-cut])
+                        if len(out) > 0:
+                            return out
+                    except Exception:
+                        pass
         elif tag == 0x10:
             try:
                 import bz2

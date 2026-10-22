@@ -60,27 +60,44 @@ def main():
     out = sys.argv[1]
     inputs = sys.argv[2:]
 
-    all_orig = []
-    all_cust = []
-    seen = set()
-    for p in inputs:
-        ver, orig, cust = read_all(p)
-        for e in orig + cust:
-            new_id = e[4:8]
-            if new_id in seen:
-                continue
-            seen.add(new_id)
-            all_cust.append(e)
+    n_orig, n_cust = merge_files(out, inputs)
+    print("merged %d orig + %d custom -> %s" % (n_orig, n_cust, out))
+    return 0
 
-    # 输出: version=2, origCount=0, customCount=N
-    data = struct.pack("<ii", 2, 0) + struct.pack("<i", len(all_cust))
+
+def merge_files(out, inputs):
+    """合并多个同类对象数据文件，**保留 orig / custom 两段**。
+
+    ⚠ 老版本把所有条目拍平成 custom 段（origCount=0），那会把目标图里
+    "修改原版对象" 的条目变成 "自定义对象"，等于把它的数值改动弄坏 ——
+    往别的图移植时必须保留分段。去重键：orig 段用 oldId+newId，custom 段用 newId。
+    """
+    all_orig, all_cust = [], []
+    seen_orig, seen_cust = set(), set()
+    for p in inputs:
+        if not os.path.exists(p):
+            continue
+        _ver, orig, cust = read_all(p)
+        for e in orig:
+            key = e[0:8]
+            if key in seen_orig:
+                continue
+            seen_orig.add(key)
+            all_orig.append(e)
+        for e in cust:
+            key = e[4:8]
+            if key in seen_cust:
+                continue
+            seen_cust.add(key)
+            all_cust.append(e)
+    data = struct.pack("<ii", 2, len(all_orig))
+    for e in all_orig:
+        data += e
+    data += struct.pack("<i", len(all_cust))
     for e in all_cust:
         data += e
     open(out, "wb").write(data)
-    print("merged %d entries -> %s (%d bytes)" % (len(all_cust), out, len(data)))
-    for e in all_cust:
-        print("   %s -> %s" % (e[:4].decode("latin-1"), e[4:8].decode("latin-1")))
-    return 0
+    return len(all_orig), len(all_cust)
 
 
 if __name__ == "__main__":

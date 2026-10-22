@@ -81,8 +81,17 @@ def replace_file(main, script_path):
     im.click_real(ob[0]); time.sleep(2); im.handle_popups(); time.sleep(1)
 
 
-def build_script(orig_bytes, gj_bytes, fj_bytes, mj_bytes):
-    """Insert g.j/f.j/m.j into orig (bytes) exactly once each. Returns bytes."""
+def build_script(orig_bytes, gj_bytes, fj_bytes, mj_bytes, defer_init=True):
+    """把 g.j/f.j/m.j 各插一次到 orig 里，返回新脚本。
+
+    defer_init=True（默认）: **入口调用不放 main 的第一行**，而是包成
+      `call TimerStart(CreateTimer(), 0.0, false, function XXX)`
+      —— 让模块初始化跑在**自己的线程**里。原因（2026-10-10 战役黑屏）：
+      过场章的 main 里塞着建单位/镜头/InitBlizzard/YDWE 系统/200KB 触发器注册，
+      全在同一个线程；入口放在第一行时，模块里任何异常或线程操作数超限都会
+      让 main 后半段（InitCustomTriggers / RunInitializationTriggers）跑不完，
+      结果"进去一片黑"。放到 0 秒定时器里最稳。
+    """
     text = orig_bytes.decode("latin-1")
     lines = text.split("\n")
     # find the real endglobals line (first line that is exactly 'endglobals')
@@ -96,7 +105,20 @@ def build_script(orig_bytes, gj_bytes, fj_bytes, mj_bytes):
 
     g_block = gj_bytes.decode("latin-1").rstrip("\n").split("\n")
     f_block = fj_bytes.decode("latin-1").rstrip("\n").split("\n")
-    m_block = mj_bytes.decode("latin-1").rstrip("\n").split("\n")
+    m_lines = mj_bytes.decode("latin-1").rstrip("\n").split("\n")
+    if defer_init:
+        out_lines = []
+        for ln in m_lines:
+            s = ln.strip()
+            m = re.match(r"^call\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)$", s)
+            if m:
+                out_lines.append("call TimerStart(CreateTimer(), 0.0, false, function %s)"
+                                 % m.group(1))
+                continue
+            out_lines.append(ln)
+        m_block = out_lines
+    else:
+        m_block = m_lines
 
     # insert g.j before endglobals
     new_lines = lines[:eg_idx] + g_block + lines[eg_idx:]
@@ -109,12 +131,37 @@ def build_script(orig_bytes, gj_bytes, fj_bytes, mj_bytes):
     new_lines = new_lines[:eg_idx2 + 1] + [""] + f_block + new_lines[eg_idx2 + 1:]
 
     out = "\n".join(new_lines)
-    mm = re.search(r"(function main takes nothing returns nothing\r?\n)", out)
-    if mm:
-        out = out[:mm.end()] + "".join("    " + l.strip() + "\n" for l in m_block if l.strip()) + out[mm.end():]
-    else:
+    mm = re.search(r"(function main takes nothing returns nothing[^\n]*\n)", out)
+    if not mm:
         raise RuntimeError("找不到 function main")
-    return out.encode("latin-1")
+    # JASS 规定 local 声明必须在函数体所有语句之前。入口调用要是直接插在
+    # `function main ...` 的下一行，只要 main 里有 `local xxx yy`，脚本立刻变语法错误
+    # （2026-10-11 战役序章：游戏报"找不到地图或者损毁"）。所以插到最后一个前导 local 之后。
+    head = out[:mm.end()]
+    segs = out[mm.end():].split("\n")
+    last_local = -1
+    i = 0
+    while i < len(segs):
+        s = segs[i].strip()
+        if s.startswith("local ") or s.startswith("local\t"):
+            last_local = i
+        elif s == "" or s.startswith("//"):
+            pass
+        else:
+            break
+        i += 1
+    ins = last_local + 1 if last_local >= 0 else 0
+    block = ["    " + l.strip() for l in m_block if l.strip()]
+    out = head + "\n".join(segs[:ins] + block + segs[ins:])
+    new_bytes = out.encode("latin-1")
+    # 构建期门禁：注入后的脚本不能出现新的编译错误（否则游戏直接载入失败）
+    if os.environ.get("SKIP_PJASS_GATE") != "1":
+        import jass_gate
+        ok, note = jass_gate.check(orig_bytes, new_bytes)
+        print("    脚本门禁: %s" % note, flush=True)
+        if not ok:
+            raise RuntimeError("脚本注入后 pjass 校验不通过，拒绝写出: %s" % note)
+    return new_bytes
 
 
 def main():

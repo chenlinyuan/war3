@@ -8,75 +8,59 @@
 
 注意: 必须把 _hand.w3t (阿克蒙德之手 I000) 合并进来, 否则注入时会覆盖掉它!
 """
-import os, sys
+import os, shutil, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_wing
 import gen_wing_item
 import gen_w3u
-from merge_w3obj import read_all
+import hand_data
+from merge_w3obj import read_all, merge_files
 import struct
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def merge_w3t(inputs, out):
-    """合并多个 w3t (按 newId 去重), 输出 origCount=0 + customCount=N。"""
-    all_cust = []
-    seen = set()
-    for p in inputs:
-        if not os.path.exists(p):
-            continue
-        ver, orig, cust = read_all(p)
-        for e in orig + cust:
-            new_id = e[4:8]
-            if new_id in seen:
-                continue
-            seen.add(new_id)
-            all_cust.append(e)
-    data = struct.pack("<ii", 2, 0) + struct.pack("<i", len(all_cust))
-    for e in all_cust:
-        data += e
-    open(out, "wb").write(data)
-    print("merged %d items -> %s" % (len(all_cust), out))
-    for e in all_cust:
-        print("   %s" % e[4:8].decode("latin-1"))
-
-
 def merge_w3a(inputs, out):
-    """合并多个 w3a (按 newId 去重)。"""
-    all_cust = []
-    seen = set()
+    """合并多个 w3a —— 保留 orig/custom 分段（见 merge_w3obj.merge_files 说明）。"""
+    n_orig, n_cust = merge_files(out, inputs)
+    print("merge w3a: %d orig + %d custom -> %s" % (n_orig, n_cust, os.path.basename(out)))
     for p in inputs:
-        if not os.path.exists(p):
-            continue
-        ver, orig, cust = read_all(p)
-        for e in orig + cust:
-            new_id = e[4:8]
-            if new_id in seen:
-                continue
-            seen.add(new_id)
-            all_cust.append(e)
-    data = struct.pack("<ii", 2, 0) + struct.pack("<i", len(all_cust))
-    for e in all_cust:
-        data += e
-    open(out, "wb").write(data)
-    print("merged %d abilities -> %s" % (len(all_cust), out))
-    for e in all_cust:
-        print("   %s" % e[4:8].decode("latin-1"))
+        if os.path.exists(p):
+            _v, _o, cust = read_all(p)
+            print("   %s: %s" % (os.path.basename(p), [e[4:8].decode("latin-1") for e in cust]))
+
+
+def merge_w3t(inputs, out):
+    """合并多个 w3t（同样保留 orig/custom 分段）。"""
+    n_orig, n_cust = merge_files(out, inputs)
+    print("merge w3t: %d orig + %d custom -> %s" % (n_orig, n_cust, os.path.basename(out)))
+    for p in inputs:
+        if os.path.exists(p):
+            _v, _o, cust = read_all(p)
+            print("   %s: %s" % (os.path.basename(p), [e[4:8].decode("latin-1") for e in cust]))
 
 
 def main():
+    # 0) 先从 wings_config.py 生成 JASS 里的表（f.j / g.j 的生成段）
+    import gen_jass_tables
+    gen_jass_tables.main()
     gen_wing.build(os.path.join(HERE, "_wing.w3a"))
     gen_wing_item.build(os.path.join(HERE, "_wing_item.w3t"))
+    # 存一份"没合并阿克蒙德之手"的版本：移植到别的图时用它（不带 LostTemple 专属装备）
+    shutil.copy2(os.path.join(HERE, "_wing.w3a"), os.path.join(HERE, "_wing_nohand.w3a"))
+    shutil.copy2(os.path.join(HERE, "_wing_item.w3t"), os.path.join(HERE, "_wing_item_nohand.w3t"))
+    # 阿克蒙德之手：按配置 HAND 里的 ID 重写模板（换图时 pick_ids 会自动避开占用）
+    hand_data.build(os.path.join(HERE, "_hand_reid.w3t"),
+                    os.path.join(HERE, "_lt_hand_reid.w3a"))
     # CRITICAL: 必须合并原有技能/物品, 否则注入时会覆盖掉它们!
-    # 合并阿克蒙德之手技能 (A000/A001/A002/Azcr) + 翅膀/坐骑技能
+    # 合并阿克蒙德之手技能 + 翅膀/坐骑技能
     merge_w3a([
-        os.path.join(HERE, "_lt_hand.w3a"),
+        os.path.join(HERE, "_lt_hand_reid.w3a"),
         os.path.join(HERE, "_wing.w3a"),
     ], os.path.join(HERE, "_wing.w3a"))
     # 合并阿克蒙德之手物品 (I000) + 翅膀/坐骑物品
     merge_w3t([
-        os.path.join(HERE, "_hand.w3t"),
+        os.path.join(HERE, "_hand_reid.w3t"),
         os.path.join(HERE, "_wing_item.w3t"),
     ], os.path.join(HERE, "_wing_item.w3t"))
     # 自定义坐骑单位 (w3u, 完全照抄伏魔战记: n02L/n02M/n02N/n02P/h01D)

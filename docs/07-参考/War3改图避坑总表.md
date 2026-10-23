@@ -194,6 +194,17 @@ W3x2lni 优化图会把自定义技能放在 `AbilityData.slk`，其中有些别
 - 标准 `Amin` 延迟 10 秒；3C 炎魔分裂体需要 0.1 秒。
 - 标准 `Atru` 范围 900；3C 炎之绞杀载体需要 1500。
 
+### 4.6 Reforged 模型不能直接放进 1.27
+
+3.0 CASC 的 HD 模型当前是 MDX v1800（`VERS=1800`），1.27 需要经典 v800。直接把 `VERS` 改成 800 还不够：
+
+- HD 模型同时包含 LOD0–LOD3，经典格式没有 LOD 选择字段，必须只保留 LOD0，否则所有细节层会叠在一起。
+- Reforged `SKIN` 段是每顶点 4 个权重和 4 个骨骼；v800 需要每顶点一个 `GNDX` 矩阵组。应按最大权重选主导骨骼，并映射回该几何段的 `MATS/Groups`。
+- HD `MTLS` 的 Shader、Normal/ORM/Emissive/Reflection 纹理层在 v800 没有对应字段；只保留实际 diffuse 层，并为需要团队色的对象重建经典团队色层。
+- DDS 贴图必须转成 BLP1；主贴图 2048×2048 可以用 BLP1-JPEG 保留画质和 alpha。
+- `CAMS/CORN/FAFX/BPOS` 等 Reforged 段以及不存在的 Reforged 子模型挂点需要剥离。
+- 转换后必须额外检查 `GNDX` 数量、矩阵组上限、几何 extents 和模型版本；只改对象 `umdl` 不能证明模型可运行。
+
 ## 五、JASS 与脚本注入
 
 1. JASS 的所有 `local` 声明必须位于函数体语句之前。

@@ -69,7 +69,7 @@ def expand_hash_table(ar, hash_tbl, incoming_names, load_limit=0.70):
     # readable archive unless continuing to append would actually run out of
     # empty slots, since protected maps often contain unlisted internal names
     # that cannot be reconstructed safely.
-    if required < len(hash_tbl):
+    if required <= len(hash_tbl):
         return hash_tbl, len(hash_tbl)
 
     # listfile() intentionally omits MPQ-internal names.

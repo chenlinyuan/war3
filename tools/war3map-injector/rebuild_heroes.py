@@ -28,6 +28,7 @@ HERO_DIR_SH = os.path.join(BASE, "heroes", "shadow_shaman")
 HERO_DIR_BM = os.path.join(BASE, "heroes", "blade_master")
 HERO_DIR_FL = os.path.join(BASE, "heroes", "firelord")
 FROST_DIR = os.path.join(BASE, "heroes", "frostmourne")
+BLADE_RE_DIR = os.path.join(BASE, "heroes", "blade_master", "reforged")
 SCRIPTS = os.path.join(BASE, "scripts", "heroes")
 FROST_SCRIPTS = os.path.join(BASE, "scripts", "frostmourne")
 HERO_SOURCE_MAP = os.path.join("H:\\", "Games", "War3", "Maps", "mod", "ChengHai_3c_692.w3x")
@@ -52,6 +53,18 @@ FROST_ASSETS = [
     ("IceStompRaised.mdx", "war3campImported\\IceStompRaised.mdx"),
     ("Rune-Blue-Aura_Raised20.mdx",
      "war3campImported\\Rune-Blue-Aura_Raised20.mdx"),
+]
+BLADE_RE_ASSETS = [
+    ("HeroBladeMaster_Reforged.mdx",
+     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Reforged.mdx"),
+    ("HeroBladeMaster_Main.blp",
+     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Main.blp"),
+    ("HeroBladeMaster_Hair.blp",
+     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Hair.blp"),
+    ("HeroBladeMaster_Flag.blp",
+     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Flag.blp"),
+    ("HeroBladeMaster_Weapon.blp",
+     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Weapon.blp"),
 ]
 
 
@@ -228,6 +241,11 @@ def main():
              token
              for src_name, internal in FROST_ASSETS
              for token in ("--file", os.path.join(FROST_DIR, "assets", src_name)
+                           + "=" + internal)
+         ] + [
+             token
+             for src_name, internal in BLADE_RE_ASSETS
+             for token in ("--file", os.path.join(BLADE_RE_DIR, src_name)
                            + "=" + internal)
          ] + [
          "--deploy", "LostTemple_heroes.w3x"])

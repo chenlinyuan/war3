@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "w3xd-toolkit"
+version = "1.0.0"
+description = "Decrypt Warcraft III: Reforged 3.0 .w3xd campaign map containers and decompile their Lua 5.3 bytecode"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+keywords = ["warcraft", "warcraft3", "reforged", "w3xd", "mpq", "lua", "luac", "reverse-engineering"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment",
+    "Topic :: System :: Archiving",
+    "Topic :: Utilities",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# only needed for `luac53 disasm` on very large chunks; everything else is
+# dependency free
+dev = ["pytest"]
+
+[project.scripts]
+w3xd = "w3xd.cli:main"
+luac53 = "luac53.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/mythic-p/w3xd-toolkit"
+Source = "https://github.com/mythic-p/w3xd-toolkit"
+
+[tool.setuptools]
+packages = ["w3xd", "luac53"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -72,8 +72,8 @@ def build_new_entry(new_id, cooldown=12.0, mana=100, cast_range=800.0, name="死
         mod("aite", 0, 0, 0, 1),
         mod("aher", 0, 0, 0, 0),
         # 按钮位置
-        mod("abpx", 0, 0, 0, 0),
-        mod("abpy", 0, 0, 0, 2),
+        mod("abpx", 0, 0, 0, 2),
+        mod("abpy", 0, 0, 0, 1),
         # 冷却 / 魔法 / 距离
         mod("acdn", 2, 1, 0, cooldown),
         mod("amcs", 0, 1, 0, mana),

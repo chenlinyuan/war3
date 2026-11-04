@@ -39,8 +39,10 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE = os.path.dirname(os.path.dirname(HERE))
+DOCTOR = os.path.join(BASE, "tools", "_devos-map-doctor", "devos-map-doctor-main")
 PY = sys.executable or "c:/python313/python.exe"
 sys.path.insert(0, HERE)
+sys.path.insert(0, DOCTOR)
 import war3mpq as W  # noqa: E402
 from merge_w3obj import merge_files  # noqa: E402
 import port_wings as P  # noqa: E402  (复用 run / check_script_clash / WING_MODELS)
@@ -103,7 +105,12 @@ def merge_chapter_objects(chapter, objdir, mapping):
 def obj_list(a):
     return CAMPAIGN_OBJ if getattr(a, "no_hand", False) else CAMPAIGN_OBJ_HAND
 # 打包时要一起写回、但不是"合并"出来的文件
-EXTRA_PACK_FILES = ["war3campaign.w3f", "war3campaign.wts"]
+EXTRA_PACK_FILES = [
+    "war3campaign.w3f",
+    "war3campaign.wts",
+    "war3campaignSkin.w3u",
+    "war3campImported\\DemonBoltImpactSilent.mdx",
+]
 DEFAULT_CFG = "wings_config_campaign"
 
 
@@ -131,10 +138,21 @@ def cmd_extract(a):
         print("从目录复制 %d 个文件 -> %s" % (n, base))
     else:
         ar = W.MPQArchive(src)
+        robust_wts = None
+        try:
+            from doctor.mpq import mpqread
+
+            robust_archive = mpqread.Archive(src)
+            robust_wts = robust_archive.read("war3campaign.wts")
+        except Exception:
+            robust_wts = None
         try:
             names = ar.listfile or []
             for name in names:
-                data = ar.read_file(name)
+                if name.lower() == "war3campaign.wts" and robust_wts is not None:
+                    data = robust_wts
+                else:
+                    data = ar.read_file(name)
                 if data is None:
                     print("  ! 读不出: %s" % name)
                     continue
@@ -145,6 +163,13 @@ def cmd_extract(a):
         finally:
             ar.close()
         print("从 %s 解出 %d 个文件 -> %s" % (os.path.basename(src), n, base))
+    if os.environ.get("ALAS_FOLLOW_GAME_GRAPHICS", "0").strip() == "1":
+        P.run([
+            PY,
+            os.path.join(HERE, "apply_graphics_mode.py"),
+            "--input",
+            base,
+        ])
     chs = sorted(f for f in os.listdir(base) if f.lower().endswith((".w3x", ".w3m")))
     print("章节地图 %d 个: %s" % (len(chs), ", ".join(chs)))
     return 0
@@ -162,13 +187,6 @@ def cmd_extract(a):
 #     溅射会打到友军 —— 实测"坐骑把自己骑乘的英雄打伤"。
 PROFILE = [
     ('summon_count=2,', 'summon_count=0,', 1),        # 战役里关掉召唤小龙
-    # 阿克蒙德之手的两个被动在战役里**也打开**（数值和 LT 一样，都是玩家验收过的）：
-    #   掠夺（击杀制，门槛 300 生命）+ 重击（8% / 600 额外伤害 + 眩晕）。
-    #   ⚠ 这两个开关在默认配置里是**关**的（见 wings_config.py 的注释），
-    #     所以战役/后续移植要显式打开。
-    ('plunder_enable=0,', 'plunder_enable=1,', 1),
-    ('plunder_min_hp=500,', 'plunder_min_hp=300,', 1),
-    ('hand_bash_chance=0,', 'hand_bash_chance=8,', 1),
 ]
 
 # 另一档：**350 打架档**（就是 `wings_config_1_5.py` / 伏魔战记那套数值）。
@@ -412,7 +430,7 @@ def cmd_chapters(a):
             for srcname, internal in P.WING_MODELS:
                 s = P.model_src(srcname)
                 if os.path.exists(s):
-                    args += ["--file", s + "=" + internal]
+                    args += ["--file", s + "=" + internal, "--store", internal]
                 else:
                     print("  ! 缺模型:", s)
             P.run(args)
@@ -447,7 +465,20 @@ def cmd_ib(a):
     P.run([PY, os.path.join(HERE, "collect_map_items.py"), stage], env=env)
     P.run([PY, os.path.join(HERE, "collect_skills.py"), stage], env=env)
     import importlib
-    dst = P.prepare_item_browser(work, cfg, importlib.import_module(cfg), base)
+    cfg_mod = importlib.import_module(cfg)
+    dst = P.prepare_item_browser(work, cfg, cfg_mod, base)
+    # ``prepare_item_browser`` only stages the campaign-level object data.
+    # Build an all-chapter catalog before embedding the final browser tables.
+    env.update({
+        "IB_BASE_DIR": work,
+        "IB_OUT_DIR": dst,
+        "IB_EXTRA_DIR": work,
+        "IB_FINGER_ABILITY": cfg_mod.HAND["finger"],
+        "IB_CRIT_ABILITY": cfg_mod.HAND["crit"],
+    })
+    P.run([PY, os.path.join(HERE, "collect_campaign_catalog.py"),
+           "--work", work], env=env)
+    P.run([PY, os.path.join(HERE, "build_fj.py")], env=env)
     print("   物品/技能系统就位 ->", dst)
     return 0
 
@@ -487,6 +518,7 @@ def cmd_pack(a):
     #   （SFileOpenFileAsArchive），压缩过的块打不开 -> "找不到地图或者损毁"。
     #   原版战役里章节也都是未压缩存储的；这里顺便照抄原战役每个文件的存储方式。
     store = set(ch for ch in chs)
+    store.update(internal for _srcname, internal in P.WING_MODELS)
     try:
         src_ar = W.MPQArchive(src)
         try:

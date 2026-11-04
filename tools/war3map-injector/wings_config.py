@@ -157,7 +157,7 @@ BUFFS = {
 # ---------------------------------------------------------------------------
 # 3b) 阿克蒙德之手（战役装备：物品 + 4 个技能）
 # ---------------------------------------------------------------------------
-#   物品：+50% 攻击力光环 / +100% 攻击速度 / 主动"死亡之指"（秒杀）
+#   物品：+50% 攻击力光环 / +100% 攻击速度；装备后获得技能"死亡之指"(F)
 #   数据本身是从战役地图提取的模板（`_hand.w3t` / `_lt_hand.w3a`），
 #   这里只声明它用掉的 ID —— 换图时 `pick_ids.py` 会自动换成空闲的
 #   （实测：侏罗纪公园1.5 里 I000 是"瓦斯"、A000/A001/A002 都被占）。
@@ -278,9 +278,9 @@ WINGS = [
          hotkey="D",
          item_key="wing_fallen", book_key="book_fallen", book2_key=None,
          model_abil_key="wing_model_fallen", active_key="act_invul",
-         iabi_keys=["act_invul", "wing_speed", "wing_model_fallen"],
+         iabi_keys=["act_invul", "wing_speed", "wing_model_fallen", "aura_vamp"],
          model=r"WingOfTheLucifer.MDX",
-         book_abil_keys=["aura_unholy", "aura_vamp", "evasion"], book2_abil_keys=[]),
+         book_abil_keys=["aura_unholy", "evasion"], book2_abil_keys=[]),
     dict(key="seraph", name="炽天使之翼", short="炽天使",
          hotkey="T",
         # 2026-10-15：Min/Max Spells 写满后一本书能装 4 条，重生并回主书，
@@ -402,7 +402,7 @@ COMMON = dict(
     # 主动技能
     act_invul_dur=6.0,          # 暗影庇护：无敌时长（adur/ahdu）
     act_invul_cd=50.0,          # 暗影庇护：冷却
-    act_tele_cd=60.0,           # 群体传送：冷却
+    act_tele_cd=15.0,           # 群体传送：冷却
     act_blink_cd=12.0,          # 闪烁：冷却
     act_blink_range=1300.0,     # 闪烁：最远距离
     # 星魂之力（第 4 件翅膀）：2026-10-15 玩家改需求 —— 原来的 +1000 生命 /
@@ -451,9 +451,9 @@ COMMON = dict(
     #         英雄:   (plunder_hero_base  + 等级*plunder_hero_per_lv
     #                  + 随机(1..等级)*plunder_hero_rand)        / plunder_div
     #       （原图就是 /3；5 级小兵 ≈ 9~11 金，10 级英雄 ≈ 85~100 金）
-    #   plunder_enable = 0 时整个被动关闭（默认关，只在指定图里打开）。
-    plunder_enable=0,          # 0 = 关闭这个被动；1 = 打开
-    plunder_min_hp=500,        # 只掠夺"最大生命 ≥ 这个值"的单位（0 = 不限）
+    #   plunder_enable = 0 时整个被动关闭。默认对所有地图启用。
+    plunder_enable=1,          # 0 = 关闭这个被动；1 = 打开
+    plunder_min_hp=300,        # 只掠夺"最大生命 ≥ 这个值"的单位（0 = 不限）
     plunder_base=15,           # 非英雄：基础值
     plunder_per_lv=2,          # 非英雄：每级加成
     plunder_rand=2,            # 非英雄：随机(1..等级) 的系数
@@ -465,26 +465,32 @@ COMMON = dict(
     #   照抄燃烧之怒里现成的物品版重击（`A6AE`「重击600 8%」，基对象 AHbh = 山丘之王-重击）：
     #   alev=1 / aher=0 / Hbh1 = 概率(%) / Hbh3 = 额外伤害。
     #   眩晕时长用原生值（非英雄 2 秒、英雄 1 秒）。
-    #   hand_bash_chance = 0 时不生成这条技能、也不写进物品的技能列表（默认关）。
-    hand_bash_chance=0,        # 触发概率（%）；0 = 关闭
+    #   hand_bash_chance = 0 时不生成这条技能、也不写进物品的技能列表。
+    hand_bash_chance=8,        # 触发概率（%）；0 = 关闭
     hand_bash_damage=600,      # 额外伤害（照抄"重击600 8%"那档）
+    # --- 夺魂：死亡之指击杀英雄或高分强敌时永久增加智力 ---
+    hand_soul_gain=1,          # 1 = 开启；0 = 关闭
+    hand_soul_hero_chance=100, # 英雄击杀触发概率（%）
+    hand_soul_elite_chance=25, # 非英雄强敌触发概率（%）
+    hand_soul_min_level=8,     # 非英雄强敌最低等级
+    hand_soul_min_hp=2000,     # 非英雄强敌最低最大生命；满足等级或生命之一
     # --- 死亡之指（阿克蒙德之手的主动，脚本实现；2026-10-15 玩家定的数值）---
-    #   伤害：对**英雄** = 最高属性 × finger_dmg_hero_mult
+    #   伤害：对**英雄** = 智力 × finger_dmg_hero_mult
     #         非英雄（含建筑）= 翻倍 → × finger_dmg_other_mult
     #         混沌攻击 + 万能伤害类型 = 无视护甲与魔法免疫（照原图"对魔免也生效"）
-    #   冷却 = max(finger_cd_min,   finger_cd_base   - 最高属性 / finger_cd_div)
-    #   耗魔 = max(finger_mana_min, finger_mana_base - 最高属性 / finger_mana_div)
-    #   ⚠ 冷却/耗魔要"随属性变"，技能就必须做成多档：最高属性每 finger_stat_step 点升一档，
-    #     脚本每秒按佩戴者的最高属性给技能调等级（见 f.j 的 WG_FingerSync）。
+    #   冷却 = max(finger_cd_min,   finger_cd_base   - 智力 / finger_cd_div)
+    #   耗魔 = max(finger_mana_min, finger_mana_base - 智力 / finger_mana_div)
+    #   ⚠ 冷却/耗魔要"随属性变"，技能就必须做成多档：智力每 finger_stat_step 点升一档，
+    #     脚本每秒按佩戴者的智力给技能调等级（见 f.j 的 WG_FingerSync）。
     finger_dmg_hero_mult=25.0,     # 对英雄的伤害倍率
     finger_dmg_other_mult=50.0,    # 非英雄（含建筑）：翻倍
     finger_cd_base=12.0,           # 冷却基数（秒）
-    finger_cd_div=25.0,            # 每多少点最高属性减 1 秒
+    finger_cd_div=25.0,            # 每多少点智力减 1 秒
     finger_cd_min=6.0,             # 冷却下限（秒）
     finger_mana_base=100,          # 耗魔基数
-    finger_mana_div=2.0,           # 每多少点最高属性减 1 点魔
+    finger_mana_div=2.0,           # 每多少点智力减 1 点魔
     finger_mana_min=40,            # 耗魔下限
-    finger_stat_step=25,           # 最高属性每 +N 升一档
+    finger_stat_step=25,           # 智力每 +N 升一档
     finger_levels=7,               # 档数（0/25/50/75/100/125/150+ → 12/11/10/9/8/7/6 秒）
     finger_range=800.0,            # 施法距离（照原图）
     finger_lightning="AFOD",       # 施法时画的闪电（原图技能的 alig 就是 AFOD）
@@ -633,7 +639,7 @@ for _o in ITEM_OVERRIDES:
 def finger_level_table(common=None):
     """死亡之指每档的 (冷却, 耗魔)。
 
-    档位 i 对应"最高属性 = i * finger_stat_step"，越靠后越短/越省：
+    档位 i 对应"智力 = i * finger_stat_step"，越靠后越短/越省：
       CD   = max(finger_cd_min,   finger_cd_base   - 属性 / finger_cd_div)
       mana = max(finger_mana_min, finger_mana_base - 属性 / finger_mana_div)
     默认参数下 7 档 = 12/11/10/9/8/7/6 秒、100/88/75/63/50/40/40 魔。

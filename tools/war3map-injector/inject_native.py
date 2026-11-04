@@ -13,6 +13,7 @@
 import argparse
 import os
 import shutil
+import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +23,19 @@ import war3mpq as W  # noqa: E402
 import inject_all as IA  # noqa: E402  (复用 entry_points / 默认脚本目录)
 import inject_script_manual as ISM  # noqa: E402
 import mpq_patch as MP  # noqa: E402
+
+
+def find_script(archive):
+    candidates = (
+        "war3map.j",
+        "scripts\\war3map.j",
+        "Scripts\\war3map.j",
+    )
+    for internal in candidates:
+        data = archive.read_file(internal)
+        if data:
+            return internal, data
+    return candidates[0], b""
 
 
 def assemble(orig_script, script_dirs):
@@ -60,6 +74,7 @@ def main():
     ap.add_argument("--no-backup", action="store_true")
     ap.add_argument("--no-verify", action="store_true")
     ap.add_argument("--skip-clash-check", action="store_true")
+    ap.add_argument("--script-internal")
     args = ap.parse_args()
 
     map_path = os.path.abspath(args.map)
@@ -76,17 +91,37 @@ def main():
         src, internal = spec.split("=", 1)
         payload.append((internal, open(src, "rb").read()))
 
+    # Replaced entries invalidate the archive's legacy CRC table. The game
+    # rejects changed maps whose (attributes) file still checks the old bytes.
+    if not any(internal.lower() == "(attributes)" for internal, _data in payload):
+        ar = W.MPQArchive(map_path)
+        try:
+            attributes = ar.read_file("(attributes)")
+        finally:
+            ar.close()
+        if attributes is not None and len(attributes) >= 8:
+            version, flags = struct.unpack_from("<II", attributes)
+            if flags:
+                payload.append(("(attributes)", struct.pack("<II", 100, 0)))
+                print(
+                    "   (attributes): version %d flags 0x%X -> checksums disabled"
+                    % (version, flags)
+                )
+
     # --- 脚本 ---
     if script_dirs:
         print("== 组装脚本 ==")
+        script_internal = args.script_internal or "war3map.j"
         if args.base_script:
             orig = open(os.path.abspath(args.base_script), "rb").read()
         else:
             ar = W.MPQArchive(map_path)
             try:
-                orig = ar.read_file("war3map.j")
+                detected_internal, orig = find_script(ar)
             finally:
                 ar.close()
+            script_internal = args.script_internal or detected_internal
+        script_internal = args.script_internal or script_internal
         if not orig:
             raise SystemExit("地图里读不到 war3map.j（壳化/加密图？）")
         if not args.skip_clash_check:
@@ -103,7 +138,7 @@ def main():
         os.makedirs(rep, exist_ok=True)
         with open(os.path.join(rep, "war3map.j"), "wb") as fh:
             fh.write(new)
-        payload.append(("war3map.j", new))
+        payload.append((script_internal, new))
 
     if not payload:
         raise SystemExit("没有要写的东西（给 --script 或 --file）")

@@ -93,6 +93,9 @@ def build_script(orig_bytes, gj_bytes, fj_bytes, mj_bytes, defer_init=True):
       结果"进去一片黑"。放到 0 秒定时器里最稳。
     """
     text = orig_bytes.decode("latin-1")
+    # Some custom maps use classic bare-CR line endings.  Splitting only on LF
+    # leaves the entire globals block as one line and hides ``endglobals``.
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     lines = text.split("\n")
     # find the real endglobals line (first line that is exactly 'endglobals')
     eg_idx = None
@@ -127,8 +130,16 @@ def build_script(orig_bytes, gj_bytes, fj_bytes, mj_bytes, defer_init=True):
         if ln.strip() == "endglobals":
             eg_idx2 = i
             break
-    # insert f.j after endglobals
-    new_lines = new_lines[:eg_idx2 + 1] + [""] + f_block + new_lines[eg_idx2 + 1:]
+    # insert f.j before the first function, after any platform-specific native
+    # declarations that this map puts after endglobals.
+    first_function = None
+    for i in range(eg_idx2 + 1, len(new_lines)):
+        if new_lines[i].lstrip().startswith("function "):
+            first_function = i
+            break
+    if first_function is None:
+        raise RuntimeError("endglobals 后找不到函数声明")
+    new_lines = new_lines[:first_function] + [""] + f_block + new_lines[first_function:]
 
     out = "\n".join(new_lines)
     mm = re.search(r"(function main takes nothing returns nothing[^\n]*\n)", out)

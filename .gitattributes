@@ -1,19 +1,28 @@
-# 二进制文件：禁止行尾转换与文本 diff，避免 Git 破坏内容
-*.w3m  binary
-*.w3x  binary
-*.w3n  binary
-*.mpq  binary
-*.exe  binary
-*.dll  binary
-*.blp  binary
-*.mdx  binary
-*.mdl  binary
-*.mp3  binary
-*.wav  binary
-*.png  binary
-*.jpg  binary
-*.jpeg  binary
-*.gif  binary
-*.zip  binary
-*.7z  binary
-*.rar  binary
+# ---- 二进制文件：禁止 git 做换行 / 编码转换 ----
+# 2026-10-10：`tools/war3map-injector/_wing.w3a` / `_wing_item.w3t` / `_wing_unit.w3u`
+#   之前被 git 当**文本**处理，提交进仓库的其实是 UTF-16 垃圾（16 位 + BOM）——
+#   对象数据一旦被转码就完全不可用。这几个生成物不参与构建（build_wings.py 会重新生成），
+#   但仓库里存着坏文件迟早会坑人，所以这里统一按二进制处理。
+*.w3a binary
+*.w3t binary
+*.w3u binary
+*.w3h binary
+*.w3q binary
+*.w3b binary
+*.w3d binary
+*.w3e binary
+*.w3c binary
+*.w3s binary
+*.w3i binary
+*.w3x binary
+*.w3m binary
+*.w3n binary
+*.blp binary
+*.mdx binary
+*.mdl binary
+*.mpq binary
+*.dds binary
+*.tga binary
+*.pld binary
+*.exe binary
+*.zip binary

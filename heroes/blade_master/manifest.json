@@ -121,7 +121,5 @@
     "tilesets": "*",
     "upgrades": "Rura,Reht"
   },
-  "icon_files": [],
-  "model": "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Reforged.mdx",
-  "model_source": "H:\\Games\\Warcraft III\\_retail_\\x86_64\\Units\\Orc\\HeroBladeMaster\\HeroBladeMaster.mdx (HD CASC)"
+  "icon_files": []
 }

@@ -158,8 +158,12 @@ def map_used_ids(path, chapters=False):
 def our_groups():
     """返回 [(字典名, 键, 当前 ID)]，顺序稳定。"""
     out = []
-    for dname, d in (("ABIL", CFG.ABIL), ("ITEMS", CFG.ITEMS), ("UNITS", CFG.UNITS),
-                     ("BUFFS", CFG.BUFFS), ("HAND", CFG.HAND)):
+    groups = [("ABIL", CFG.ABIL), ("ITEMS", CFG.ITEMS),
+              ("UNITS", CFG.UNITS), ("BUFFS", CFG.BUFFS),
+              ("HAND", CFG.HAND)]
+    if hasattr(CFG, "WEAPONS"):
+        groups.append(("WEAPONS", CFG.WEAPONS))
+    for dname, d in groups:
         for k, v in d.items():
             out.append((dname, k, v))
     return out
@@ -181,14 +185,26 @@ def alloc(prefix, digits, used, n):
 
 
 def write_config(mapping):
-    """把 {键: 新ID} 写回 wings_config.py（按 '键名": "旧ID"' 精确定位，保持顺序）。"""
+    """把 [(区块, 键, 新ID)] 写回配置，并限制在目标字典区块内。
+
+    ``spell_shield`` 同时存在于 ABIL 和 BUFFS；只按键名全局替换会把
+    ``ABIL["spell_shield"]="W090"`` 一并改成 buff ID，生成出非法技能对象。
+    """
     s = open(CFG_PATH, "rb").read().decode("utf-8")
     n = 0
-    for key, new_id in mapping.items():
+    for dname, key, new_id in mapping:
+        block = dname.split(".", 1)[0]
+        block_pat = re.compile(r"(?ms)^%s\s*=\s*\{.*?^\}" % re.escape(block))
+        block_match = block_pat.search(s)
+        if not block_match:
+            raise SystemExit("找不到配置区块: %s" % block)
+        start, end = block_match.span()
+        chunk = s[start:end]
         pat = re.compile(r'("%s"\s*:\s*")([A-Za-z0-9]{4})(")' % re.escape(key))
-        s, cnt = pat.subn(lambda m: m.group(1) + new_id + m.group(3), s)
-        if not cnt:
-            print("  !! 找不到键:", key)
+        chunk, cnt = pat.subn(lambda m: m.group(1) + new_id + m.group(3), chunk)
+        if cnt != 1:
+            raise SystemExit("%s.%s: 期望写入 1 处，实际 %d 处" % (dname, key, cnt))
+        s = s[:start] + chunk + s[end:]
         n += cnt
     open(CFG_PATH, "wb").write(s.encode("utf-8"))
     # NOTE: 必须清掉这个配置模块的 __pycache__。改名前后文件大小常常一样,
@@ -238,13 +254,15 @@ def main():
 
     if mode == "--write":
         # 只给"属于本系统、且和地图冲突"的 ID 重新分配；同时保证新 ID 不撞车
-        mapping = {}
+        mapping = []
         groups = [("ABIL", "W", 0, CFG.ABIL), ("ITEMS", "I", 0, CFG.ITEMS),
                   ("UNITS", "n", 0, CFG.UNITS), ("BUFFS", "B", 0, CFG.BUFFS),
                   # 阿克蒙德之手：item 是物品，其余 4 个都是技能
                   ("HAND.item", "I", 0, {"item": CFG.HAND["item"]}),
                   ("HAND.abil", "A", 0,
                    {k: v for k, v in CFG.HAND.items() if k != "item"})]
+        if hasattr(CFG, "WEAPONS"):
+            groups.append(("WEAPONS", "I", 0, CFG.WEAPONS))
         # 目标图用掉的 ID + **本系统自己现有的全部 ID** 都不能再用
         # （否则会把新 ID 分给一个我们自己已经占用的号，例如物品撞 I100）
         taken = set(used) | {v for _d, _k, v in our_groups()}
@@ -254,7 +272,7 @@ def main():
                 continue
             new = alloc(prefix, digits, taken, len(need))
             for k, nid in zip(need, new):
-                mapping[k] = nid
+                mapping.append((dname, k, nid))
                 taken.add(nid)
             print("  %s: %d 个冲突 ID 重新分配" % (dname, len(need)))
         if not mapping:

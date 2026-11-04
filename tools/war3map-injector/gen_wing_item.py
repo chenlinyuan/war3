@@ -62,6 +62,20 @@ WING_ABILS_DEMON = ",".join(CFG.wing_by_key("demon")["iabi"])
 WING_ABILS_STAR = ",".join(CFG.wing_by_key("star")["iabi"])
 
 TREASURE = "Objects\\InventoryItems\\TreasureChest\\treasurechest.mdl"
+WING_HEADER_ARTIFACT = "|cffff8c00神器|r|n|n"
+WING_HEADER_RELIC = "|cffff8c00魔器|r|n|n"
+WING_PASSIVE = "|cff5ddf26"
+WING_ACTIVE = "|cff66ccff"
+
+
+def wing_passive(text):
+    if text.endswith("|n"):
+        text = text[:-2]
+    return WING_PASSIVE + text + "|r|n"
+
+
+def wing_active(text):
+    return WING_ACTIVE + text + "|r"
 
 
 def ground_of(key):
@@ -128,74 +142,151 @@ def item_entry(new_id, name, tip, ubertip, desc, icon, abilities,
 def build(out_path):
     entries = []
 
-    # === 翅膀 (三件各有定位; 属性全部是百分比, 数值见 gen_wing.py) ===
-    #   堕落天使之翼: 生存 (生命上限%/每秒回%/魔法减伤/4 秒无敌)
-    fallen_tip = ("|cffFF3300堕落天使之翼(魔器)|r|n|cffFFE79B|n"
-                  "移动速度 +100|n闪避 30%|n"
-                  "邪恶光环: 附近友军 移动速度 +20%、每秒回复生命 30|n"
-                  "吸血光环: 附近友军 吸血 +40%|n"
-                  "主动: 暗影庇护 —— 6 秒无敌，冷却 50 秒")
+    # === 翅膀 ===
+    #   文案层级与三神器一致：
+    #     橙色类别 -> 白色基础数值 -> 绿色被动/光环 -> 浅蓝主动。
+    #   数值全部从 CFG.COMMON 读取，避免技能数据改了而物品说明没跟上。
+    aura_radius = int(_C["aura_radius"])
+
+    # 堕落天使之翼：生存与吸血。
+    fallen_tip = (
+        WING_HEADER_RELIC
+        + "移动速度 +100|n"
+        + wing_passive("闪避 30%。|n")
+        + wing_passive(
+            f"邪恶光环：{aura_radius} 范围内友军移动速度 +20%、"
+            "每秒回复 30 生命。|n"
+        )
+        + wing_passive(
+            f"吸血光环：{aura_radius} 范围内友军普通攻击吸血 +40%。|n"
+        )
+        + wing_active(
+            f"主动·暗影庇护：{int(_C['act_invul_dur'])} 秒内免疫所有伤害；"
+            f"冷却 {int(_C['act_invul_cd'])} 秒。"
+        )
+    )
+    fallen_desc = (
+        "移动速度 +100。|n"
+        + wing_passive("闪避 30%。|n")
+        + wing_passive("邪恶光环：友军移动速度 +20%，每秒回复 30 生命。|n")
+        + wing_passive("吸血光环：友军普通攻击吸血 +40%。|n")
+        + wing_active(
+            f"主动·暗影庇护：{int(_C['act_invul_dur'])} 秒内免疫伤害；"
+            f"冷却 {int(_C['act_invul_cd'])} 秒。"
+        )
+    )
     entries.append(item_entry(
         WING_ITEM_FALLEN,
         "|cffCC33FF堕落天使之翼|r", "堕落天使之翼",
-        fallen_tip, fallen_tip,
+        fallen_tip, fallen_desc,
         ICON_FALLEN, WING_ABILS_FALLEN, usable=True, hotkey="D", cooldown_id="wgf1",
         ground=ground_of("fallen"),
     ))
-    #   炽天使之翼: 团队辅助 (附近友军 移速/攻速/回蓝 + 群体传送)
-    seraph_tip = ("|cffFF3300炽天使之翼(神器)|r|n|cffFFE79B|n"
-                  "移动速度 +100|n重生: 阵亡 3 秒后自动复活（冷却 150 秒，骑乘时坐骑保留）|n"
-                  "辉煌光环: 附近友军 魔法恢复 +300%|n"
-                  "治疗光环: 附近友军 每秒回复最大生命 3%|n"
-                  "主动: 群体传送 —— 自身与周围 700 友军一起传送，冷却 60 秒")
+    # 炽天使之翼：团队辅助与重生。
+    seraph_tip = (
+        WING_HEADER_ARTIFACT
+        + "移动速度 +100|n"
+        + wing_passive(
+            f"重生：阵亡 {int(_C['rebirth_delay'])} 秒后自动复活；"
+            f"冷却 {int(_C['rebirth_cd'])} 秒。|n"
+        )
+        + wing_passive(
+            f"辉煌光环：{aura_radius} 范围内友军魔法恢复 +300%。|n"
+        )
+        + wing_passive(
+            f"治疗光环：{aura_radius} 范围内友军每秒回复最大生命 3%。|n"
+        )
+        + wing_active(
+            f"主动·群体传送：自身与 {aura_radius} 范围内最多 24 个友军"
+            "传送到目标友军或建筑旁；冷却 15 秒，不耗魔。"
+        )
+    )
+    seraph_desc = (
+        "移动速度 +100。|n"
+        + wing_passive(
+            f"重生：阵亡 {int(_C['rebirth_delay'])} 秒后自动复活；"
+            f"冷却 {int(_C['rebirth_cd'])} 秒。|n"
+        )
+        + wing_passive("辉煌光环：友军魔法恢复 +300%。|n")
+        + wing_passive("治疗光环：友军每秒回复最大生命 3%。|n")
+        + wing_active(
+            "主动·群体传送：自身与附近最多 24 个友军传送到目标友军或建筑旁；"
+            "冷却 15 秒，不耗魔。"
+        )
+    )
     entries.append(item_entry(
         WING_ITEM_SERAPH,
         "|cffFFFF00天|cffFFAA55使|cffFF55AA之|cffFF00FF翼|r", "炽天使之翼",
-        seraph_tip, seraph_tip,
+        seraph_tip, seraph_desc,
         ICON_SERAPH, WING_ABILS_SERAPH, usable=True, hotkey="T", cooldown_id="wgs1",
         ground=ground_of("seraph"),
     ))
-    #   恶魔之翼: 输出与机动 (攻击力 +30%、攻速 +50% + 闪烁)
-    demon_tip = ("|cffFF3300恶魔之翼(魔器)|r|n|cffFFE79B|n"
-                 "移动速度 +100|n致命一击 35% × 3 倍伤害|n"
-                 "命令光环: 附近友军 攻击力 +50%（近战/远程都生效）|n"
-                 "耐久光环: 附近友军 攻击速度 +40%|n"
-                 "主动: 闪烁 —— 最远 1300，冷却 12 秒")
+    # 恶魔之翼：输出与机动。
+    demon_tip = (
+        WING_HEADER_RELIC
+        + "移动速度 +100|n"
+        + wing_passive("致命一击：35% 概率造成 3 倍伤害。|n")
+        + wing_passive(
+            f"命令光环：{aura_radius} 范围内友军攻击力 +50%，"
+            "近战与远程均生效。|n"
+        )
+        + wing_passive(
+            f"耐久光环：{aura_radius} 范围内友军攻击速度 +40%。|n"
+        )
+        + wing_active(
+            f"主动·闪烁：最远 {int(_C['act_blink_range'])} 码；"
+            f"冷却 {int(_C['act_blink_cd'])} 秒。"
+        )
+    )
+    demon_desc = (
+        "移动速度 +100。|n"
+        + wing_passive("致命一击：35% 概率造成 3 倍伤害。|n")
+        + wing_passive("命令光环：友军攻击力 +50%。|n")
+        + wing_passive("耐久光环：友军攻击速度 +40%。|n")
+        + wing_active(
+            f"主动·闪烁：最远 {int(_C['act_blink_range'])} 码；"
+            f"冷却 {int(_C['act_blink_cd'])} 秒。"
+        )
+    )
     entries.append(item_entry(
         WING_ITEM_DEMON,
         "|cff3E3E3E恶|cff696969魔|cff959595之|cffC0C0C0翼|r", "恶魔之翼",
-        demon_tip, demon_tip,
+        demon_tip, demon_desc,
         ICON_DEMON, WING_ABILS_DEMON, usable=True, hotkey="B", cooldown_id="wgd1",
         ground=ground_of("demon"),
     ))
-    #   星魂之力（从燃烧之怒 194213 的「星魂之力（神器）」移植）
-    #   2026-10-15 玩家改需求：去掉 +1000 生命 / +20 全属性 / +500 魔法，
-    #   改成"移动速度顶满"（W095），保留法术护盾与主动·灰烬雷暴。
-    #   ⚠ 说明文字要**短**：WC3 的物品浮窗放不下太多行，太长会被直接截掉
-    #     （玩家实测截图确认）。所以这里只用 4 行短句。
-    #   class_="" ：玩家截图里标题那串 `(|cffed…` 是客户端把物品类别 'Artifact'
-    #     换成带颜色代码的中文后又没解析、还被截断造成的 —— 清空类别即可。
-    #   ⚠ 这里的数字**全部从 COMMON 取**（和 gen_wing.py 的 W089 技能说明同一个来源），
-    #     否则玩家改了 ash_damage / ash_wave_damage 之后，技能说明变了、物品说明没变。
-    #   2026-10-17 玩家指出的三处文案问题，一并处理：
-    #     * 名字后面拖着 "|cff…"：那是下面这行开头那个"裸"颜色码 `|cffFFE79B` 被显示出来了
-    #       → 去掉它；顺便把物品名从四段渐变改成纯色（渐变的名字在某些客户端也会漏码）；
-    #     * "移动速度：顶满" → "最大移动速度"；
-    #     * "火箭" → "落雷"，并且不再列 冷却/耗魔。
-    #   （"献祭"那一行等模块脚本就位后再加，避免说明和实际不符。）
-    #   2026-10-17 玩家要求：描述第一行那个"物品名"是多余的（标题已经显示名字），去掉。
-    star_tip = ("移动速度：最大移动速度|n"
-                "献祭：300 码内的敌人每 0.5 秒受到最高属性×0.5 的魔法伤害|n"
-                "主动: 灰烬雷暴 —— 区域内造成 %d+最高属性×%g 魔法伤害、"
-                "减速 8 秒，自身回血 %d+最高属性×%g；1 秒后自动接第二阶段"
-                "（%d 段落雷，每段 %d+最高属性）" % (
-                    int(_C["ash_damage"]), _C["ash_stat_mult"],
-                    int(_C["ash_heal"]), _C["ash_heal_stat_mult"],
-                    int(_C["ash_wave_count"]), int(_C["ash_wave_damage"])))
+    # 星魂之力：最大移速、献祭与灰烬雷暴。
+    #   物品浮窗高度有限，主动效果压成两行短句；数值全部从 COMMON 读取。
+    star_tip = (
+        WING_HEADER_ARTIFACT
+        + "移动速度：最大|n"
+        + wing_passive(
+            "献祭：300 范围内敌人每 0.5 秒受到最高属性×0.5 魔法伤害。|n"
+        )
+        + wing_active(
+            f"主动·灰烬雷暴：对 {int(_C['ash_radius'])} 范围内敌人造成 "
+            f"{int(_C['ash_damage'])}+最高属性×{_C['ash_stat_mult']:g} 魔法伤害"
+            f"并减速 8 秒，自身回复 {int(_C['ash_heal'])}+"
+            f"最高属性×{_C['ash_heal_stat_mult']:g} 生命。|n"
+        )
+        + wing_active(
+            f"1 秒后追加 {int(_C['ash_wave_count'])} 段落雷，"
+            f"每段 {int(_C['ash_wave_damage'])}+最高属性；"
+            f"冷却 {int(_C['ash_cd'])} 秒，耗魔 {int(_C['ash_mana'])}。"
+        )
+    )
+    star_desc = (
+        "移动速度：最大。|n"
+        + wing_passive("献祭：敌人每 0.5 秒受到最高属性×0.5 魔法伤害。|n")
+        + wing_active(
+            "主动·灰烬雷暴：范围伤害并减速，随后追加 3 段落雷；"
+            f"冷却 {int(_C['ash_cd'])} 秒，耗魔 {int(_C['ash_mana'])}。"
+        )
+    )
     entries.append(item_entry(
         WING_ITEM_STAR,
         "|cff66CCFF星魂之力|r", "星魂之力",
-        star_tip, star_tip,
+        star_tip, star_desc,
         # 图标用原版"火焰风衣"的图标（橙红色，和火焰翅膀一致）
         r"ReplaceableTextures\CommandButtons\BTNCloakOfFlames.blp",
         WING_ABILS_STAR, usable=True, hotkey="S", cooldown_id="wgst1",

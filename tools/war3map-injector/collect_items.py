@@ -13,6 +13,9 @@ GAME_SLK = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemdata.slk"
 # 游戏自带的物品名称（本地化中文），用于没有地图 itemfunc.txt 的官方地图
 GAME_ITEMSTRINGS = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemstrings.txt"
 GAME_ITEMFUNC = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemfunc.txt"
+BUNDLED_ITEM_CATALOG = os.path.join(
+    REPO, "tools", "alas-offline", "assets", "game_item_catalog.tsv"
+)
 
 
 def detect_decode(path):
@@ -136,6 +139,19 @@ def parse_w3t(path, wts_path=None):
     return items
 
 
+def parse_catalog(path):
+    """Read the offline ``flag<TAB>id<TAB>name`` item snapshot."""
+    rows = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            parts = line.rstrip("\n").split("\t", 2)
+            if len(parts) == 3 and len(parts[1].strip()) == 4:
+                rows.append(
+                    (parts[0].strip(), parts[1].strip(), parts[2].strip())
+                )
+    return rows
+
+
 
 def main():
     map_dir = sys.argv[1] if len(sys.argv) > 1 else None
@@ -150,6 +166,16 @@ def main():
     map_wts_path = os.path.join(map_dir, "war3map.wts") if map_dir else None
 
     names = {}  # id -> name (from itemfunc.txt)
+    bundled = (
+        parse_catalog(BUNDLED_ITEM_CATALOG)
+        if os.path.isfile(BUNDLED_ITEM_CATALOG)
+        else []
+    )
+    for _flag, iid, nm in bundled:
+        if nm:
+            names[iid] = nm
+    if bundled:
+        print("bundled offline item catalog:", len(bundled))
     if map_func_path and os.path.isfile(map_func_path):
         for iid, nm in parse_itemfunc(map_func_path):
             names[iid] = nm
@@ -174,6 +200,12 @@ def main():
     if map_slk_path and os.path.isfile(map_slk_path):
         creatable = parse_slk(map_slk_path)
         print("map itemdata.slk (creatable):", len(creatable))
+    elif bundled:
+        creatable = [iid for _flag, iid, _nm in bundled]
+        print("using bundled offline item catalog:", len(creatable))
+        for iid, _ in w3t_items:
+            if iid not in creatable:
+                creatable.append(iid)
     else:
         # No map slk -> use the game's standard list, plus any custom items
         # defined through the object editor (war3map.w3t).
@@ -184,7 +216,10 @@ def main():
                 creatable.append(iid)
         print("after adding w3t custom:", len(creatable))
 
-    game = set(parse_slk(GAME_SLK)) if os.path.isfile(GAME_SLK) else set()
+    if bundled:
+        game = {iid for _flag, iid, _nm in bundled}
+    else:
+        game = set(parse_slk(GAME_SLK)) if os.path.isfile(GAME_SLK) else set()
 
     std_out = []
     cus_out = []

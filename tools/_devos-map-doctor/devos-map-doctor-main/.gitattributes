@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.ico binary
+*.png binary
+*.gif binary
+doctor/cheatpacks/* -text
+doctor/cheatpacks/** -text
+doctor/ref/*/* -text
+doctor/ref/** linguist-vendored
+doctor/cheatpacks/** linguist-vendored

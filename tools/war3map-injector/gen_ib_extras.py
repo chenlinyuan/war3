@@ -60,6 +60,12 @@ def our_item_ids(cfg):
         out.append((w["item"], [w["name"]]))
     for m in cfg.MOUNTS:
         out.append((m["egg"], [m["name"] + "蛋"]))
+    for key, ident in getattr(cfg, "WEAPONS", {}).items():
+        names = {
+            "frostmourne": ["霜之哀伤", "Frostmourne"],
+            "warglaive": ["埃辛诺斯战刃", "Warglaive"],
+        }.get(key, [key])
+        out.append((ident, names))
     return out
 
 

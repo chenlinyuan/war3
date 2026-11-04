@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from merge_w3obj import read_all  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT = "ReplaceableTextures\\CommandButtons\\BTNSpellSteal.blp"
+DEFAULT = "ReplaceableTextures\\CommandButtons\\BTNArchimondeHand_30HD.blp"
 
 
 def read_mods(e):

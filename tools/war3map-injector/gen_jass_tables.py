@@ -77,6 +77,8 @@ def body_g_hand():
     里的「掠夺」脚本（见 f.j 的 WG_OnPlunder）。
     """
     return ["// 阿克蒙德之手的物品 ID（掠夺挂在它身上）",
+            "// 1 = equipment skills are owned by the item; 0 = hero command card.",
+            "boolean WG_ITEM_ACTIVE = false",
             "integer WG_HAND_ITEM = " + q(CFG.HAND["item"]),
             "// 掠夺总开关（0 = 关掉这个被动）",
             "integer WG_PLUNDER_ENABLE = %d" % int(C.get("plunder_enable", 0)),
@@ -92,7 +94,13 @@ def body_g_hand():
             "integer WG_PLUNDER_HERO_RAND = %d" % int(C.get("plunder_hero_rand", 5)),
             "// 最后除以这个数（照抄原图的 /3）",
             "integer WG_PLUNDER_DIV = %d" % int(C.get("plunder_div", 3)),
-            # 2026-10-15 死亡之指改成"按最高属性算的混沌伤害"：
+            "// 夺魂：1 = 死亡之指击杀英雄/强敌时永久增加 1 点智力",
+            "integer WG_HAND_SOUL_GAIN = %d" % int(C.get("hand_soul_gain", 1)),
+            "integer WG_HAND_SOUL_HERO_CHANCE = %d" % int(C.get("hand_soul_hero_chance", 100)),
+            "integer WG_HAND_SOUL_ELITE_CHANCE = %d" % int(C.get("hand_soul_elite_chance", 25)),
+            "integer WG_HAND_SOUL_MIN_LEVEL = %d" % int(C.get("hand_soul_min_level", 8)),
+            "real WG_HAND_SOUL_MIN_HP = " + num(C.get("hand_soul_min_hp", 2000)),
+            # 2026-10-15 死亡之指改成按智力计算的混沌伤害：
             "// --- 死亡之指（阿克蒙德之手的主动）---",
             "integer WG_FINGER_ABILITY = " + q(CFG.HAND["finger"]),
             "// 对英雄/非英雄的伤害倍率（非英雄=翻倍）",
@@ -101,6 +109,10 @@ def body_g_hand():
             "// 冷却/耗魔分档：最高属性每 WG_FINGER_STEP 点升一档，最多 WG_FINGER_MAXLVL 档",
             "integer WG_FINGER_STEP = %d" % int(C.get("finger_stat_step", 25)),
             "integer WG_FINGER_MAXLVL = %d" % int(C.get("finger_levels", 7)),
+            "// Cooldown formula for the item-owned Death Finger instance.",
+            "real WG_FINGER_CD_BASE = " + num(C.get("finger_cd_base", 12.0)),
+            "real WG_FINGER_CD_DIV = " + num(C.get("finger_cd_div", 25.0)),
+            "real WG_FINGER_CD_MIN = " + num(C.get("finger_cd_min", 6.0)),
             "// 施法时画的闪电（原图技能 alig = AFOD）",
             "string WG_FINGER_LIGHTNING = " + '"' + str(C.get("finger_lightning", "AFOD")) + '"',
             # 脚本在"点错目标"时要把魔退回给玩家，所以耗魔公式也生成一份
@@ -147,6 +159,16 @@ def body_g_starfall():
             "string WG_ASH_FX_CASTER = " + '"' + str(C.get("ash_fx_caster", "ssw1.mdl")) + '"',
             "// 主属性取法：0 = 最高属性（含加成）；1/2/3 = 力量/敏捷/智力",
             "integer WG_ASH_STAT = %d" % mode]
+
+
+def body_g_aura_runtime():
+    return [
+        "integer WG_FALLEN_ITEM = " + q(CFG.ITEMS["wing_fallen"]),
+        "integer WG_TELEPORT_ABILITY = " + q(CFG.ABIL["act_tele"]),
+        "real WG_VAMP_RADIUS = " + num(C["aura_radius"]),
+        "real WG_VAMP_PERCENT = " + num(C["aura_vamp"]),
+        "real WG_TELEPORT_RADIUS = " + num(C["aura_radius"]),
+    ]
 
 
 def body_mount_table():
@@ -247,6 +269,7 @@ def main():
     gj = rebuild(gj, "g_summon", body_g_summon())
     gj = rebuild(gj, "g_hand", body_g_hand())
     gj = rebuild(gj, "g_starfall", body_g_starfall())
+    gj = rebuild(gj, "g_aura_runtime", body_g_aura_runtime())
     fj = rebuild(fj, "mount_table", body_mount_table())
     fj = rebuild(fj, "wing_table", body_wing_table())
     fj = rebuild(fj, "wing_names", body_wing_names())

@@ -142,7 +142,10 @@ def write_blp1_palette(path, img, min_size=4, colors=256):
 
     rgb = img.convert("RGB")
     q = rgb.quantize(colors=colors, method=Image.MEDIANCUT)
-    pal = np.array(q.getpalette()[: colors * 3], dtype=np.uint8).reshape(colors, 3)
+    raw_pal = q.getpalette() or []
+    if len(raw_pal) < colors * 3:
+        raw_pal = raw_pal + [0] * (colors * 3 - len(raw_pal))
+    pal = np.array(raw_pal[: colors * 3], dtype=np.uint8).reshape(colors, 3)
     pal256 = np.zeros((256, 4), dtype=np.uint8)
     pal256[:colors, :3] = pal[:, [2, 1, 0]]  # BGR
 

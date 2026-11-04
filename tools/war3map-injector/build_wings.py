@@ -12,6 +12,7 @@ import os, shutil, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_wing
 import gen_wing_item
+import gen_w3h
 import gen_w3u
 import hand_data
 from merge_w3obj import read_all, merge_files
@@ -46,6 +47,7 @@ def main():
     gen_jass_tables.main()
     gen_wing.build(os.path.join(HERE, "_wing.w3a"))
     gen_wing_item.build(os.path.join(HERE, "_wing_item.w3t"))
+    gen_w3h.build_project_buffs(os.path.join(HERE, "_wing_buff.w3h"))
     # 存一份"没合并阿克蒙德之手"的版本：移植到别的图时用它（不带 LostTemple 专属装备）
     shutil.copy2(os.path.join(HERE, "_wing.w3a"), os.path.join(HERE, "_wing_nohand.w3a"))
     shutil.copy2(os.path.join(HERE, "_wing_item.w3t"), os.path.join(HERE, "_wing_item_nohand.w3t"))

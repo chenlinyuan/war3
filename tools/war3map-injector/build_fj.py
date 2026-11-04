@@ -31,6 +31,11 @@ def clean_name(s):
     return "".join(chr(ord(c) + 32) if "A" <= c <= "Z" else c for c in s)
 
 
+def valid_rawcode(value):
+    """Object rawcodes embedded in JASS must be four ASCII characters."""
+    return len(value) == 4 and value.isascii()
+
+
 # Read flag + id + name
 items = []
 with open(os.path.join(BASE_DIR, "_itemids.txt"), encoding="utf-8") as fh:
@@ -42,7 +47,7 @@ with open(os.path.join(BASE_DIR, "_itemids.txt"), encoding="utf-8") as fh:
             flag, iid, nm = "S", parts[0].strip(), parts[1].strip()
         else:
             continue
-        if len(iid) == 4:
+        if valid_rawcode(iid):
             items.append((flag, iid, clean_name(nm)))
 
 # 读取技能列表 (id<TAB>name), 技能名同样预清洗
@@ -52,7 +57,7 @@ if os.path.isfile(skill_path):
     with open(skill_path, encoding="utf-8") as fh:
         for line in fh:
             parts = line.rstrip("\n").split("\t")
-            if len(parts) >= 2 and len(parts[0].strip()) == 4:
+            if len(parts) >= 2 and valid_rawcode(parts[0].strip()):
                 sid = parts[0].strip()
                 nm = clean_name(parts[1].strip())
                 # 标准技能 = 4字符且非 A000-A999 之外; 简化: 以 A 开头且第2字符是数字视为自定义
@@ -66,7 +71,7 @@ if os.path.isfile(unit_path):
     with open(unit_path, encoding="utf-8") as fh:
         for line in fh:
             parts = line.rstrip("\n").split("\t")
-            if len(parts) >= 3 and len(parts[0].strip()) == 4:
+            if len(parts) >= 3 and valid_rawcode(parts[0].strip()):
                 uid = parts[0].strip()
                 nm = clean_name(parts[1].strip())
                 armor = parts[2].strip()
@@ -94,7 +99,7 @@ def read_extra(name, ncols):
             if len(parts) < ncols:
                 continue
             ident = parts[1] if name.startswith("_item") else parts[0]
-            if len(ident) == 4:
+            if valid_rawcode(ident):
                 rows.append(parts)
     return rows
 
@@ -280,6 +285,103 @@ fill_step_block = "\n".join(fill_step)
 with open(FJ, encoding="utf-8", errors="replace") as fh:
     txt = fh.read()
 
+# The source browser contains GBK names and is not always valid UTF-8.
+# Patch the generated add-item function by structure so future builds keep
+# exclusive artifacts out of the inventory in the first place.
+add_give = """function IB_IsExclusiveArtifact takes integer itemId returns boolean
+    return itemId == 'I103' or itemId == 'I105' or itemId == 'I106'
+endfunction
+
+function IB_HasExclusiveArtifact takes unit u returns boolean
+    local integer i = 0
+    local item current
+    if u == null or GetUnitTypeId(u) == 0 then
+        return false
+    endif
+    loop
+        exitwhen i >= 6
+        set current = UnitItemInSlot(u, i)
+        if current != null and IB_IsExclusiveArtifact(GetItemTypeId(current)) then
+            set current = null
+            return true
+        endif
+        set i = i + 1
+    endloop
+    set current = null
+    return false
+endfunction
+
+function IB_AddGive takes player p, integer itemId, integer count returns nothing
+    local unit u = IB_GetSelectedUnit(p)
+    local item it
+    local real x
+    local real y
+    local real dropX
+    local real dropY
+    local integer added = 0
+    local integer created = 0
+    if u == null then
+        call IB_Message(p, "请先选中一个英雄/单位")
+        return
+    endif
+    set x = GetUnitX(u)
+    set y = GetUnitY(u)
+    loop
+        exitwhen created >= count
+        set it = CreateItem(itemId, x, y)
+        if it != null then
+            if IB_IsExclusiveArtifact(itemId) and IB_HasExclusiveArtifact(u) then
+                set dropX = GetUnitX(u) + 64.0 * Cos(GetUnitFacing(u) * bj_DEGTORAD)
+                set dropY = GetUnitY(u) + 64.0 * Sin(GetUnitFacing(u) * bj_DEGTORAD)
+                call SetItemPosition(it, dropX, dropY)
+            elseif UnitAddItem(u, it) then
+                set added = added + 1
+            else
+                call SetItemPosition(it, x, y)
+            endif
+        endif
+        set created = created + 1
+        set it = null
+        exitwhen added == 0 and IB_IsExclusiveArtifact(itemId) and IB_HasExclusiveArtifact(u)
+    endloop
+    if added > 0 then
+        call IB_Message(p, "已添加 " + I2S(added) + " 个 \\"" + IB_ItemName(ib_addFoundIdx) + "\\"")
+    endif
+    set u = null
+endfunction"""
+add_give_pattern = re.compile(
+    r"function IB_AddGive takes player p, integer itemId, integer count returns nothing"
+    r"\n.*?\nendfunction",
+    re.S,
+)
+# Remove previously generated helpers before inserting the complete block.
+# GUI builds may reuse a work directory, so this patch must be idempotent.
+txt = re.sub(
+    r"function IB_IsExclusiveArtifact takes integer itemId returns boolean"
+    r"\n.*?\nendfunction\n\n?",
+    "",
+    txt,
+    flags=re.S,
+)
+txt = re.sub(
+    r"function IB_HasExclusiveArtifact takes unit u returns boolean"
+    r"\n.*?\nendfunction\n\n?",
+    "",
+    txt,
+    flags=re.S,
+)
+if not add_give_pattern.search(txt):
+    raise SystemExit("IB_AddGive block not found in f.j")
+txt = add_give_pattern.sub(lambda m: add_give, txt, count=1)
+if (
+    "exitwhen created >= count" not in txt
+    or "exitwhen added >= count" in txt
+):
+    raise SystemExit(
+        "IB_AddGive must cap item creation by requested count, not by "
+        "successfully-added count"
+    )
+
 # 1) Remove any previously generated IB_Fill* / IB_FillStep / IB_SkillFill* / IB_UnitFill* functions (idempotent rebuild)
 txt = re.sub(r"function IB_FillStep takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
 txt = re.sub(r"function IB_Fill\d+ takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)
@@ -358,17 +460,19 @@ with open(FJ, "wb") as fh:
     # 先按 UTF-8 编码，再把 \x00GBK<idx>\x00 标记替换为 GBK 字节
     data = txt.encode("utf-8")
     for i, nm in gbk_map.items():
+        escaped = jass_escape(nm)
         try:
-            gbk_bytes = nm.encode("gbk")
+            gbk_bytes = escaped.encode("gbk")
         except Exception:
-            gbk_bytes = nm.encode("utf-8")
+            gbk_bytes = escaped.encode("utf-8")
         data = data.replace(("\x00GBK%d\x00" % i).encode("utf-8"), gbk_bytes)
     # 物品 GBK 名称
     for i, nm in item_gbk_map.items():
+        escaped = jass_escape(nm)
         try:
-            gbk_bytes = nm.encode("gbk")
+            gbk_bytes = escaped.encode("gbk")
         except Exception:
-            gbk_bytes = nm.encode("utf-8")
+            gbk_bytes = escaped.encode("utf-8")
         data = data.replace(("\x00IGBK%d\x00" % i).encode("utf-8"), gbk_bytes)
     fh.write(data)
 

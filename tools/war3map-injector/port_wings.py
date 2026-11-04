@@ -206,7 +206,12 @@ def check_script_clash(target, script_dirs):
     """
     a = W.MPQArchive(target)
     try:
-        data = a.read_file("war3map.j") or b""
+        data = (
+            a.read_file("war3map.j")
+            or a.read_file(r"scripts\war3map.j")
+            or a.read_file(r"Scripts\war3map.j")
+            or b""
+        )
     finally:
         a.close()
     map_fns = set(FUNC_RE.findall(data.decode("latin-1")))
@@ -242,6 +247,38 @@ def verify_injected(dst, pairs):
         a.close()
 
 
+def preadd_missing_native_payloads(dst, pairs):
+    """Fill missing hash entries through SFmpq before rebuilding with native MPQ."""
+    helper = os.path.join(HERE, "sfmpq_add_file.ps1")
+    powershell = r"C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
+    if not os.path.exists(helper) or not os.path.exists(powershell):
+        return
+    for source, internal in pairs:
+        archive = W.MPQArchive(dst)
+        try:
+            exists = archive._find_file(internal) is not None
+        finally:
+            archive.close()
+        if exists:
+            continue
+        cmd = [
+            powershell, "-NoProfile", "-ExecutionPolicy", "Bypass",
+            "-File", helper,
+            "-Map", dst,
+            "-Source", source,
+            "-Internal", internal,
+        ]
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, encoding="utf-8", errors="replace"
+        )
+        if result.returncode:
+            raise SystemExit(
+                "SFmpq pre-add failed for %s:\n%s\n%s"
+                % (internal, result.stdout, result.stderr)
+            )
+        print("  SFmpq 预写入:", internal, flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("map")
@@ -254,6 +291,8 @@ def main():
                     help="不注入物品浏览器（默认注入；没有它就只能用 wing/mount 命令）")
     ap.add_argument("--native", action="store_true",
                     help="用原生 MPQ 写入器注入（不走 HKE；没有 (listfile) 的图必须用它）")
+    ap.add_argument("--no-native-verify", action="store_true",
+                    help="跳过原生注入器的全档案重复解压校验；仍执行目标文件回读校验")
     ap.add_argument("--profile-original", action="store_true",
                     help="坐骑数值用「只加不改」档位（伤害/护甲等全部继承原版；战役/别人家的图推荐）")
     ap.add_argument("--dry-run", action="store_true")
@@ -366,6 +405,8 @@ def main():
     inject = [PY, os.path.join(HERE, injector), dst]
     if not args.native:
         inject += ["--script-mode", "manual", "--kill-stale"]
+    elif args.no_native_verify:
+        inject += ["--no-verify"]
     for d in script_dirs:
         inject += ["--script", d]
     for outp, internal in merged:
@@ -380,6 +421,13 @@ def main():
     if args.deploy:
         out_name = args.name or (os.path.splitext(os.path.basename(target))[0] + "_wings.w3x")
         inject += ["--deploy", out_name]
+    if args.native:
+        model_pairs = []
+        for srcname, internal in WING_MODELS:
+            p = model_src(srcname)
+            if os.path.exists(p):
+                model_pairs.append((p, internal))
+        preadd_missing_native_payloads(dst, merged + model_pairs)
     run(inject)
 
     print("\n注入结果校验（读回地图，和本地构件逐字节比对）：")

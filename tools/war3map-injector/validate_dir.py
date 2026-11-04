@@ -7,10 +7,21 @@ import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE = os.path.dirname(os.path.dirname(HERE))
-PJASS_DIR = r"H:\Games\War3\Tools\偶久改图一条龙工具包\tools\JassCraft"
+# pjass 用仓库里那份 JassCraft（H 盘那个路径已经不存在了）。
+PJASS_DIR = os.path.join(BASE, "tools", "war3-tools", "偶久改图一条龙工具包",
+                         "tools", "JassCraft")
 PJASS = os.path.join(PJASS_DIR, "pjass.exe")
-COMMON = os.path.join(PJASS_DIR, "common.j")
-BLIZZ = os.path.join(PJASS_DIR, "blizzard.j")
+# ⚠ 参考脚本要用 Doctor 的 1.24 版：JassCraft 自带的是 1.07 时代的 common.j，
+#   缺 agent/hashtable/GetHandleId，会报一堆假错（见 docs/06-工具链/KKWE平台图单机化.md）。
+_VERSION = os.environ.get("JASS_REF_VERSION", "1.24").strip()
+_REF = os.path.join(BASE, "tools", "_devos-map-doctor", "devos-map-doctor-main",
+                    "doctor", "ref", _VERSION)
+if os.path.exists(os.path.join(_REF, "common.j")):
+    COMMON = os.path.join(_REF, "common.j")
+    BLIZZ = os.path.join(_REF, "blizzard.j")
+else:
+    COMMON = os.path.join(PJASS_DIR, "common.j")
+    BLIZZ = os.path.join(PJASS_DIR, "blizzard.j")
 
 
 def main():
@@ -25,7 +36,8 @@ def main():
     out = os.path.join(d, "_combined.j")
     open(out, "w", encoding="utf-8", errors="replace").write(combined)
     print("wrote", out, len(combined), "bytes")
-    r = subprocess.run([PJASS, COMMON, BLIZZ, out], capture_output=True)
+    compat = os.path.join(HERE, "reforged_compat.j")
+    r = subprocess.run([PJASS, COMMON, BLIZZ, compat, out], capture_output=True)
     print("returncode", r.returncode)
     for stream in (r.stdout, r.stderr):
         txt = stream.decode("utf-8", "replace")

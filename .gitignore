@@ -120,3 +120,6 @@ maps/LostTemple/LostTemple_wings/
 maps/*.w3x
 !maps/LostTemple/*.w3x
 !maps/campaign/*.w3x
+
+# ---- port_wings.py working dir ----
+maps/port/

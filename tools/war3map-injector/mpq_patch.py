@@ -31,6 +31,11 @@ ALIGN = 512
 WRITE_FLAGS = W.MPQ_FILE_EXISTS | W.MPQ_FILE_COMPRESS
 
 
+def compact_archive_enabled() -> bool:
+    value = os.environ.get("ALAS_COMPACT_ARCHIVE", "1").strip().lower()
+    return value not in ("0", "false", "no", "off")
+
+
 def compress_sectors(data, sector_size):
     """返回 file_data：扇区偏移表 + 各扇区（每扇区 = 1 字节压缩类型 + 数据）。"""
     pieces = []
@@ -54,6 +59,50 @@ def used_hash_count(hash_tbl):
                if e[0] not in (W.MPQ_HASH_ENTRY_EMPTY, W.MPQ_HASH_ENTRY_DELETED))
 
 
+def block_index_for_name(archive, name):
+    hash_a = W._hash_string(name, W.MPQ_HASH_NAME_A)
+    hash_b = W._hash_string(name, W.MPQ_HASH_NAME_B)
+    index = W._hash_string(
+        name, W.MPQ_HASH_TABLE_OFFSET
+    ) % archive.hash_table_size
+    for _ in range(archive.hash_table_size):
+        entry = archive.hash_table[index]
+        if entry[0] == hash_a and entry[1] == hash_b:
+            return entry[3]
+        if entry[0] == W.MPQ_HASH_ENTRY_EMPTY:
+            return None
+        index = (index + 1) % archive.hash_table_size
+    return None
+
+
+def known_internal_names(ar):
+    """Return recoverable MPQ names for rebuilding a nearly full hash table."""
+    names = set(ar.files())
+    names.update(W.MPQ_INTERNAL_NAMES)
+    names.update(W.WAR3_STANDARD_MAP_FILES)
+
+    imports = ar.read_file("war3map.imp") or b""
+    if len(imports) < 8:
+        return names
+    count = struct.unpack_from("<I", imports, 4)[0]
+    pos = 8
+    for _ in range(count):
+        if pos >= len(imports):
+            break
+        flags = imports[pos]
+        pos += 1
+        end = imports.find(b"\x00", pos)
+        if end < 0:
+            break
+        name = imports[pos:end].decode("utf-8", "replace")
+        pos = end + 1
+        if flags == 0x08:
+            name = "war3mapImported\\" + name
+        if name:
+            names.add(name)
+    return names
+
+
 def expand_hash_table(ar, hash_tbl, incoming_names, load_limit=0.70):
     """Grow a nearly full MPQ hash table without losing unlisted entries."""
     live = [e for e in hash_tbl
@@ -72,13 +121,8 @@ def expand_hash_table(ar, hash_tbl, incoming_names, load_limit=0.70):
     if required <= len(hash_tbl):
         return hash_tbl, len(hash_tbl)
 
-    # listfile() intentionally omits MPQ-internal names.
-    candidates = list(ar.files()) + [
-        "(listfile)",
-        "(attributes)",
-        "(signature)",
-        "(user data)",
-    ]
+    # listfile() intentionally omits MPQ-internal names and imported files.
+    candidates = known_internal_names(ar)
     name_by_pair = {}
     for name in candidates:
         pair = (W._hash_string(name, W.MPQ_HASH_NAME_A),
@@ -146,6 +190,22 @@ def table_encrypted(raw, size, name, file_size=None):
     return False
 
 
+def hash_table_encrypted(raw, size, name, known_table):
+    """Detect a full hash table by comparing it with the archive's parsed rows."""
+    known = list(known_table)
+    for hash_type in (3, 1, 0, 2):
+        key = W._hash_string(name, W.MPQ_HASH_FILE_KEY)
+        if hash_type != 3:
+            key = W._hash_string(name, hash_type)
+        dec = W._decrypt(raw, key)
+        rows = [struct.unpack_from("<IIII", dec, i * 16) for i in range(size)]
+        if rows == known:
+            return True
+    if [struct.unpack_from("<IIII", raw, i * 16) for i in range(size)] == known:
+        return False
+    return table_encrypted(raw, size, name)
+
+
 def read_block(ar, idx):
     """按块表索引读一个块（绕过文件名），解压后的原始数据。"""
     off, csize, fsize, flags = ar.block_table[idx]
@@ -179,7 +239,105 @@ def read_block(ar, idx):
     return bytes(out[:fsize])
 
 
-def patch(map_path, patches, out_path=None, backup=True, store=()):
+def read_block_raw(ar, idx):
+    off, csize, _fsize, flags = ar.block_table[idx]
+    if not (flags & W.MPQ_FILE_EXISTS):
+        return None
+    ar.file.seek(ar.header_offset + off)
+    return ar.file.read(csize)
+
+
+def rekey_fixed_block(
+    raw, name, old_offset, new_offset, fsize, flags, block_size
+):
+    """Re-encrypt an MPQ_FIX_KEY block after it moves in the archive."""
+    if not (
+        flags & W.MPQ_FILE_ENCRYPTED
+        and flags & W.MPQ_FILE_FIX_KEY
+    ) or old_offset == new_offset:
+        return raw
+    key_base = W._hash_string(
+        os.path.basename(name).replace("/", "\\"),
+        W.MPQ_HASH_FILE_KEY,
+    )
+    old_key = ((key_base + old_offset) ^ fsize) & 0xFFFFFFFF
+    new_key = ((key_base + new_offset) ^ fsize) & 0xFFFFFFFF
+
+    def encrypt(data, key):
+        padded = bytes(data) + b"\x00" * ((-len(data)) % 4)
+        return W._encrypt(padded, key)[:len(data)]
+
+    if flags & W.MPQ_FILE_SINGLE_UNIT:
+        plain = W._decrypt(raw, (old_key - 1) & 0xFFFFFFFF)
+        return encrypt(plain, (new_key - 1) & 0xFFFFFFFF)
+
+    sector_size = 512 << block_size
+    count = (fsize + sector_size - 1) // sector_size
+    table_size = (count + 1) * 4
+    if len(raw) < table_size:
+        raise SystemExit("固定密钥块过短，无法安全迁移")
+    plain_table = W._decrypt(
+        raw[:table_size], (old_key - 1) & 0xFFFFFFFF
+    )
+    offsets = list(struct.unpack_from("<%dI" % (count + 1), plain_table))
+    if (
+        offsets[0] != table_size
+        or any(offsets[i] > offsets[i + 1] for i in range(count))
+        or offsets[-1] > len(raw)
+    ):
+        raise SystemExit("固定密钥块的扇区表无效，无法安全迁移")
+    output = bytearray(
+        encrypt(plain_table, (new_key - 1) & 0xFFFFFFFF)
+    )
+    for index in range(count):
+        sector = raw[offsets[index]:offsets[index + 1]]
+        plain = W._decrypt(
+            sector, (old_key + index) & 0xFFFFFFFF
+        )
+        output.extend(
+            encrypt(plain, (new_key + index) & 0xFFFFFFFF)
+        )
+    return bytes(output)
+
+
+def fixed_block_can_rekey(archive, index, name):
+    off, csize, fsize, flags = archive.block_table[index]
+    if not (
+        flags & W.MPQ_FILE_EXISTS
+        and flags & W.MPQ_FILE_ENCRYPTED
+        and flags & W.MPQ_FILE_FIX_KEY
+    ):
+        return True
+    if flags & W.MPQ_FILE_SINGLE_UNIT:
+        return True
+    sector_size = 512 << archive.block_size
+    count = (fsize + sector_size - 1) // sector_size
+    table_size = (count + 1) * 4
+    archive.file.seek(archive.header_offset + off)
+    raw = archive.file.read(csize)
+    if len(raw) < table_size:
+        return False
+    key_base = W._hash_string(
+        os.path.basename(name).replace("/", "\\"),
+        W.MPQ_HASH_FILE_KEY,
+    )
+    key = ((key_base + off) ^ fsize) & 0xFFFFFFFF
+    table = W._decrypt(raw[:table_size], (key - 1) & 0xFFFFFFFF)
+    offsets = list(
+        struct.unpack_from("<%dI" % (count + 1), table)
+    )
+    return (
+        offsets[0] == table_size
+        and not any(
+            offsets[i] > offsets[i + 1]
+            for i in range(count)
+        )
+        and offsets[-1] <= csize
+    )
+
+
+def patch(map_path, patches, out_path=None, backup=True, store=(),
+          compact=None):
     """patches = [(内部名, 新数据)]；返回写入路径。
 
     store = 需要**原样存储(不压缩)**的内部名集合。
@@ -187,15 +345,54 @@ def patch(map_path, patches, out_path=None, backup=True, store=()):
     压缩块打不开（会报"找不到地图或者损毁"）。原版战役里章节都是未压缩的。
     """
     out_path = out_path or map_path
+    if compact is None:
+        compact = compact_archive_enabled()
     store = set(s.lower() for s in store)
     a = W.MPQArchive(map_path)
     try:
         header_offset = a.header_offset
+        header_size = a.header_size
         fmt = a.format_version
         block_size = a.block_size
         hash_size = a.hash_table_size
         hash_tbl = list(a.hash_table)
         block_tbl = list(a.block_table)
+        known_names = known_internal_names(a)
+        name_by_pair = {
+            (
+                W._hash_string(name, W.MPQ_HASH_NAME_A),
+                W._hash_string(name, W.MPQ_HASH_NAME_B),
+            ): name
+            for name in known_names
+        }
+        block_names = {}
+        for entry in hash_tbl:
+            if entry[0] in (
+                W.MPQ_HASH_ENTRY_EMPTY,
+                W.MPQ_HASH_ENTRY_DELETED,
+            ):
+                continue
+            name = name_by_pair.get((entry[0], entry[1]))
+            if name is not None and entry[3] < len(block_tbl):
+                block_names[entry[3]] = name
+        unsafe_fixed = [
+            index for index, entry in enumerate(block_tbl)
+            if entry[3] & W.MPQ_FILE_EXISTS
+            and entry[3] & W.MPQ_FILE_ENCRYPTED
+            and entry[3] & W.MPQ_FILE_FIX_KEY
+            and (
+                index not in block_names
+                or not fixed_block_can_rekey(
+                    a, index, block_names.get(index, "")
+                )
+            )
+        ]
+        if compact and unsafe_fixed:
+            print(
+                "   紧凑归档：发现 %d 个无法安全迁移的固定密钥保护块，"
+                "本次自动保留原始归档布局" % len(unsafe_fixed)
+            )
+            compact = False
         ext = b""
         if fmt >= 1:
             a.file.seek(header_offset + 32)
@@ -203,7 +400,9 @@ def patch(map_path, patches, out_path=None, backup=True, store=()):
         file_size = os.path.getsize(map_path)
         a.file.seek(header_offset + a.hash_table_pos)
         raw_ht = a.file.read(hash_size * 16)
-        ht_enc = table_encrypted(raw_ht, hash_size, "(hash table)")
+        ht_enc = hash_table_encrypted(
+            raw_ht, hash_size, "(hash table)", hash_tbl
+        )
         a.file.seek(header_offset + a.block_table_pos)
         raw_bt = a.file.read(len(block_tbl) * 16)
         bt_enc = table_encrypted(raw_bt, len(block_tbl), "(block table)", file_size)
@@ -213,8 +412,18 @@ def patch(map_path, patches, out_path=None, backup=True, store=()):
     finally:
         a.close()
     sector_size = 512 << block_size
-    body = bytearray(open(map_path, "rb").read())
-    size_before = len(body)
+    with open(map_path, "rb") as source:
+        prefix = source.read(header_offset)
+        source.seek(header_offset)
+        header_blob = source.read(header_size)
+        source.seek(0, os.SEEK_END)
+        size_before = source.tell()
+    body = (
+        bytearray(prefix + header_blob)
+        if compact
+        else bytearray(open(map_path, "rb").read())
+    )
+    payloads = {}
     # 注意：有些图 header 里的 archive_size **小于**真实数据范围（保护图常见，
     #   例如《西方世界的劫难6》：archive_size 之后其实还是块数据）。
     #   所以新块一律**追加在文件末尾**、再把哈希/块表也写在末尾，绝不"裁剪"任何东西 ——
@@ -249,32 +458,99 @@ def patch(map_path, patches, out_path=None, backup=True, store=()):
                 # 完全合法，游戏按该条目自己的 flags 读，不影响其它条目。
                 print("   注意 %s 原来是加密/单块(0x%08X) -> 写成未加密压缩条目"
                       % (internal, flags))
-        if len(body) % ALIGN:
-            body += b"\x00" * (ALIGN - len(body) % ALIGN)
-        off = len(body) - header_offset
         if internal.lower() in store:
             fdata = data
             wflags = W.MPQ_FILE_EXISTS
         else:
             fdata = compress_sectors(data, sector_size)
             wflags = WRITE_FLAGS
-        body += fdata
         csize = len(fdata)
         if hi is not None:
             bi = hash_tbl[hi][3]
             old = block_tbl[bi]
-            block_tbl[bi] = (off, csize, len(data), wflags)
+            if compact:
+                block_tbl[bi] = (0, csize, len(data), wflags)
+                payloads[bi] = fdata
+            else:
+                if len(body) % ALIGN:
+                    body += b"\x00" * (ALIGN - len(body) % ALIGN)
+                off = len(body) - header_offset
+                body += fdata
+                block_tbl[bi] = (off, csize, len(data), wflags)
             print("   替换 %-26s 块 %-5d %d -> %d 字节%s"
                   % (internal, bi, old[2], len(data), "（原样存储）" if wflags == W.MPQ_FILE_EXISTS else ""))
         else:
-            block_tbl.append((off, csize, len(data), wflags))
-            bi = len(block_tbl) - 1
+            bi = len(block_tbl)
+            if compact:
+                block_tbl.append((0, csize, len(data), wflags))
+                payloads[bi] = fdata
+            else:
+                if len(body) % ALIGN:
+                    body += b"\x00" * (ALIGN - len(body) % ALIGN)
+                off = len(body) - header_offset
+                body += fdata
+                block_tbl.append((off, csize, len(data), wflags))
             idx = W._hash_string(internal, W.MPQ_HASH_TABLE_OFFSET) % hash_size
             while hash_tbl[idx][0] != W.MPQ_HASH_ENTRY_EMPTY:
                 idx = (idx + 1) % hash_size
             hash_tbl[idx] = (ha, hb, 0, bi)
             print("   新增 %-26s 块 %-5d %d 字节（哈希槽 %d）%s"
                   % (internal, bi, len(data), idx, "（原样存储）" if wflags == W.MPQ_FILE_EXISTS else ""))
+
+    if compact:
+        compacted = []
+        copied = {}
+        with open(map_path, "rb") as source:
+            for bi, (old_off, old_csize, fsize, flags) in enumerate(block_tbl):
+                if not (flags & W.MPQ_FILE_EXISTS):
+                    compacted.append((0, old_csize, fsize, flags))
+                    continue
+                if bi in payloads:
+                    fdata = payloads[bi]
+                    key = None
+                else:
+                    key = (old_off, old_csize, fsize, flags)
+                    if key in copied:
+                        compacted.append(
+                            (copied[key], old_csize, fsize, flags)
+                        )
+                        continue
+                    source.seek(header_offset + old_off)
+                    fdata = source.read(old_csize)
+                    if len(fdata) != old_csize:
+                        raise SystemExit(
+                            "紧凑归档复制块 %d 失败：期望 %d 字节，读到 %d"
+                            % (bi, old_csize, len(fdata))
+                        )
+                relative = len(body) - header_offset
+                if relative % ALIGN:
+                    pad = ALIGN - relative % ALIGN
+                    body.extend(b"\x00" * pad)
+                new_off = len(body) - header_offset
+                if (
+                    bi not in payloads
+                    and flags & W.MPQ_FILE_ENCRYPTED
+                    and flags & W.MPQ_FILE_FIX_KEY
+                ):
+                    fdata = rekey_fixed_block(
+                        fdata,
+                        block_names[bi],
+                        old_off,
+                        new_off,
+                        fsize,
+                        flags,
+                        block_size,
+                    )
+                body.extend(fdata)
+                compacted.append((new_off, old_csize, fsize, flags))
+                if key is not None:
+                    copied[key] = new_off
+        block_tbl = compacted
+        print(
+            "   紧凑归档：去除未引用数据，保留 %d 个块"
+            % sum(1 for entry in block_tbl
+                  if entry[3] & W.MPQ_FILE_EXISTS)
+        )
 
     def write_table(tbl, name, encrypted):
         if len(body) % ALIGN:
@@ -323,21 +599,64 @@ def verify(old_path, new_path, patched):
     a = W.MPQArchive(old_path)
     old_blocks = list(a.block_table)
     old_used = used_hash_count(a.hash_table)
-    old_data = [read_block(a, i) for i in range(len(old_blocks))]
+    old_data = [read_block_raw(a, i) for i in range(len(old_blocks))]
+    names = known_internal_names(a)
+    name_by_pair = {
+        (
+            W._hash_string(name, W.MPQ_HASH_NAME_A),
+            W._hash_string(name, W.MPQ_HASH_NAME_B),
+        ): name
+        for name in names
+    }
+    block_names = {}
+    for entry in a.hash_table:
+        if entry[0] in (
+            W.MPQ_HASH_ENTRY_EMPTY,
+            W.MPQ_HASH_ENTRY_DELETED,
+        ):
+            continue
+        name = name_by_pair.get((entry[0], entry[1]))
+        if name is not None and entry[3] < len(old_blocks):
+            block_names[entry[3]] = name
+    rekeyed_data = {
+        i: a.read_file(name)
+        for i, name in block_names.items()
+        if old_blocks[i][3] & W.MPQ_FILE_ENCRYPTED
+        and old_blocks[i][3] & W.MPQ_FILE_FIX_KEY
+    }
     a.close()
     b = W.MPQArchive(new_path)
     new_used = used_hash_count(b.hash_table)
     new_blocks = list(b.block_table)
+    replaced_indices = {
+        block_index_for_name(b, internal)
+        for internal, _want in patched
+    }
+    replaced_indices.discard(None)
     bad = 0
     skipped = 0
     for i, want in enumerate(old_data):
         if want is None:
             continue
-        # 被我们**故意替换**的块（块表条目本身变了）不参与"老内容"比对
-        if i >= len(new_blocks) or new_blocks[i] != old_blocks[i]:
+        if i >= len(new_blocks):
+            bad += 1
+            continue
+        old = old_blocks[i]
+        new = new_blocks[i]
+        # 紧凑归档会移动所有块的 offset。只要大小与 flags 没变，就应逐字节
+        # 保留原数据；offset 变化本身不算内容变化。
+        if i in replaced_indices:
             skipped += 1
             continue
-        if read_block(b, i) != want:
+        if old[1:] != new[1:]:
+            bad += 1
+            continue
+        if i in rekeyed_data:
+            name = block_names[i]
+            if b.read_file(name) != rekeyed_data[i]:
+                bad += 1
+            continue
+        if read_block_raw(b, i) != want:
             bad += 1
     ok = True
     print("   条目: 哈希 %d -> %d，块 %d -> %d" % (old_used, new_used,

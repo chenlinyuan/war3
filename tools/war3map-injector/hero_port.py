@@ -1004,12 +1004,62 @@ def main():
             for m in mods:
                 if m[0] == "unam":
                     m[4] = "分身"
-        if new_id == "H0B1":
-            mods = [m for m in mods if m[0] != "umdl"]
-            mods.append([
-                "umdl", 3, None, None,
-                r"war3campImported\ReforgedBladeMaster\HeroBladeMaster_Reforged.mdx",
-            ])
+        if new_id == "H0F1":
+            # The hero frame uses upro for the proper name and unam for the
+            # class shown after the level. Keep them distinct and explicit.
+            replacements = {
+                "unam": "火焰巨魔",
+                "upro": "拉格纳罗斯(FL)",
+                "utip": "火焰巨魔",
+                "uico": (
+                    r"ReplaceableTextures\CommandButtons"
+                    r"\BTNFirelordAvatar_30HD.blp"
+                ),
+                "ussi": (
+                    r"ReplaceableTextures\CommandButtons"
+                    r"\BTNFirelordAvatar_30HD.blp"
+                ),
+            }
+            present = {m[0] for m in mods}
+            for mod in mods:
+                if mod[0] in replacements:
+                    mod[4] = replacements[mod[0]]
+                elif mod[0] == "upru":
+                    mod[4] = 1
+            for field, value in replacements.items():
+                if field not in present:
+                    mods.append([field, 3, None, None, value])
+            if "upru" not in present:
+                mods.append(["upru", 0, None, None, 1])
+        elif new_id == "h0F1":
+            # 1.27 resolves some custom-unit UI lookups case-insensitively.
+            # This helper shares the same letters as H0F1 and would otherwise
+            # leak its "Flying Machine" icon and empty proper name into the
+            # Firelord's hero frame.
+            replacements = {
+                "unam": "火焰巨魔",
+                "upro": "拉格纳罗斯(FL)",
+                "utip": "火焰巨魔",
+                "uico": (
+                    r"ReplaceableTextures\CommandButtons"
+                    r"\BTNFirelordAvatar_30HD.blp"
+                ),
+                "ussi": (
+                    r"ReplaceableTextures\CommandButtons"
+                    r"\BTNFirelordAvatar_30HD.blp"
+                ),
+            }
+            present = {m[0] for m in mods}
+            for mod in mods:
+                if mod[0] in replacements:
+                    mod[4] = replacements[mod[0]]
+                elif mod[0] == "upru":
+                    mod[4] = 1
+            for field, value in replacements.items():
+                if field not in present:
+                    mods.append([field, 3, None, None, value])
+            if "upru" not in present:
+                mods.append(["upru", 0, None, None, 1])
         primary = cfg.get("primary")
         if primary:
             for m in mods:
@@ -1045,15 +1095,6 @@ def main():
         "stats": hero_row,
         "icon_files": cfg.get("icons", []),
     }
-    if cfg["out"] == "blade_master":
-        manifest["model"] = (
-            r"war3campImported\ReforgedBladeMaster"
-            r"\HeroBladeMaster_Reforged.mdx"
-        )
-        manifest["model_source"] = (
-            r"H:\Games\Warcraft III\_retail_\x86_64"
-            r"\Units\Orc\HeroBladeMaster\HeroBladeMaster.mdx (HD CASC)"
-        )
     open(os.path.join(outdir, "manifest.json"), "w", encoding="utf-8").write(
         json.dumps(manifest, ensure_ascii=False, indent=2))
     print("manifest ->", os.path.join(outdir, "manifest.json"))

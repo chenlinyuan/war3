@@ -31,6 +31,7 @@ BTN_BOOTS = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp"
 BTN_REGEN = "ReplaceableTextures\\CommandButtons\\BTNRingSkull.blp"
 BTN_MANA = "ReplaceableTextures\\CommandButtons\\BTNSobiMask.blp"
 BTN_BRACER = "ReplaceableTextures\\CommandButtons\\BTNRunedBracers.blp"
+BTN_DEATH_FINGER = "ReplaceableTextures\\CommandButtons\\BTNCorpseExplode.blp"
 BTN_EGG = "ReplaceableTextures\\CommandButtons\\BTNThunderLizardEgg.blp"
 BTN_PHOENIX = "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp"
 BTN_DRAGON_B = "ReplaceableTextures\\CommandButtons\\BTNAzureDragon.blp"
@@ -241,17 +242,28 @@ def build(out_path):
             mod("Uau1", 2, 1, 1, C["aura_unholy_speed"]),
             mod("Uau2", 2, 1, 2, C["aura_unholy_regen"]),
             mod("aare", 2, 1, 0, C["aura_radius"]),
+            mod("abuf", 3, 1, 0, CFG.BUFFS["aura_unholy"]),
         ],
         item_ability=False,
     ))
-    # 吸血光环: Uav1 = 吸血比例
+    # 吸血光环: Uav1 = 吸血比例。
+    #   天灾骨钟 sbch 的原生写法是把物品版 AIav 直接放进物品 abilList，
+    #   而不是把单位版 AUav 塞进隐藏魔法书。新配置按这个原生物品写法生成；
+    #   仍使用旧书内配置的战役则继续用 AUav，避免旧快照重建时失效。
+    fallen_cfg = CFG.wing_by_key("fallen")
+    vamp_is_item = "aura_vamp" in fallen_cfg["iabi_keys"]
+    vamp_mods = [
+        mod("Uav1", 2, 1, 1, C["aura_vamp"]),
+        mod("aare", 2, 1, 0, C["aura_radius"]),
+        mod("abuf", 3, 1, 0, CFG.BUFFS["aura_vamp"]),
+    ]
+    if not vamp_is_item:
+        vamp_mods.append(mod("atar", 3, 1, 0, C["aura_targets"]))
     entries.append(ability_entry(
-        WING_AURA_VAMP, "AUav", "[光环]吸血 +40%", BTN_DRAGON_R,
-        extra_mods=[
-            mod("Uav1", 2, 1, 1, C["aura_vamp"]),
-            mod("aare", 2, 1, 0, C["aura_radius"]),
-        ],
-        item_ability=False,
+        WING_AURA_VAMP, "AIav" if vamp_is_item else "AUav",
+        "[光环]吸血 +40%", BTN_DRAGON_R,
+        extra_mods=vamp_mods,
+        item_ability=vamp_is_item,
     ))
     # 闪避: Eev1 = 闪避概率
     entries.append(ability_entry(
@@ -265,6 +277,7 @@ def build(out_path):
         extra_mods=[
             mod("Hab1", 2, 1, 1, C["aura_brill"]),
             mod("aare", 2, 1, 0, C["aura_radius"]),
+            mod("abuf", 3, 1, 0, CFG.BUFFS["aura_brill"]),
         ],
         item_ability=False,
     ))
@@ -331,6 +344,7 @@ def build(out_path):
             mod("Ear2", 0, 1, 2, 1),
             mod("Ear3", 0, 1, 3, 1),
             mod("aare", 2, 1, 0, C["aura_radius"]),
+            mod("abuf", 3, 1, 0, CFG.BUFFS["aura_command"]),
         ],
         item_ability=False,
     ))
@@ -341,6 +355,7 @@ def build(out_path):
             mod("Oae1", 2, 1, 1, C["aura_endur_speed"]),
             mod("Oae2", 2, 1, 2, C["aura_endur_attack"]),
             mod("aare", 2, 1, 0, C["aura_radius"]),
+            mod("abuf", 3, 1, 0, CFG.BUFFS["aura_endur"]),
         ],
         item_ability=False,
     ))
@@ -416,16 +431,27 @@ def build(out_path):
         tip="暗影庇护(|cffffcc00D|r)",
         ubertip="%d 秒内免疫所有伤害。|n冷却 %d 秒。" % (C["act_invul_dur"], C["act_invul_cd"]),
     ))
-    # 群体传送: 必须用英雄版 AHmt(点地面); 物品版 AImt 是"指向友军单位"的, 点地面无效
+    # 群体传送直接复刻澄海 3C 的传送权杖 AImt 配置。
     entries.append(ability_entry(
         WING_ACT_TELE, "AHmt", "群体传送", BTN_MANA,
         extra_mods=[
-            mod("aare", 2, 1, 0, C["aura_radius"]),
-            mod("acdn", 2, 1, 0, C["act_tele_cd"]),
+            mod("aare", 2, 1, 0, 700.0),
+            mod("aran", 2, 1, 0, 99999.0),
+            mod(
+                "atar", 3, 1, 0,
+                "friend,vulnerable,ground,structure,invulnerable,nonsapper",
+            ),
+            mod("acdn", 2, 1, 0, 15.0),
+            mod("amcs", 0, 1, 0, 0),
+            mod("acas", 2, 1, 0, 0.0),
+            mod("Hmt1", 0, 1, 1, 24),
+            mod("Hmt2", 2, 1, 2, 0.2),
+            mod("Hmt3", 0, 1, 3, 1),
         ],
         tip="群体传送(|cffffcc00T|r)",
-        ubertip="把自身与周围 %d 范围内的友军一起传送到地图上任意可见位置。|n冷却 %d 秒。" % (
-            C["aura_radius"], C["act_tele_cd"]),
+        ubertip="将自身与周围 %d 范围内的最多 24 个友军单位"
+                "传送到目标友军单位或建筑旁。|n冷却 15 秒，不消耗魔法。"
+                % C["aura_radius"],
     ))
     entries.append(ability_entry(
         WING_ACT_BLINK, "AIbk", "闪烁", BTN_BOOTS,
@@ -537,11 +563,11 @@ def build(out_path):
         WING_SPELL_SHIELD, "AIcf", "[星魂]献祭", CFG.ICONS["star"],
         extra_mods=[
             mod("acdn", 2, 1, 0, 0.0),          # 冷却 0：没有冷却就不会锁物品
-            mod("aare", 2, 1, 0, 1.0),          # 原生伤害"关掉"（脚本按 500 码自己算）
+            mod("aare", 2, 1, 0, 1.0),          # 原生伤害"关掉"（脚本按 300 码自己算）
             mod("atar", 3, 1, 0, "ground,enemies,air"),
         ],
         tip="献祭(|cffffcc00被动|r)",
-        ubertip="500 码内的敌人每 0.5 秒受到最高属性×0.5 的魔法伤害"
+        ubertip="300 码内的敌人每 0.5 秒受到最高属性×0.5 的魔法伤害"
                 "（不吃魔法免疫、不打建筑，伤害由装备脚本结算）。",
     ))
     # 阿克蒙德之手的「重击」：概率触发额外伤害 + 眩晕（放物品的技能列表里，被动生效）。
@@ -573,7 +599,7 @@ def build(out_path):
     #     它**不画闪电**，只能脚本用 AddLightningEx 自己画 —— 一旦"单位坐标 ≠ 显示位置"
     #     闪电就会画歪（玩家实测两次）。ANfd 的闪电是引擎画的，位置永远对；
     #     目标表 `atar` 也是真字段（能限制成"只点敌人、能点英雄"）。
-    #   ⚠ 官方 ANfd 的 Damage 是 500，我们**置 0**，伤害改由脚本按最高属性算（f.j 的 WG_OnFinger）。
+    #   ⚠ 官方 ANfd 的 Damage 是 500，我们**置 0**，伤害改由脚本按智力算（f.j 的 WG_OnFinger）。
     #   ⚠ 7 档必须**逐档**把 AbilityData 类字段写全（含 Nfd1/Nfd2/Nfd3/atar/aran），
     #     否则第 2 档往后会回退到基对象 ANfd 的默认值（Nfd3=500 → 白送一次官方伤害）；
     #     `alig`/`ahky`/`atat`/`aefs` 是 Profile 全局字段 → 写 lv=0 就够。
@@ -598,18 +624,18 @@ def build(out_path):
         finger_mods.append(mod("aran", 2, i, 0, C["finger_range"]))
         finger_mods.append(mod("Nfd1", 2, i, 1, 0.25))  # Graphic Delay（官方值）
         finger_mods.append(mod("Nfd2", 2, i, 2, 1.0))   # Graphic Duration（官方值）
-        finger_mods.append(mod("Nfd3", 2, i, 3, 0.0))   # Damage = 0（伤害由脚本按最高属性给）
+        finger_mods.append(mod("Nfd3", 2, i, 3, 0.0))   # Damage = 0（伤害由脚本按智力给）
         finger_mods.append(mod("acdn", 2, i, 0, cd))
         finger_mods.append(mod("amcs", 0, i, 0, mana))
-        finger_mods.append(mod("atp1", 3, i, 0, "死亡之指(|cffffcc00F|r)"))
+        finger_mods.append(mod("atp1", 3, i, 0, "死亡之指"))
         finger_mods.append(mod("aub1", 3, i, 0,
-                               "对英雄造成 最高属性×%g 的混沌伤害，非英雄单位翻倍（×%g）；"
-                               "无视护甲与魔法免疫。|n冷却 %g 秒、耗魔 %d。"
-                               % (C["finger_dmg_hero_mult"], C["finger_dmg_other_mult"],
-                                  cd, mana)))
+                               "对英雄造成 智力×%g 的混沌伤害，非英雄单位翻倍（×%g）；"
+                               "无视护甲与魔法免疫。"
+                               % (C["finger_dmg_hero_mult"],
+                                  C["finger_dmg_other_mult"])))
     entries.append(ability_entry(
-        CFG.HAND["finger"], "ANfd", "死亡之指", CFG.ICONS["akmond"],
-        extra_mods=finger_mods, levels=len(finger_lv),
+        CFG.HAND["finger"], "ANfd", "死亡之指", BTN_DEATH_FINGER,
+        extra_mods=finger_mods, levels=len(finger_lv), item_ability=False,
     ))
 
     # === 坐骑相关技能（挂载 / 蛋使用 / 取消骑乘）===

@@ -15,9 +15,6 @@ SPEED_ID = "A106"
 FROST_ID = "A107"
 ATTACK_ID = "A108"
 REGEN_ID = "A109"
-SOUL_BASE_ID = 130
-SOUL_BIT_COUNT = 12
-SOUL_DRAIN_PER_PROC = 50
 ICON = r"ReplaceableTextures\CommandButtons\BTNFrostMourne.blp"
 SPELL_ICON = r"ReplaceableTextures\CommandButtons\BTNBreathOfFrost.blp"
 
@@ -26,13 +23,13 @@ def item_entry():
     name = "|cffff8c00霜之哀伤|r"
     lore = "巫妖王的低语。这是一柄萦绕着哀伤的长剑，它会窃取你的灵魂。"
     ubertip = (
-        lore +
-        "|n|n攻速 +50%｜攻击力 +30｜魔法恢复 +200%"
-        "|n攻击减速 65%（普通 4 秒 / 英雄 2 秒）"
-        "|n|n|cffffcc00主动：冰封践踏|r"
-        "|n耗魔 100，冷却 10 秒；550 范围，地面与空中均有效。"
-        "|n造成 100+最高属性×4 伤害，冰冻普通 5 秒 / 英雄 3 秒。"
-        "|n|cff9d5cff灵魂代价：成功释放时 25% 概率永久失去 50 最大生命。|r"
+        "|cffff8c00神器|r|n|n"
+        "攻击力 +30，攻击速度 +50%，魔法恢复 +100%。|n"
+        "|cff5ddf26霜冻新星：普通攻击有 30% 概率触发，250 范围内造成 100 点伤害，"
+        "主目标额外受到 50 点伤害，并减速 4 秒。|n"
+        "|cff5ddf26噬魂：击杀敌人有 5% 概率永久 +1 力量，击杀英雄时为 50%。|r|n"
+        "|cff66ccff装备后获得技能：冰封践踏（D）。|r|n|n"
+        + lore
     )
     entry = {
         "old": "gcel",
@@ -42,18 +39,19 @@ def item_entry():
             ["utip", O.T_STRING, 0, 0, "霜之哀伤"],
             ["utub", O.T_STRING, 0, 0, ubertip],
             ["ides", O.T_STRING, 0, 0, (
-                "巫妖王的低语。攻击速度 +50%，攻击力 +30，魔法恢复 +2 倍，"
-                "攻击减速；"
-                "主动：冰封践踏，地面与空中均有效。"
+                "攻击力 +30，攻击速度 +50%，魔法恢复 +100%。|n"
+                "|cff5ddf26霜冻新星：普通攻击有 30% 概率造成范围伤害与减速。|r|n"
+                "|cff5ddf26噬魂：击杀敌人有 5% 概率永久 +1 力量，击杀英雄时为 50%。|r|n"
+                "|cff66ccff装备后获得技能：冰封践踏（D）。|r|n|n"
+                + lore
             )],
             ["iico", O.T_STRING, 0, 0, ICON],
             ["icla", O.T_STRING, 0, 0, "Artifact"],
             ["ilev", O.T_INT, 0, 0, 8],
             ["igol", O.T_INT, 0, 0, 1000],
             ["iabi", O.T_STRING, 0, 0,
-             ",".join((SPELL_ID, SPEED_ID, ATTACK_ID, REGEN_ID))],
-            ["iusa", O.T_INT, 0, 0, 1],
-            ["icid", O.T_STRING, 0, 0, SPELL_ID],
+             ",".join((SPEED_ID, ATTACK_ID, REGEN_ID))],
+            ["iusa", O.T_INT, 0, 0, 0],
             ["idro", O.T_INT, 0, 0, 1],
             ["ipaw", O.T_INT, 0, 0, 0],
             ["ifil", O.T_STRING, 0, 0,
@@ -64,42 +62,41 @@ def item_entry():
 
 
 def spell_entry():
-    tip = "冰封践踏(|cffffcc00R|r)"
+    tip = "冰封践踏"
     ubertip = (
-        "释放霜之哀伤的力量，冰封并伤害四周敌人。|n"
-        "对范围内敌人造成 100+最高属性×4 的伤害。|n"
-        "普通单位冰冻 5 秒，英雄冰冻 3 秒；地面与空中均有效。|n"
-        "冷却 10 秒，耗魔 100。|n"
-        "|cff9d5cff灵魂代价：每次成功释放有 25% 概率永久失去 50 最大生命。|r"
+        "对 550 范围内地面与空中敌人造成 100 + 4×力量 的伤害。|n"
+        "普通单位冰冻 5 秒，英雄冰冻 3 秒。|n"
+        "魔法免疫单位会被冻结，但不会受到伤害。|n"
+        "|cff9d5cff消耗当前生命 20%，不会致死。|r"
     )
     return {
-        "old": "AOws",
+        "old": "ANcl",
         "new": SPELL_ID,
         "mods": [
             ["anam", O.T_STRING, 0, 0, "冰封践踏"],
             ["aart", O.T_STRING, 0, 0, SPELL_ICON],
             ["arar", O.T_STRING, 0, 0, SPELL_ICON],
             ["aret", O.T_STRING, 0, 0, tip],
-            ["arhk", O.T_STRING, 0, 0, "R"],
-            ["ahky", O.T_STRING, 0, 0, "R"],
+            ["arhk", O.T_STRING, 0, 0, "D"],
+            ["ahky", O.T_STRING, 0, 0, "D"],
+            ["aani", O.T_STRING, 0, 0, "stand"],
+            ["aord", O.T_STRING, 0, 0, "froststomp"],
             ["atp1", O.T_STRING, 1, 0, tip],
             ["aub1", O.T_STRING, 1, 0, ubertip],
             ["alev", O.T_INT, 0, 0, 1],
-            ["aite", O.T_INT, 0, 0, 1],
+            ["aite", O.T_INT, 0, 0, 0],
             ["aher", O.T_INT, 0, 0, 0],
-            ["Wrs1", O.T_UNREAL, 1, 1, 100.0],
-            ["aare", O.T_UNREAL, 1, 0, 550.0],
-            ["adur", O.T_UNREAL, 1, 0, 5.0],
-            ["ahdu", O.T_UNREAL, 1, 0, 3.0],
+            ["Ncl1", O.T_UNREAL, 1, 1, 0.0],
+            ["Ncl2", O.T_INT, 1, 2, 0],
+            ["Ncl3", O.T_INT, 1, 3, 1],
+            ["Ncl4", O.T_UNREAL, 1, 4, 0.0],
+            ["Ncl5", O.T_INT, 1, 5, 0],
+            ["Ncl6", O.T_STRING, 1, 6, "froststomp"],
             ["acdn", O.T_UNREAL, 1, 0, 10.0],
             ["amcs", O.T_INT, 1, 0, 100],
-            ["abuf", O.T_STRING, 1, 0, "Bfrz"],
-            ["acat", O.T_STRING, 0, 0,
-             r"war3campImported\IceStompRaised.mdx"],
+            ["acat", O.T_STRING, 0, 0, ""],
             ["arpx", O.T_INT, 0, 0, 2],
             ["aubx", O.T_INT, 0, 0, 1],
-            ["atar", O.T_STRING, 1, 0,
-             "neutral,ground,structure,enemies,organic,mechanical,air"],
         ],
     }
 
@@ -159,30 +156,9 @@ def regen_entry():
             ["alev", O.T_INT, 0, 0, 1],
             ["aite", O.T_INT, 0, 0, 1],
             ["aher", O.T_INT, 0, 0, 0],
-            ["Imrp", O.T_UNREAL, 1, 1, 2.0],
+            ["Imrp", O.T_UNREAL, 1, 1, 1.0],
         ],
     }
-
-
-def soul_entry(bit):
-    new_id = "A%03d" % (SOUL_BASE_ID + bit)
-    mods = [
-        ["anam", O.T_STRING, 0, 0, "霜之哀伤·灵魂负担"],
-        ["aart", O.T_STRING, 0, 0, ICON],
-        ["arar", O.T_STRING, 0, 0, ICON],
-        ["alev", O.T_INT, 0, 0, 1],
-        ["aite", O.T_INT, 0, 0, 1],
-        ["aher", O.T_INT, 0, 0, 0],
-        ["Ilif", O.T_INT, 1, 1,
-         -SOUL_DRAIN_PER_PROC * (1 << bit)],
-    ]
-    return {
-        "old": "AIl2",
-        "new": new_id,
-        "mods": mods,
-    }
-
-
 
 
 def merge_object(source, extra, out, ext):
@@ -204,8 +180,7 @@ def main():
                  os.path.join(out, "war3map.w3t"), "w3t")
     merge_object(os.path.join(work, "war3map.w3a"),
                  [spell_entry(), speed_entry(), frost_entry(),
-                  attack_entry(), regen_entry()]
-                 + [soul_entry(i) for i in range(SOUL_BIT_COUNT)],
+                  attack_entry(), regen_entry()],
                  os.path.join(out, "war3map.w3a"), "w3a")
     return 0
 

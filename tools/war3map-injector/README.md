@@ -5,9 +5,19 @@
 
 ## 一句话现状
 
-**入口是 `inject_all.py`：一次 HKE 会话干完所有事。**
-旧的 `inject_map.py` / `inject_file.py` 每次调用都要完整开关一次工具，
-一次部署要开关 4 次、还容易把重压缩强杀掉，已不推荐（保留可用）。
+**首选 `inject_native.py`：不开 GUI，原生写 MPQ，几秒完成，一次替换脚本 + 任意多个内部文件。**
+它的容器被游戏自带的 Storm.dll 校验过（`sfmpq_probe.ps1`：逐文件开门 + md5 与本地一致），
+可以放心用。`inject_all.py`（一次 HKE 会话）作为备选，遇到容器脾气怪的图再上。
+更旧的 `inject_map.py` / `inject_file.py` 每次调用都要完整开关一次 HKE，已不推荐（保留可用）。
+
+```powershell
+# 原生注入：脚本 + 对象数据 + 模型，一次写入（秒级）
+python tools/war3map-injector/inject_native.py maps/LostTemple/LostTemple_wings.w3x `
+    --script scripts/wings `
+    --file tools/war3map-injector/_wing.w3a=war3map.w3a `
+    --file tools/war3map-injector/_wing_item.w3t=war3map.w3t `
+    --deploy LostTemple_wings.w3x
+```
 
 ```powershell
 # 脚本 + 三个对象数据，一次会话搞定（实测约 30s，旧流程 100s+）
@@ -18,11 +28,12 @@ python tools/war3map-injector/inject_all.py "maps/LostTemple/LostTemple_ft_hand.
     --deploy "LostTemple_ft_阿克蒙德之手.w3x"
 ```
 
-## 为什么必须用 HKE（不能纯 Python）
+## 关于"要不要用 HKE"
 
-实测：`war3mpq.py` 对本项目所有地图都读不出 `war3map.j`——
-哈希表解密后 `EMPTY` 条目数为 0，整张表用非标准密钥加密。
-所以**优化空间只在"减少 HKE 会话次数"，不在"绕开 HKE"**。
+2026-10-11 复测：`war3mpq.py` 现在可以正常读这些图（哈希/块表、加密条目、
+`HM3W` 头、单块/分块文件都能处理），`mpq_patch.py` 写出的档案也能被
+游戏自带的 `Storm.dll` 完整读取。所以**纯 Python 路线是可行的，也是默认路线**；
+HKE 只在两种情况下需要：图里有本工具不认识的压缩方式，或需要 HKE 自带的重压缩。
 
 ## 工具清单
 
@@ -30,6 +41,13 @@ python tools/war3map-injector/inject_all.py "maps/LostTemple/LostTemple_ft_hand.
 
 | 文件 | 用途 |
 | --- | --- |
+| `inject_native.py` | **原生写入（推荐）**：不开 HKE，几秒完成脚本 + 文件替换；写入后自动读回校验。`--store <内部名>` = 原样存储（战役 .w3n 的章节**必须**这样写，否则游戏打不开章节）|
+| `mpq_patch.py` | 原生 MPQ 写入器（保留全部老条目 + 重写哈希/块表）|
+| `jass_gate.py` | 构建期门禁：pjass 对比注入前后，出现**新的错误类型**就拒绝写出 |
+| `check_locals.py` | JASS 硬规则审计：任何函数里"语句出现在 local 之前"都会点名 |
+| `fix_main_locals.py` | 修复类工具：把 main 里位置不对的 local 搬回函数头部 |
+| `sfmpq_probe.ps1` | 用 SFmpq.dll → **游戏自带 Storm.dll** 验容器（32 位 PowerShell 运行）|
+| `sfmpq_subarchive.ps1` | 验"归档里的归档"能否打开——**战役 .w3n 能否进游戏的关键判据** |
 | `inject_all.py` | **一键批量注入**：一次会话完成脚本 + 任意多个内部文件替换 |
 | `hke_session.py` | HKE 会话层（供上面两个脚本复用，也可被自己的脚本 import） |
 | `verify_inject.py` | 注入后校验：另开一次会话解压，检查标记与逐字节一致性 |
@@ -64,19 +82,24 @@ python tools/war3map-injector/inject_all.py "maps/LostTemple/LostTemple_ft_hand.
 | `gen_w3t.py` / `gen_w3a.py` / `gen_w3a_finger.py` / `gen_w3a_crit.py` | 生成物品/技能（war3map.w3t / w3a） |
 | `gen_item_abils.py` | 生成物品技能（攻击力光环/攻速） |
 | `gen_w3h.py` | 生成/覆盖 buff（war3map.w3h） |
+| `add_warglaive_lt30.py` | 向 Reforged LT 成品加入埃辛诺斯战刃、敏捷成长攻速、能力、图标和物品浏览器条目 |
 | `merge_w3a.py` / `append_w3obj.py` | 合并/追加 w3obj（append 会保留目标 origCount） |
 | `collect_items.py` / `collect_map_items.py` / `collect_skills.py` / `collect_units.py` | 收集物品/技能/单位清单 |
 | `build_fj.py` | 把清单嵌入 f.j |
 | `validate_dir.py` | 用 pjass 校验脚本目录 |
 | `deploy_mod.py` | 部署到 `H:\Games\War3\Maps\mod` |
 
-### 实验性（实测不可用，留作记录）
+### 校验 / 排查
 
-| 文件 | 状态 |
+| 文件 | 用途 |
 | --- | --- |
-| `war3mpq.py` | 纯 Python MPQ 读；对加密表地图读不出（哈希表 0 个 EMPTY） |
-| `inject.py` | 纯 Python 注入；依赖 `war3mpq.py`，同上不可用 |
-| `war3mpq.py` 的 list/提取能力仅适用于未加密图 |
+| `audit_item_copy.py` | 检查神器说明颜色/顺序、冰封践踏冷却隔离和半透明冰封清理 |
+| `_objcmp.py` | 比对改写前后的对象数据"原始条目"是否被动过 |
+| `check_locals.py` / `jass_gate.py` | 见上（脚本层） |
+| `strip_crit.py` | 摘掉图里旧的 criton 暴击系统（带 pjass 门禁） |
+| `verify_map.py` / `verify_inject.py` / `verify_w3obj.py` | 各自的读回校验 |
+
+踩坑记录见 `docs/06-工具链/地图载入校验.md`（"找不到地图或者损毁"排查手册）。
 
 ## 环境要求
 

@@ -1699,9 +1699,10 @@ function HB_FLRopeFinish takes integer slot returns nothing
         call UnitRemoveAbility(caster, 'AItj')
     endif
     if HB_FL_ROPE_TERRAIN[slot] != null then
-        call TerrainDeformationStopBJ(HB_FL_ROPE_TERRAIN[slot], 1.5)
+        call TerrainDeformationStopBJ(HB_FL_ROPE_TERRAIN[slot], 0.0)
         set HB_FL_ROPE_TERRAIN[slot] = null
     endif
+    call TerrainDeformStopAll()
     if HB_FL_ROPE_TIMER[slot] != null then
         call PauseTimer(HB_FL_ROPE_TIMER[slot])
         call DestroyTimer(HB_FL_ROPE_TIMER[slot])
@@ -1875,9 +1876,10 @@ function HB_FLRopeEnd takes unit caster returns nothing
         call UnitRemoveAbility(caster, 'AItj')
     endif
     if HB_FL_ROPE_TERRAIN[slot] != null then
-        call TerrainDeformationStopBJ(HB_FL_ROPE_TERRAIN[slot], 1.5)
+        call TerrainDeformationStopBJ(HB_FL_ROPE_TERRAIN[slot], 0.0)
         set HB_FL_ROPE_TERRAIN[slot] = null
     endif
+    call TerrainDeformStopAll()
 endfunction
 
 function HB_FLVolcanoSave takes unit caster, location target returns nothing
@@ -2292,6 +2294,8 @@ function HB_Init takes nothing returns nothing
     call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_HERO_LEVEL)
     call TriggerAddAction(t, function HB_OnHeroLevel)
 
+    // 上一条循环结束时 i 为 12；聊天事件必须从 Player(0) 重新注册。
+    set i = 0
     set t = CreateTrigger()
     loop
         exitwhen i > 11
@@ -2302,6 +2306,7 @@ function HB_Init takes nothing returns nothing
     endloop
     call TriggerAddAction(t, function HB_OnChat)
     set t = null
+    call HB_Msg(Player(0), "|cff00ff00[英雄系统]|r 已加载：addhero / listhero / heroskills")
 endfunction
 
 function main takes nothing returns nothing

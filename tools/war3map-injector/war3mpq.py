@@ -54,6 +54,55 @@ COMPRESSION_MASK = (
     | 0x00000400  # lzma
 )
 
+MPQ_INTERNAL_NAMES = (
+    "(listfile)",
+    "(attributes)",
+    "(signature)",
+    "(user data)",
+)
+
+WAR3_STANDARD_MAP_FILES = (
+    "war3map.j",
+    "war3map.lua",
+    "war3map.jc",
+    "kkmap.jc",
+    "blizzard.j",
+    "scripts\\war3map.j",
+    "scripts\\war3map.lua",
+    "Scripts\\Blizzard.j",
+    "war3map.wts",
+    "war3map.w3a",
+    "war3map.w3t",
+    "war3map.w3u",
+    "war3map.w3h",
+    "war3map.w3e",
+    "war3map.w3i",
+    "war3map.imp",
+    "war3map.w3d",
+    "war3map.w3b",
+    "war3map.w3q",
+    "war3map.w3v",
+    "war3map.w3s",
+    "war3map.w3r",
+    "war3map.w3c",
+    "war3map.w3o",
+    "war3map.wtg",
+    "war3map.wct",
+    "war3mapUnits.doo",
+    "war3map.doo",
+    "war3mapMisc.txt",
+    "war3mapSkin.txt",
+    "war3mapExtra.txt",
+    "war3map.wpm",
+    "war3map.mmp",
+    "war3mapMap.blp",
+    "war3mapPreview.tga",
+    "war3mapPreview.blp",
+    "war3mapPath.tga",
+    "war3map.shd",
+    "conversation.json",
+)
+
 
 # ---------------------------------------------------------------------------
 # 加密表
@@ -308,6 +357,11 @@ class MPQArchive:
                 data = _decompress(data, info.fsize)
             return data[: info.fsize]
         else:
+            # 未压缩且未加密的文件没有扇区偏移表。战役里的章节地图通常以
+            # 这种形式原样存储；若继续按“分块文件”解析，会把开头的 MPQ
+            # 头当成偏移表并吞掉 32 字节。
+            if not (flags & COMPRESSION_MASK) and not (flags & MPQ_FILE_ENCRYPTED):
+                return raw[: info.fsize]
             # 分块文件
             sector_size = 512 << self.block_size
             num_sectors = (info.fsize + sector_size - 1) // sector_size

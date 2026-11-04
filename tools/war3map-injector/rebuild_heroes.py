@@ -28,7 +28,7 @@ HERO_DIR_SH = os.path.join(BASE, "heroes", "shadow_shaman")
 HERO_DIR_BM = os.path.join(BASE, "heroes", "blade_master")
 HERO_DIR_FL = os.path.join(BASE, "heroes", "firelord")
 FROST_DIR = os.path.join(BASE, "heroes", "frostmourne")
-BLADE_RE_DIR = os.path.join(BASE, "heroes", "blade_master", "reforged")
+ITEM_ICON_DIR = os.path.join(BASE, "heroes", "item_icons")
 SCRIPTS = os.path.join(BASE, "scripts", "heroes")
 FROST_SCRIPTS = os.path.join(BASE, "scripts", "frostmourne")
 HERO_SOURCE_MAP = os.path.join("H:\\", "Games", "War3", "Maps", "mod", "ChengHai_3c_692.w3x")
@@ -54,17 +54,17 @@ FROST_ASSETS = [
     ("Rune-Blue-Aura_Raised20.mdx",
      "war3campImported\\Rune-Blue-Aura_Raised20.mdx"),
 ]
-BLADE_RE_ASSETS = [
-    ("HeroBladeMaster_Reforged.mdx",
-     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Reforged.mdx"),
-    ("HeroBladeMaster_Main.blp",
-     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Main.blp"),
-    ("HeroBladeMaster_Hair.blp",
-     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Hair.blp"),
-    ("HeroBladeMaster_Flag.blp",
-     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Flag.blp"),
-    ("HeroBladeMaster_Weapon.blp",
-     "war3campImported\\ReforgedBladeMaster\\HeroBladeMaster_Weapon.blp"),
+ITEM_ICONS = [
+    ("BTNArchimondeHand_30HD.blp",
+     "ReplaceableTextures\\CommandButtons\\BTNArchimondeHand_30HD.blp"),
+    ("DISBTNArchimondeHand_30HD.blp",
+     "ReplaceableTextures\\CommandButtonsDisabled\\DISBTNArchimondeHand_30HD.blp"),
+    ("BTNFrostmourne_30HD.blp",
+     "ReplaceableTextures\\CommandButtons\\BTNFrostmourne_30HD.blp"),
+    ("DISBTNFrostmourne_30HD.blp",
+     "ReplaceableTextures\\CommandButtonsDisabled\\DISBTNFrostmourne_30HD.blp"),
+    ("BTNFirelordAvatar_30HD.blp",
+     "ReplaceableTextures\\CommandButtons\\BTNFirelordAvatar_30HD.blp"),
 ]
 
 
@@ -154,6 +154,28 @@ def normalize_jpeg_icon(src, dst):
     print("normalize jpeg icon %dx%d -> %s (%d bytes)" % (im.size[0], im.size[1], dst, n))
 
 
+def patch_item_icon(path, item_id, icon):
+    sys.path.insert(0, HERE)
+    import objparse as O
+    data = open(path, "rb").read()
+    version, orig, custom = O.read_bytes(data, "w3t")
+    found = False
+    for entry in orig + custom:
+        if entry["new"] != item_id:
+            continue
+        for mod in entry["mods"]:
+            if mod[0] == "iico":
+                mod[4] = icon
+                found = True
+        if not found:
+            entry["mods"].append(["iico", O.T_STRING, None, None, icon])
+            found = True
+    if not found:
+        raise SystemExit("item %s not found in %s" % (item_id, path))
+    open(path, "wb").write(O.build_bytes(version, orig, custom, "w3t"))
+    print("item icon %s -> %s" % (item_id, icon))
+
+
 def main():
     if not os.path.exists(SRC):
         raise SystemExit("找不到底图: %s" % SRC)
@@ -217,6 +239,12 @@ def main():
          os.path.join(FROST_DIR, "ability.w3a")])
     run([PY, os.path.join(HERE, "merge_w3obj.py"), merged_t,
          base_t, os.path.join(FROST_DIR, "item.w3t")])
+    patch_item_icon(
+        merged_t, "I000",
+        r"ReplaceableTextures\CommandButtons\BTNArchimondeHand_30HD.blp")
+    patch_item_icon(
+        merged_t, "I105",
+        r"ReplaceableTextures\CommandButtons\BTNFrostmourne_30HD.blp")
     run([PY, os.path.join(HERE, "merge_w3obj.py"), merged_u,
          base_u, os.path.join(HERO_DIR, "hero.w3u"),
          os.path.join(HERO_DIR_DH, "hero.w3u"), os.path.join(HERO_DIR_SH, "hero.w3u"),
@@ -244,8 +272,8 @@ def main():
                            + "=" + internal)
          ] + [
              token
-             for src_name, internal in BLADE_RE_ASSETS
-             for token in ("--file", os.path.join(BLADE_RE_DIR, src_name)
+             for src_name, internal in ITEM_ICONS
+             for token in ("--file", os.path.join(ITEM_ICON_DIR, src_name)
                            + "=" + internal)
          ] + [
          "--deploy", "LostTemple_heroes.w3x"])

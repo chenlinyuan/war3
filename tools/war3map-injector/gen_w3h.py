@@ -124,6 +124,8 @@ def build_full(out_path, overrides, customs=()):
         里所有 orig 条目都是 `oldId + 四空格`）。之前写成 oldId==newId（"BoarBoar"）
         → 引擎不认，光环名称/图标都不会变。
     customs:   [(baseId, newId, 名称, 提示, 扩展提示, 图标), ...]
+               也支持 (baseId, newId, mods)：需要改"挂点特效(ftat/fta1..)"这类
+               额外字段时直接给字段表（灰烬雷暴的减速 buff 就是这么写的）。
         newId 用没用过的 B 打头 4 字符 ID；技能侧再用 `abuf` 指过来。
     """
     data = struct.pack("<ii", 2, len(overrides))
@@ -137,8 +139,13 @@ def build_full(out_path, overrides, customs=()):
         for m in mods:
             data += write_mod(m)
     data += struct.pack("<i", len(customs))
-    for (base, new, name, tip, ubertip, icon) in customs:
-        mods = buff_mods(name, tip, ubertip, icon)
+    for ent in customs:
+        if len(ent) == 3:
+            # (baseId, newId, mods) —— 需要改"挂点特效"之类额外字段时用这种写法
+            base, new, mods = ent
+        else:
+            base, new, name, tip, ubertip, icon = ent
+            mods = buff_mods(name, tip, ubertip, icon)
         data += base.encode("latin-1") + new.encode("latin-1") + struct.pack("<i", len(mods))
         for m in mods:
             data += write_mod(m)
@@ -161,28 +168,88 @@ AKMOND_ICON = "ReplaceableTextures\\CommandButtons\\BTNCorpseExplode.blp"
 #   下面这些名字都是从本机已解包地图的对象数据里反查出来的真实路径。
 #   备选（同样是真实存在的）: BTNHeartOfAszune / BTNHealingWard / BTNRejuvenation /
 #   BTNScrollOfHealing / BTNPotionRed
-WING_HEAL_ICON = "ReplaceableTextures\\CommandButtons\\BTNHeal.blp"
 WING_HEAL_ICON_CUSTOM = "btnwingheal.blp"   # 自制橙色十字（暂时不用，保留）
+
+# 配置源（移植到别的图时用 WINGS_CONFIG=<别的配置模块名>）
+CFG = __import__(os.environ.get("WINGS_CONFIG", "wings_config"))
+WING_HEAL_ICON = CFG.ICONS["heal"]
+
+# 我们这几个自定义 buff 各自的**底子**（base）：只决定"从哪个原版 buff 复制字段"，
+#   运行时不与原版共享任何东西 —— 这正是"独立 buff、不影响原有光环"的关键。
+BUFF_BASE = {
+    "akmond": "BEar",        # 强击光环(Trueshot Aura)的 buff
+    "heal_native": "Boar",   # 治疗守卫的再生 buff
+    "heal_show": "Babr",     # 黑曜石雕像的枯萎再生 buff
+    "spell_shield": "BNss",  # 原生法术护盾的 buff
+    "ash_slow": "BHtc",      # 雷霆一击的 buff（战役里 B642「灰烬之电」也是拿它当底子）
+    "aura_unholy": "BUau",
+    "aura_vamp": "BUav",
+    "aura_brill": "BHab",
+    "aura_command": "BOac",
+    "aura_endur": "BOae",
+    "warglaive_charge": "BHab",
+}
 
 
 def build_project_buffs(out_path):
-    build_full(out_path, [
-        # BEar = 强击光环 buff -> 阿克蒙德之手(AIar) 的光环
-        #   ⚠ 这条是玩家要的"光环改名/换图标"，必须保留（曾被误删）
-        ("BEar", "阿克蒙德之力", "阿克蒙德之力",
-         "增加周围友军 50% 攻击力（近战/远程均生效）。", AKMOND_ICON),
-        # Boar = 治疗守卫再生光环(W074/Aoar) 自带的 buff。留一条覆盖只是为了万一它会挂上；
-        #   （实测它并不挂 buff。展示光环**不能**用这个 buff —— 会抢走 W074 的 buff 来源，
-        #     导致"治疗不再按百分比回血"，见 gen_wing.py 第十轮说明。）
-        ("Boar", "治疗光环", "治疗光环",
-         "持续回复生命：每秒回复最大生命的 3%（自身与 700 范围内友军）。", WING_HEAL_ICON),
-        # Babr = 黑曜石雕像的"枯萎再生"光环 buff —— 这张图里没有任何单位/技能用它，
-        #   所以拿来给**展示光环 W079** 挂（状态栏图标就靠它）。名字同样叫"治疗光环"。
-        ("Babr", "治疗光环", "治疗光环",
-         "持续回复生命：每秒回复最大生命的 3%（自身与 700 范围内友军）。", WING_HEAL_ICON),
-    ])
-    # 曾经试过"新建自定义 buff B0W1 + 技能 abuf 指过去" —— 实测状态栏依然没图标。
-    #   能显示图标的链路(阿克蒙德之手)用的是**原版 buff + orig 段覆盖**, 所以只保留覆盖。
+    """本工程的 buff：**全部**写成"以原版 buff 为底子的自定义 buff"。
+
+    ⚠ 2026-10-15 玩家要求：**不许覆盖原版 buff**。
+      原来阿克蒙德之手的光环是去覆盖原版强击光环的 buff（BEar），副作用是
+      "地图里别人的强击光环也跟着改名/换图标"（玩家实测发现）。
+      现在覆盖段是**空的**：原版 BEar / Boar / Babr / BNss 一个字段都不动，
+      技能侧靠 `abuf` 指向下面这些自定义 buff（状态栏图标来自自定义 buff 自己的
+      `fart`；光环/护盾的**数值与行为**始终来自挂它的那个技能本身）。
+    """
+    charge_buff_name = getattr(
+        CFG, "WARGLAIVE_CHARGE_BUFF_NAME", "邪焰冲锋"
+    )
+    plan = [
+        ("akmond", "阿克蒙德之力", "阿克蒙德之力",
+         CFG.AKMOND_BUFF_TEXT, CFG.ICONS["akmond"]),
+        ("heal_native", "治疗光环", "治疗光环",
+         CFG.HEAL_BUFF_TEXT, WING_HEAL_ICON),
+        ("heal_show", "治疗光环", "治疗光环",
+         CFG.HEAL_BUFF_TEXT, WING_HEAL_ICON),
+        ("spell_shield", "法术护盾", "法术护盾",
+         CFG.SHIELD_BUFF_TEXT, CFG.ICONS["star"]),
+        ("aura_unholy", "邪恶光环", "邪恶光环",
+         CFG.UNHOLY_BUFF_TEXT,
+         r"ReplaceableTextures\CommandButtons\BTNUnholyAura.blp"),
+        ("aura_vamp", "吸血光环", "吸血光环",
+         CFG.VAMP_BUFF_TEXT,
+         r"ReplaceableTextures\CommandButtons\BTNVampiricAura.blp"),
+        ("aura_brill", "辉煌光环", "辉煌光环",
+         CFG.BRILL_BUFF_TEXT,
+         r"ReplaceableTextures\CommandButtons\BTNBrilliance.blp"),
+        ("aura_command", "命令光环", "命令光环",
+         CFG.COMMAND_BUFF_TEXT,
+         r"ReplaceableTextures\CommandButtons\BTNGnollCommandAura.blp"),
+        ("aura_endur", "耐久光环", "耐久光环",
+         CFG.ENDUR_BUFF_TEXT,
+         r"ReplaceableTextures\CommandButtons\BTNCommand.blp"),
+        ("warglaive_charge", charge_buff_name, charge_buff_name,
+         CFG.WARGLAIVE_CHARGE_BUFF_TEXT,
+         r"ReplaceableTextures\CommandButtons\BTNGarrekCharge.blp"),
+    ]
+    customs = [(BUFF_BASE[key], CFG.BUFFS[key], buff_mods(nm, tp, ub, ic))
+               for (key, nm, tp, ub, ic) in plan]
+    # 灰烬雷暴一阶的减速 buff：**照抄战役里的 B642「灰烬之电」**
+    #   （底子 BHtc = 原版雷霆一击的 buff；字段：名字/说明/图标 + ftac=3 个挂点特效）
+    #   ⚠ 这里的"挂点特效"就是玩家看到的"被雷劈中"的样子：
+    #     眩晕图腾 + 雷霆一击 + 我们自己注入的 StormfallRed.mdx。
+    #     HKE 注入时只保留文件名并压成小写，所以第三个特效写**裸名**。
+    customs.append((BUFF_BASE["ash_slow"], CFG.BUFFS["ash_slow"], [
+        mod("fnam", 3, CFG.ASH_SLOW_BUFF_NAME),
+        mod("ftip", 3, CFG.ASH_SLOW_BUFF_TIP),
+        mod("fube", 3, CFG.ASH_SLOW_BUFF_TEXT),
+        mod("ftac", 0, 3),
+        mod("ftat", 3, CFG.ASH_SLOW_BUFF_FX),
+        mod("fta1", 3, "origin"),
+        mod("fta2", 3, "origin"),
+        mod("fart", 3, CFG.ICONS["star"]),
+    ]))
+    build_full(out_path, [], customs)
 
 
 if __name__ == "__main__":

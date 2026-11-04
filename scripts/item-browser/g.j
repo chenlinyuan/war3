@@ -109,27 +109,6 @@ timer ib_skClrTimer = null
 
 
 //---------------------------------------------------------------------------
-// 致命一击系统（自定义暴击）
-//---------------------------------------------------------------------------
-// 携带暴击的单位集合（用 unit group 注册，无需修改地图对象数据）
-group ib_critGroup = null
-// 已注册伤害事件的单位集合（避免重复注册）
-group ib_critRegGroup = null
-// 伤害事件触发器（为每个单位单独注册 EVENT_UNIT_DAMAGED）
-trigger ib_critDmgTrig = null
-// 是否启用暴击系统
-boolean ib_critEnabled = true
-// 攻击者/目标标记（用于把暴击限定在普通攻击上）
-unit ib_critAttacker = null
-unit ib_critTarget = null
-boolean ib_critArmed = false
-// 重入保护（额外伤害会再次触发伤害事件）
-boolean ib_critBusy = false
-// 统计
-integer ib_critCount = 0
-integer ib_critLastMult = 0
-
-//---------------------------------------------------------------------------
 // 单位系统（给玩家添加/删除单位）
 //---------------------------------------------------------------------------
 // 单位 ID 列表（注入时预扫描硬编码）
@@ -180,10 +159,6 @@ real ib_fingerDamage = 1000000.0
 integer ib_fingerAbility = 'A000'
 // 统计
 integer ib_fingerCount = 0
-
-// 致命一击技能 ID（被动，由 war3map.w3a 定义，技能栏图标）
-integer ib_critAbility = 'Azcr'
-
 
 
 

@@ -23,6 +23,7 @@ GAME_ABILITYSTRINGS = [
     r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\campaignabilitystrings.txt",
     r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemabilitystrings.txt",
 ]
+BUNDLED_SKILL_TABLE = os.path.join(HERE, "_skillids.txt")
 
 
 def parse_w3a(path):
@@ -100,6 +101,15 @@ def parse_abil_strings(path):
 def main():
     map_dir = sys.argv[1] if len(sys.argv) > 1 else None
     names = {}
+
+    # 离线包首选内置完整技能快照；本机游戏目录只用于补充。
+    if os.path.isfile(BUNDLED_SKILL_TABLE):
+        with open(BUNDLED_SKILL_TABLE, encoding="utf-8") as fh:
+            for line in fh:
+                parts = line.rstrip("\n").split("\t", 1)
+                if len(parts) == 2 and len(parts[0]) == 4:
+                    names[parts[0]] = parts[1]
+        print("离线技能目录:", len(names))
 
     # 游戏标准技能名
     for p in GAME_ABILITYSTRINGS:

@@ -3,6 +3,9 @@
 > 适用范围：经典版 War3 1.24–1.28（重点为 1.27），以及本项目中的 `.w3x`、`.w3m`、`.w3n` 移植、对象数据、JASS、MPQ 注入和资源导入。
 >
 > 本文记录已经实际遇到过并定位过的问题。排错时先看“症状速查”，再查对应章节。
+>
+> 主动装备、英雄技能栏、物品落地符文、法球冲突和快捷键重复的完整案例见
+> [`主动装备技能与物品特效排障.md`](主动装备技能与物品特效排障.md)。
 
 ## 一、症状速查
 
@@ -25,6 +28,29 @@
 | 战役对象数据无法用普通解析器读取 | 战役级 original 段可能使用带基对象前缀的字段 ID | 使用本项目解析/合并工具，保留 orig/custom 两段 |
 | 任务文字很久后才出现 | 客户端字幕开关或过场状态，而非缺少触发器 | 先检查客户端字幕设置和过场触发器 |
 | 全屏卡死、声音仍在、Ctrl+Alt+Del 无响应 | 显卡 TDR/驱动/全屏模式问题，不一定是地图脚本 | 检查事件日志和 TdrDelay，避免把系统问题误判为地图崩溃 |
+| 修改 Lua 后可进入旧存档，但旧游戏事件仍不正常 | 存档会恢复保存时的 Lua 闭包和状态，当前地图脚本不会替换旧档内回调 | 旧档只重绑地图校验与 SHA-1 保证可进入；修复逻辑从干净地图重建，并让用户新开档验证 |
+| 中立敌对 Boss 死亡不掉任务物品、蛛网门显示无敌 | `TriggerRegisterAnyUnitEventBJ` 未覆盖 `PLAYER_NEUTRAL_AGGRESSIVE`；门进入竞技场后被设为无敌 | 触发器额外注册中立敌对玩家死亡事件；拆门前先取消无敌，再做 `KillDestructable` |
+| 装备主动技能不在英雄技能栏 | 期望是英雄命令栏技能，却把技能只放进物品 `iabi` | 命令栏技能装备时添加、卸装时移除；若要求冷却跨丢捡保留，另存剩余冷却并在重装时恢复 |
+| 点击指向技能后鼠标指针消失 | Channel 的 Targeting Image 位在 Target Art 为空时会吞掉正常选目标光标 | 按澄海 A01M/LS30 使用 `Ncl3=1` |
+| 附近怪物会抢走装备主动技能 | Channel 的 Disable Other Abilities 为 0，引擎允许攻击/其它技能抢占 | 使用 `Ncl5=1`，并按参考实现的 `Ncl1/Ncl4` 补齐 |
+| 点击远处目标时先走路再施法 | 只监听 `SPELL_EFFECT`，此时引擎可能已完成接近施法距离的订单 | 监听匹配的 `EVENT_PLAYER_UNIT_ISSUED_POINT_ORDER`，当拍取消原订单并用 `GetOrderPointX/Y` 接管 |
+| 蛋刀丢掉再捡起后冷却刷新 | 移除后重加单位技能创建了新的冷却实例 | 移除前保存剩余冷却及到期时间，重装后恢复真正剩余的时间 |
+| 蛋刀丢掉后冲锋技能仍然可见或还能释放 | 当前 Reforged 中 `BlzUnitHideAbility` 和 `BlzUnitDisableAbility(..., true, true)` 都未可靠撤下 A113 | 卸装时直接 `UnitRemoveAbility`；事件英雄取 `GetTriggerUnit()`；施法入口继续检查 I106 |
+| 物品自带主动实现后英雄技能栏看不到技能 | 能力被标成 `aite=1`，或错误依赖脚本临时添加 | 使用 `aite=0` + `iabi/icid`，由物品引擎授予英雄技能栏能力 |
+| 攻击加成加到白字而不是绿字 | `AIaa/Iaa1` 修改基础攻击 | 使用 `AIat/Iatt`，与霜之哀伤攻击加成一致 |
+| 叠层后多出第二个 E 图标 | 辅助被动直接挂单位后露出命令栏 | 清空热键，并以 `BlzUnitHideAbility` 隐藏 UI；不要用会禁用被动的玩家可用性开关 |
+| 蛋刀装备后多出一个空按钮 | 隐藏被动书 `A116` 使用 `aite=0`，被当成英雄能力显示 | `A116.aite=1`，并调用 `BlzUnitHideAbility` 隐藏书本按钮；内部被动保留 |
+| `additem 魔法石 3` 创建大量物品并卡死 | `IB_AddGive` 用成功入包数量 `added` 作为循环条件；满包、不可入包或拾取即消耗的物品不会增加该值 | 使用独立的 `created` 计数，每个创建尝试后递增，并限制为请求数量；入包失败则落地 |
+| 三神器技能挤到命令栏底部 | 按钮坐标与战役原英雄技能布局冲突 | 三件神器统一使用中间排第 3 格 `abpx=2, abpy=1`，把底部按钮位留给原地图技能 |
+| JASS 地图选择“新背包”时报暂不支持 | 离线层曾把 JASS 管线固定成 command，只改了 Lua 物品归属 | JASS 也生成 `item` 专用脚本副本：三神器写为 `Equipment/Trinket`，主动技能进入 `iabi/icid`，三个 `*_ITEM_ACTIVE` 设为 `true` |
+| QT 开全图进入地图后仍被迷雾覆盖 | 只在地图初始化时关闭一次，后续地图逻辑会重新开启 | 初始化用 `FogEnableOff`/`FogMaskEnableOff`，并每 `0.50` 秒重新执行 `FogEnable(false)`、`FogMaskEnable(false)` |
+| command 模式丢下神器后技能还在 | 丢弃事件触发时背包查询仍可能看到该物品，普通同步误判为未卸装 | 丢弃处理器读取 `GetManipulatedItem()`，按物品 ID 直接保存冷却并 `UnitRemoveAbility`，不再延迟二次同步 |
+| QT 开全图不应在地图启动时自动生效 | 构建选项直接控制初始化逻辑，不符合玩家手动开启习惯 | 默认只注册 `qt`/`QT` 聊天命令；玩家输入后才启动持续关闭迷雾 |
+| 离线审计报 W3I 错误但地图能进 | `offline_core` 清理时误删 `W3I` 导入，且部分地图 W3I 存在轻微尾部偏差 | 恢复导入，并只在只读审计中使用 `parse_or_tolerant`，不改写原地图 |
+| 冲锋表现像普通走路 | 脚本直接移动时使用 `walk` 动画 | 使用模型支持的 `attack slam`，结束后 `ResetUnitAnimation` |
+| 物品丢下没有地面符文，主动技能没有外扩冰环 | 运行时 effect 未创建，或 effect/ability 的 MDX 未导入 | 事件驱动创建并清理 effect；同时导入 MDX、补齐贴图并更新 `war3map.imp` |
+| 腐蚀之球只减 5 点护甲 | 对 `AIcb` 使用了不适用于该能力的 `Idef` | 使用 `Iarp=8`，写入 `DataB` 第 2 数据列 |
+| 技能快捷键显示两个 `E` | `atp1` 手写快捷键，引擎又自动追加 | `atp1` 只写技能名，快捷键交给 `ahky` |
 
 ## 二、基线与版本纪律
 
@@ -169,6 +195,88 @@ ipaw = 0
 - 魔法书里的物品版被动可能不生效；单位版光环与物品版光环行为也不同。
 - 技能 ID 变更时，同时更新 `iabi`、`icid`、物品浏览器保护列表和脚本里的技能常量。
 
+### 4.2a 装备主动技能的实例归属与冷却
+
+装备主动技能有三种常用路线，先按需求选择：
+
+```text
+英雄命令栏技能（冷却可重置）：UnitAddAbility / UnitRemoveAbility
+英雄命令栏技能（按钮必须消失且冷却持久）：添加/移除 + 剩余冷却状态
+物品自带主动：iabi 中的技能 + icid 冷却组
+```
+
+如果需要物品授予英雄技能栏按钮且跨章节保留，可使用《被遗忘者国度》
+骑士标枪结构：
+
+```text
+etkj.iabi = Atkj
+etkj.icid = Afoa
+etkj.icla = Equipment
+etkj.iequ = Trinket
+```
+
+`Atkj` 由物品 `iabi` 授予，`Afoa` 是独立冷却组。原版 `Atkj.aite=0`，
+因此装备后直接出现在英雄技能栏；`usable=0` 只表示不能当消耗品右键使用。
+物品还必须具有 `Equipment + Trinket` 分类并进入装备槽；留在普通背包时
+不会被引擎视为已装备，`iabi` 不会生效。
+脚本里的 `UnitHasItemOfTypeBJ` 同样只查普通背包；判断已装备物品必须使用
+`BlzUnitItemInEquipmentSlot` / `UnitHasItemOfTypeEquippedBJ` 等 loadout API。
+拾取时没有用脚本重新创建技能实例，跨章节由物品数据自动重建。
+
+如果章节不能可靠使用物品授予，或者必须由脚本动态控制添加/移除，
+同时要求按钮卸装后消失且冷却不刷新：
+
+```jass
+// 装备
+call UnitAddAbility(u, 'A113')
+call BlzStartUnitAbilityCooldown(u, 'A113', remainingCooldown)
+```
+
+```jass
+// 卸下
+set cooldownRemaining = BlzGetUnitAbilityCooldownRemaining(u, 'A113')
+call SaveReal(WGL_COOLDOWN_HT, GetHandleId(u), 0, clockElapsed + cooldownRemaining)
+call UnitRemoveAbility(u, 'A113')
+```
+
+蛋刀已经实测“仅隐藏”和“禁用并隐藏”都不能可靠撤下 A113。最终改为
+物理移除技能实例，并用单调计时器保存绝对冷却到期时间；重装时计算
+`expiresAt - now`，恢复到真正剩余的冷却。`I106.iabi` 改为直接列出
+`A110,A111,Aclq`，不引用外层魔法书 `A116`。点命令条件和脚本冲锋入口还要检查
+`WGL_HasWarglaive(caster)`，防止残留事件绕过装备所有权。
+
+不要同时把同一技能放进物品 `iabi` 又给英雄添加。混用会生成重复按钮、
+重复触发，并让冷却归属不明确。
+
+### 4.2b Channel 选点、订单与光标
+
+原始参考使用 Channel 时，应逐字段复制其实测配置，而不是只看“点目标”：
+
+- Targeting Image 位可能让光标消失，尤其 Target Art 为空时。澄海 A01M/LS30
+  的可用值是 `Ncl3=1`。
+- `Ncl2=2` 表示点目标；`Ncl6` 与 `OrderId(...)` 必须使用同一个命令 ID。
+- `Ncl5=1` 会禁止其它能力和自动攻击抢占；近战怪多时仍能正常施法。
+- `SPELL_EFFECT` 不能保证“点击当拍”执行。需要把任何点击位置只当方向时，
+  监听 `EVENT_PLAYER_UNIT_ISSUED_POINT_ORDER`，比较
+  `GetIssuedOrderId()`，从 `GetOrderPointX/Y()` 取得坐标，取消原订单后启动脚本。
+- 同时保留施法效果触发器时，要用“每施法者已有 timer 就忽略”的方式防止事件重复。
+
+### 4.2c 隐藏被动与攻击数值层级
+
+- Reforged 可用 `BlzUnitHideAbility(unit, id, true)` 仅隐藏被动按钮。
+- `SetPlayerAbilityAvailable(..., false)` 可能同时禁用被动效果，不能当作纯 UI 开关。
+- 命令栏活动技能卸装时不适用“只隐藏”的被动方案；本运行时隐藏和禁用
+  都未可靠撤下按钮，应直接移除技能，并另存剩余冷却供重装恢复。
+- `AIaa/Iaa1` 增加基础白字；需要绿字附加攻击时使用 `AIat/Iatt`。
+- 只面向 1.27 的地图不能无条件调用 `Blz*` 原生；使用隐藏魔法书或 1.27 兼容替代。
+
+### 4.2d 位移动画
+
+用 `SetUnitPosition`/`SetUnitX/Y` 实现冲锋时，不要顺手播放 `walk`。优先使用
+目标模型本身支持的攻击动作，例如 Beastmaster 一类剑刃单位的
+`attack slam`，并在正常结束、死亡、眩晕、打断和 timer 到期时统一
+`ResetUnitAnimation`。动作名不存在时要在游戏中实测，不能只凭 JASS 编译通过。
+
 ### 4.3 指向技能与位移特效
 
 - 指向技能必须有正确鼠标指针。
@@ -193,17 +301,6 @@ W3x2lni 优化图会把自定义技能放在 `AbilityData.slk`，其中有些别
 - 标准 `Amls` 为 20/秒、40 秒、550 范围；3C 火魔版本为 200/秒、60 秒、999 范围。
 - 标准 `Amin` 延迟 10 秒；3C 炎魔分裂体需要 0.1 秒。
 - 标准 `Atru` 范围 900；3C 炎之绞杀载体需要 1500。
-
-### 4.6 Reforged 模型不能直接放进 1.27
-
-3.0 CASC 的 HD 模型当前是 MDX v1800（`VERS=1800`），1.27 需要经典 v800。直接把 `VERS` 改成 800 还不够：
-
-- HD 模型同时包含 LOD0–LOD3，经典格式没有 LOD 选择字段，必须只保留 LOD0，否则所有细节层会叠在一起。
-- Reforged `SKIN` 段是每顶点 4 个权重和 4 个骨骼；v800 需要每顶点一个 `GNDX` 矩阵组。应按最大权重选主导骨骼，并映射回该几何段的 `MATS/Groups`。
-- HD `MTLS` 的 Shader、Normal/ORM/Emissive/Reflection 纹理层在 v800 没有对应字段；只保留实际 diffuse 层，并为需要团队色的对象重建经典团队色层。
-- DDS 贴图必须转成 BLP1；主贴图 2048×2048 可以用 BLP1-JPEG 保留画质和 alpha。
-- `CAMS/CORN/FAFX/BPOS` 等 Reforged 段以及不存在的 Reforged 子模型挂点需要剥离。
-- 转换后必须额外检查 `GNDX` 数量、矩阵组上限、几何 extents 和模型版本；只改对象 `umdl` 不能证明模型可运行。
 
 ## 五、JASS 与脚本注入
 
@@ -293,6 +390,8 @@ war3campImported\Frostmourne.mdx
 7. 新增条目数量接近哈希表空槽上限时，必须先扩容再插入。`恐怖之潮` 原表为 121/128 槽，继续新增资源会在“寻找空槽”的线性探测中无限循环；扩容时应从 `(listfile)` 和 `(listfile)`、`(attributes)` 等标准内部名反查旧条目，无法完整反查就停止写入。
 8. 校验带大 MP3 等不可压缩资源的 MPQ 时，若扇区长度等于声明的扇区大小，该扇区就是原样存储，不要继续尝试 zlib/bzip2 解压，否则大批失败解压会严重拖慢打包。
 9. 自定义战役列表优先显示文件头 `HM3W` 的名称。只改文件名或 W3F/WTS 内部标题，列表里仍会与原战役同名；改名必须同步 HM3W，既不加尾部“翅膀版”等后缀，并在退出游戏重进后确认刷新。
+10. Reforged 存档包含并恢复保存时的 Lua 状态。地图脚本改动后，旧存档仍可能调用旧 Lua 函数闭包；不要用猜测性的存档内 Lua 字节补丁强修业务逻辑。旧档只修改地图校验与 SHA-1 身份字段，行为修复在新档中验证。若要长期跨地图版本保存完整状态，应使用独立存档系统，而不是依赖引擎原生存档。
+11. 中立敌对单位不属于普通玩家槽。只调用 `TriggerRegisterAnyUnitEventBJ` 可能漏掉 `PLAYER_NEUTRAL_AGGRESSIVE` 的死亡事件；针对这类 Boss 和召唤物，需要额外调用 `TriggerRegisterPlayerUnitEvent` 注册中立敌对玩家。
 
 ## 九、运行时与系统环境
 
@@ -324,3 +423,47 @@ war3campImported\Frostmourne.mdx
 - [物品与升级对象字段](../03-对象数据/物品与升级.md)
 - [地图载入校验](../06-工具链/地图载入校验.md)
 - [常见崩溃与问题](常见崩溃与问题.md)
+
+## 十二、原版任务物品不要乱加地图级覆盖
+
+### 12.1 症状：任务物品死亡掉落但看不见或无法拾取
+
+实际案例是《alas 被遗忘的王国》森林图的黑暗犬之血 `cdhb` 和巢母毒液 `cbmv`：
+
+- 鱼人鳞片 `cvfs` 正常掉落并可拾取。
+- 黑暗犬和巢母的死亡触发器正常执行，蛛网门也能打开。
+- `War3Log.txt` 多次出现：
+
+```text
+model creation failed - Objects\InventoryItems\PotionRed\PotionRed.mdx
+model creation failed - Objects\InventoryItems\PotionGreen\PotionGreen.mdx
+```
+
+根因不是死亡事件，而是地图级 `war3map.w3t` 把已有的原版战役物品覆盖成了 `phea` / `pman` 药水基底，并指定了 Reforged 3.0 中创建失败的旧药水模型。
+
+正确检查顺序：
+
+1. 先查 `War3Log.txt` 是否出现 `model creation failed`。
+2. 再查基础游戏 `Units\ItemData.slk` 是否已经存在该任务物品 ID。
+3. 对比原始战役和当前地图的 `war3map.w3t`，确认是否多出无必要的 custom 覆盖。
+
+这次的正确修复是：
+
+- 删除地图级 `cdhb`、`cbmv` custom 覆盖。
+- 保留原物品 ID，直接回退到基础游戏原版对象和模型。
+- 不把任务物品换成一个看似可用的其他物品基底；即使模型显示出来，也可能仍不可选中或不可拾取。
+
+物品 ID 本身可以改，但只要改 ID，就必须同步修改所有 `CreateItem`、`CreateItemLoc`、拾取事件比较、掉落实体清理、物品浏览器和存档兼容逻辑。漏一处就会出现“物品生成了但任务不推进”或“任务检查永远失败”。能用原版 ID 时不要为了修模型而改 ID。
+
+### 12.2 黑暗犬只允许头犬掉落
+
+本地图有：
+
+- `n004` Alpha Darkhound：头犬，应掉黑暗犬之血。
+- `n005` Darkhound：普通黑暗犬，不应掉任务物品。
+
+掉落条件必须明确写成只接受 `n004`，不能使用“`n004` 或 `n005`”的范围匹配。
+
+## 十三、W3Z 身份重绑的校验和引用数
+
+存档重绑后，新地图的 4 字节校验和通常会在解压内容中出现两次，但游戏数据中可能偶然撞出第三份相同字节。身份补丁最终验证应要求“至少存在两个引用”，不能硬编码为恰好两个；初始替换仍应确认旧身份引用可以唯一定位。

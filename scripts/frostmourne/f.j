@@ -1,78 +1,215 @@
-function FR_HighestStat takes unit u returns integer
-    local integer best
-    local integer value
-    if not IsUnitType(u, UNIT_TYPE_HERO) then
-        return 0
+function FR_GetEquippedItem takes unit u returns item
+    local item it
+    if u == null or GetUnitTypeId(u) == 0 then
+        return null
     endif
-    set best = GetHeroStr(u, true)
-    set value = GetHeroAgi(u, true)
-    if value > best then
-        set best = value
+    if FR_ITEM_ACTIVE then
+        set it = BlzUnitItemInEquipmentSlot(u, ConvertLoadoutSlot(8))
+        if it != null and GetItemTypeId(it) == FR_ITEM_ID then
+            return it
+        endif
+        return null
     endif
-    set value = GetHeroInt(u, true)
-    if value > best then
-        set best = value
-    endif
-    return best
+    return GetItemOfTypeFromUnitBJ(u, FR_ITEM_ID)
 endfunction
 
-function FR_ApplySlow takes unit source, unit target returns nothing
-    local integer key
-    local real base_speed
-    local real duration
-    if source == null or target == null then
+function FR_HasItem takes unit u returns boolean
+    local item it = FR_GetEquippedItem(u)
+    local boolean found = it != null
+    set it = null
+    return found
+endfunction
+
+function FR_NoOp takes nothing returns nothing
+endfunction
+
+function FR_IsSoulTarget takes unit killer, unit victim returns boolean
+    local integer ownerId
+    if killer == null or victim == null then
+        return false
+    endif
+    if GetUnitTypeId(victim) == 0 then
+        return false
+    endif
+    if IsUnitType(victim, UNIT_TYPE_STRUCTURE) or IsUnitType(victim, UNIT_TYPE_MECHANICAL) then
+        return false
+    endif
+    if IsUnitType(victim, UNIT_TYPE_SUMMONED) or IsUnitIllusion(victim) then
+        return false
+    endif
+    set ownerId = GetPlayerId(GetOwningPlayer(victim))
+    if ownerId == PLAYER_NEUTRAL_PASSIVE then
+        return false
+    endif
+    if IsUnitEnemy(victim, GetOwningPlayer(killer)) then
+        return true
+    endif
+    return ownerId == PLAYER_NEUTRAL_AGGRESSIVE
+endfunction
+
+function FR_ClearNovaSoulSource takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer timerKey = GetHandleId(t)
+    local integer unitKey = LoadInteger(fr_soul_timer_table, timerKey, 0)
+    call FlushChildHashtable(fr_soul_source_table, unitKey)
+    call FlushChildHashtable(fr_soul_timer_table, timerKey)
+    call DestroyTimer(t)
+    set t = null
+endfunction
+
+function FR_TrackNovaSoulSource takes unit source, unit dummy returns nothing
+    local timer t
+    if source == null or dummy == null then
         return
     endif
-    if not UnitHasItemOfTypeBJ(source, FR_ITEM_ID) then
+    set t = CreateTimer()
+    call SaveUnitHandle(fr_soul_source_table, GetHandleId(dummy), 0, source)
+    call SaveInteger(fr_soul_timer_table, GetHandleId(t), 0, GetHandleId(dummy))
+    call TimerStart(t, 1.2, false, function FR_ClearNovaSoulSource)
+    set t = null
+endfunction
+
+function FR_ShowSoulGain takes unit source returns nothing
+    local texttag tt = CreateTextTag()
+    call SetTextTagText(tt, "霜之哀伤·噬魂：力量 +1", 0.023)
+    call SetTextTagPosUnit(tt, source, 96.0)
+    call SetTextTagColor(tt, 157, 92, 255, 255)
+    call SetTextTagVelocity(tt, 0.0, 0.035)
+    call SetTextTagPermanent(tt, false)
+    call SetTextTagLifespan(tt, 1.6)
+    call SetTextTagFadepoint(tt, 1.1)
+    call SetTextTagVisibility(tt, GetLocalPlayer() == GetOwningPlayer(source))
+    set tt = null
+endfunction
+
+function FR_OnSoulDeath takes nothing returns nothing
+    local unit victim = GetDyingUnit()
+    local unit killer = GetKillingUnit()
+    local unit source = killer
+    if killer == null or victim == null then
+        set victim = null
+        set killer = null
+        set source = null
         return
     endif
-    if not IsUnitEnemy(target, GetOwningPlayer(source)) then
+    if not FR_HasItem(source) then
+        set source = LoadUnitHandle(fr_soul_source_table, GetHandleId(killer), 0)
+    endif
+    if source == null or not IsUnitType(source, UNIT_TYPE_HERO) or not FR_HasItem(source) then
+        set victim = null
+        set killer = null
+        set source = null
         return
     endif
-    if IsUnitType(target, UNIT_TYPE_MAGIC_IMMUNE) then
+    if not FR_IsSoulTarget(source, victim) then
+        set victim = null
+        set killer = null
+        set source = null
         return
     endif
-    set key = GetHandleId(target)
-    set base_speed = LoadReal(fr_slow_table, key, 0)
-    if base_speed <= 0.0 then
-        set base_speed = GetUnitMoveSpeed(target)
-        call SaveReal(fr_slow_table, key, 0, base_speed)
-        call GroupAddUnit(fr_slow_group, target)
+    if IsUnitType(victim, UNIT_TYPE_HERO) then
+        if GetRandomReal(0.0, 1.0) > FR_SOUL_HERO_CHANCE then
+            set victim = null
+            set killer = null
+            set source = null
+            return
+        endif
+    elseif GetRandomReal(0.0, 1.0) > FR_SOUL_NORMAL_CHANCE then
+        set victim = null
+        set killer = null
+        set source = null
+        return
     endif
-    if IsUnitType(target, UNIT_TYPE_HERO) then
-        set duration = FR_SLOW_HERO_DURATION
-    else
-        set duration = FR_SLOW_DURATION
-    endif
-    call SaveReal(fr_slow_table, key, 1, TimerGetElapsed(fr_slow_timer) + duration)
-    call SetUnitMoveSpeed(target, RMaxBJ(50.0, base_speed * FR_SLOW_FACTOR))
+    call SetHeroStr(source, GetHeroStr(source, false) + 1, true)
+    call FR_ShowSoulGain(source)
+    set victim = null
+    set killer = null
+    set source = null
 endfunction
 
 function FR_OnAttack takes nothing returns nothing
-    call FR_ApplySlow(GetAttacker(), GetTriggerUnit())
+    local unit attacker = GetAttacker()
+    local unit victim = GetTriggerUnit()
+    local unit dummy
+    if attacker == null or victim == null then
+        set attacker = null
+        set victim = null
+        return
+    endif
+    if not FR_HasItem(attacker) then
+        set attacker = null
+        set victim = null
+        return
+    endif
+    if IsUnitType(victim, UNIT_TYPE_STRUCTURE) or IsUnitType(victim, UNIT_TYPE_MAGIC_IMMUNE) then
+        set attacker = null
+        set victim = null
+        return
+    endif
+    if GetRandomReal(0.0, 1.0) > FR_NOVA_CHANCE then
+        set attacker = null
+        set victim = null
+        return
+    endif
+    // 用官方霜冻新星的马甲施法方式。A170 是 AUfn 的无耗魔、无冷却副本，
+    // 伤害、减速和视觉均继承官方能力。
+    set dummy = CreateUnit(GetOwningPlayer(attacker), FR_NOVA_DUMMY, GetUnitX(victim), GetUnitY(victim), 0.0)
+    call UnitAddAbility(dummy, 'Aloc')
+    call SetUnitScale(dummy, 0.01, 0.01, 0.01)
+    call SetUnitVertexColor(dummy, 255, 255, 255, 0)
+    call UnitAddAbility(dummy, FR_NOVA_ABILITY)
+    call FR_TrackNovaSoulSource(attacker, dummy)
+    call IssueTargetOrder(dummy, "frostnova", victim)
+    call UnitApplyTimedLife(dummy, FR_NOVA_LIFE, 1.0)
+    set attacker = null
+    set victim = null
+    set dummy = null
 endfunction
 
-function FR_SlowStep takes nothing returns nothing
-    local group work = CreateGroup()
-    local unit u
+function FR_SyncAbility takes unit u returns nothing
     local integer key
-    call GroupAddGroup(fr_slow_group, work)
-    loop
-        set u = FirstOfGroup(work)
-        exitwhen u == null
-        set key = GetHandleId(u)
-        if GetUnitTypeId(u) == 0 then
-            call FlushChildHashtable(fr_slow_table, key)
-            call GroupRemoveUnit(fr_slow_group, u)
-        elseif TimerGetElapsed(fr_slow_timer) >= LoadReal(fr_slow_table, key, 1) then
-            call SetUnitMoveSpeed(u, LoadReal(fr_slow_table, key, 0))
-            call FlushChildHashtable(fr_slow_table, key)
-            call GroupRemoveUnit(fr_slow_group, u)
+    local real cooldown
+    local real expires
+    if u == null or GetUnitTypeId(u) == 0 then
+        return
+    endif
+    if not IsUnitType(u, UNIT_TYPE_HERO) then
+        return
+    endif
+    if FR_ITEM_ACTIVE then
+        return
+    endif
+    set key = GetHandleId(u)
+    if FR_HasItem(u) then
+        if GetUnitAbilityLevel(u, FR_SPELL_ID) == 0 then
+            call UnitAddAbility(u, FR_SPELL_ID)
+            call UnitMakeAbilityPermanent(u, true, FR_SPELL_ID)
+            set expires = LoadReal(fr_cooldown_table, key, 0)
+            set cooldown = expires - TimerGetElapsed(fr_clock)
+            if cooldown > 0.0 then
+                call BlzStartUnitAbilityCooldown(u, FR_SPELL_ID, cooldown)
+            endif
+            call FlushChildHashtable(fr_cooldown_table, key)
         endif
-        call GroupRemoveUnit(work, u)
-    endloop
-    call DestroyGroup(work)
-    set work = null
+        call BlzUnitDisableAbility(u, FR_SPELL_ID, false, false)
+    elseif GetUnitAbilityLevel(u, FR_SPELL_ID) > 0 then
+        set cooldown = BlzGetUnitAbilityCooldownRemaining(u, FR_SPELL_ID)
+        if cooldown > 0.0 then
+            call SaveReal(fr_cooldown_table, key, 0, TimerGetElapsed(fr_clock) + cooldown)
+        else
+            call FlushChildHashtable(fr_cooldown_table, key)
+        endif
+        call UnitRemoveAbility(u, FR_SPELL_ID)
+    endif
+endfunction
+
+function FR_InitialAbilityUnit takes nothing returns nothing
+    call FR_SyncAbility(GetEnumUnit())
+endfunction
+
+function FR_OnHeroRevive takes nothing returns nothing
+    local unit u = GetRevivingUnit()
+    call FR_SyncAbility(u)
     set u = null
 endfunction
 
@@ -153,6 +290,8 @@ function FR_RemoveItemAura takes item it returns nothing
             set fr_ground_items[last] = null
             set fr_ground_keys[last] = 0
             set fr_ground_effects[last] = null
+            set fr_ground_x[last] = 0.0
+            set fr_ground_y[last] = 0.0
             set fr_ground_count = last
             return
         endif
@@ -161,7 +300,35 @@ function FR_RemoveItemAura takes item it returns nothing
 endfunction
 
 function FR_OnItemPickup takes nothing returns nothing
+    local unit u = GetTriggerUnit()
     call FR_RemoveItemAura(GetManipulatedItem())
+    call FR_SyncAbility(u)
+    set u = null
+endfunction
+
+function FR_OnItemDrop takes nothing returns nothing
+    local unit u = GetTriggerUnit()
+    local item it = GetManipulatedItem()
+    local integer key
+    local real cooldown
+    if not FR_ITEM_ACTIVE and u != null and it != null and GetItemTypeId(it) == FR_ITEM_ID then
+        if GetUnitAbilityLevel(u, FR_SPELL_ID) > 0 then
+            set key = GetHandleId(u)
+            set cooldown = BlzGetUnitAbilityCooldownRemaining(u, FR_SPELL_ID)
+            if cooldown > 0.0 then
+                call SaveReal(fr_cooldown_table, key, 0, TimerGetElapsed(fr_clock) + cooldown)
+            else
+                call FlushChildHashtable(fr_cooldown_table, key)
+            endif
+            call UnitRemoveAbility(u, FR_SPELL_ID)
+        endif
+        set it = null
+        set u = null
+        return
+    endif
+    call FR_SyncAbility(u)
+    set it = null
+    set u = null
 endfunction
 
 function FR_GroundAuraStep takes nothing returns nothing
@@ -177,12 +344,15 @@ function FR_GroundAuraStep takes nothing returns nothing
         set i = i - 1
         set it = fr_ground_items[i]
         if not FR_ItemOnGround(it) then
-            if it != null and GetItemTypeId(it) == FR_ITEM_ID then
-                set key = GetHandleId(it)
-                set fx = LoadEffectHandle(fr_ground_table, key, 0)
+            // A-click may invalidate the item before the next scan. Use the
+            // effect handle saved in our own table instead of asking the dead
+            // item handle for its type ID.
+            set key = fr_ground_keys[i]
+            set fx = fr_ground_effects[i]
+            if fx != null then
                 call DestroyEffect(fx)
-                call FlushChildHashtable(fr_ground_table, key)
             endif
+            call FlushChildHashtable(fr_ground_table, key)
             set last = fr_ground_count - 1
             set fr_ground_items[i] = fr_ground_items[last]
             set fr_ground_keys[i] = fr_ground_keys[last]
@@ -192,6 +362,8 @@ function FR_GroundAuraStep takes nothing returns nothing
             set fr_ground_items[last] = null
             set fr_ground_keys[last] = 0
             set fr_ground_effects[last] = null
+            set fr_ground_x[last] = 0.0
+            set fr_ground_y[last] = 0.0
             set fr_ground_count = last
         else
             set x = GetItemX(it)
@@ -210,94 +382,34 @@ function FR_GroundAuraStep takes nothing returns nothing
     call EnumItemsInRect(fr_world, null, function FR_EnumGroundItem)
 endfunction
 
-function FR_SoulAbility takes integer block returns integer
-    if block == 0 then
-        return 'A130'
-    elseif block == 1 then
-        return 'A131'
-    elseif block == 2 then
-        return 'A132'
-    elseif block == 3 then
-        return 'A133'
-    elseif block == 4 then
-        return 'A134'
-    elseif block == 5 then
-        return 'A135'
-    elseif block == 6 then
-        return 'A136'
-    elseif block == 7 then
-        return 'A137'
-    elseif block == 8 then
-        return 'A138'
-    elseif block == 9 then
-        return 'A139'
-    elseif block == 10 then
-        return 'A140'
-    elseif block == 11 then
-        return 'A141'
+function FR_CreateFreezeFx takes unit u returns nothing
+    local integer unitKey = GetHandleId(u)
+    local effect fx = AddSpecialEffectTarget("Abilities\\Spells\\Undead\\FreezingBreath\\FreezingBreathTargetArt.mdl", u, "origin")
+    if fx != null then
+        call SaveEffectHandle(fr_freeze_table, unitKey, 1, fx)
     endif
-    return 0
+    set fx = null
 endfunction
 
-function FR_SetSoulBurden takes unit u, integer value returns nothing
-    local integer bit = 0
-    local integer abil
-    loop
-        exitwhen bit >= 12
-        set abil = FR_SoulAbility(bit)
-        if ModuloInteger(value, 2) == 1 then
-            if GetUnitAbilityLevel(u, abil) == 0 then
-                call UnitAddAbility(u, abil)
-                call UnitMakeAbilityPermanent(u, true, abil)
-            endif
-        elseif GetUnitAbilityLevel(u, abil) > 0 then
-            call UnitRemoveAbility(u, abil)
+function FR_DestroyFreezeFx takes integer unitKey returns nothing
+    local effect fx
+    if HaveSavedHandle(fr_freeze_table, unitKey, 1) then
+        set fx = LoadEffectHandle(fr_freeze_table, unitKey, 1)
+        if fx != null then
+            call DestroyEffect(fx)
         endif
-        set value = value / 2
-        set bit = bit + 1
-    endloop
+    endif
+    set fx = null
 endfunction
 
-function FR_ShowSoulDrain takes unit u returns nothing
-    local texttag tt = CreateTextTag()
-    call SetTextTagText(tt, "灵魂被吞噬 -50 最大生命", 0.024)
-    call SetTextTagPosUnit(tt, u, 110.0)
-    call SetTextTagColor(tt, 190, 100, 255, 255)
-    call SetTextTagVelocity(tt, 0.0, 0.035)
-    call SetTextTagPermanent(tt, false)
-    call SetTextTagLifespan(tt, 1.8)
-    call SetTextTagFadepoint(tt, 1.2)
-    call SetTextTagVisibility(tt, GetLocalPlayer() == GetOwningPlayer(u))
-    set tt = null
-endfunction
-
-function FR_TrySoulDrain takes unit u returns nothing
-    local integer key
-    local integer total
-    local real oldMax
-    local real newMax
-    if u == null or not UnitHasItemOfTypeBJ(u, FR_ITEM_ID) then
-        return
+function FR_IsInvulnerable takes unit u returns boolean
+    if u == null then
+        return false
     endif
-    if GetRandomReal(0.0, 1.0) >= FR_SOUL_CHANCE then
-        return
+    if BlzIsUnitInvulnerable(u) then
+        return true
     endif
-    set oldMax = GetUnitState(u, UNIT_STATE_MAX_LIFE)
-    if oldMax <= I2R(FR_SOUL_DRAIN) then
-        return
-    endif
-    set key = GetHandleId(u)
-    set total = LoadInteger(fr_soul_table, key, 0) + 1
-    if total >= 4096 then
-        return
-    endif
-    call FR_SetSoulBurden(u, total)
-    set newMax = GetUnitState(u, UNIT_STATE_MAX_LIFE)
-    if oldMax - newMax < 49.0 then
-        return
-    endif
-    call SaveInteger(fr_soul_table, key, 0, total)
-    call FR_ShowSoulDrain(u)
+    return GetUnitAbilityLevel(u, 'Avul') > 0
 endfunction
 
 function FR_Unfreeze takes nothing returns nothing
@@ -305,6 +417,7 @@ function FR_Unfreeze takes nothing returns nothing
     local integer timerKey = GetHandleId(t)
     local integer unitKey = LoadInteger(fr_freeze_timer_table, timerKey, 1)
     local unit u = LoadUnitHandle(fr_freeze_timer_table, timerKey, 0)
+    call FR_DestroyFreezeFx(unitKey)
     if u != null and GetUnitTypeId(u) != 0 then
         call PauseUnit(u, false)
         call SetUnitTimeScale(u, 1.0)
@@ -316,11 +429,11 @@ function FR_Unfreeze takes nothing returns nothing
     set t = null
 endfunction
 
-function FR_FreezeAir takes unit u, real duration returns nothing
+function FR_FreezeUnit takes unit u, real duration returns nothing
     local integer unitKey
     local integer timerKey
     local timer t
-    if u == null or (not IsUnitType(u, UNIT_TYPE_FLYING) and not IsUnitType(u, UNIT_TYPE_STRUCTURE)) then
+    if u == null or FR_IsInvulnerable(u) then
         return
     endif
     set unitKey = GetHandleId(u)
@@ -334,6 +447,7 @@ function FR_FreezeAir takes unit u, real duration returns nothing
         call SaveInteger(fr_freeze_timer_table, timerKey, 1, unitKey)
         call PauseUnit(u, true)
         call SetUnitTimeScale(u, 0.0)
+        call FR_CreateFreezeFx(u)
     endif
     call TimerStart(t, duration, false, function FR_Unfreeze)
     set t = null
@@ -342,6 +456,9 @@ endfunction
 function FR_CanAffect takes unit caster, unit target returns boolean
     local integer ownerId
     if caster == null or target == null then
+        return false
+    endif
+    if FR_IsInvulnerable(target) then
         return false
     endif
     if IsUnitEnemy(target, GetOwningPlayer(caster)) then
@@ -354,26 +471,63 @@ function FR_CanAffect takes unit caster, unit target returns boolean
     return ownerId == PLAYER_NEUTRAL_PASSIVE or ownerId == PLAYER_NEUTRAL_AGGRESSIVE
 endfunction
 
-function FR_OnSpell takes nothing returns nothing
-    local unit caster
+function FR_PayActiveLife takes unit u returns nothing
+    local real currentLife
+    local real cost
+    if u == null then
+        return
+    endif
+    set currentLife = GetUnitState(u, UNIT_STATE_LIFE)
+    set cost = RMinBJ(RMaxBJ(1.0, currentLife * FR_ACTIVE_LIFE_COST), RMaxBJ(0.0, currentLife - 1.0))
+    if cost <= 0.0 then
+        return
+    endif
+    call SetUnitState(u, UNIT_STATE_LIFE, currentLife - cost)
+endfunction
+
+function FR_DestroyTimedEffect takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer timerKey = GetHandleId(t)
+    local effect fx = LoadEffectHandle(fr_active_fx_table, timerKey, 0)
+    if fx != null then
+        call DestroyEffect(fx)
+    endif
+    call FlushChildHashtable(fr_active_fx_table, timerKey)
+    call DestroyTimer(t)
+    set fx = null
+    set t = null
+endfunction
+
+function FR_ShowTimedEffect takes string path, real x, real y, real duration returns nothing
+    local timer t = CreateTimer()
+    local effect fx = AddSpecialEffect(path, x, y)
+    call SaveEffectHandle(fr_active_fx_table, GetHandleId(t), 0, fx)
+    call TimerStart(t, duration, false, function FR_DestroyTimedEffect)
+    set fx = null
+    set t = null
+endfunction
+
+function FR_CastStomp takes unit caster returns nothing
     local group g
     local unit target
     local real x
     local real y
     local real bonus
     local real freeze_duration
-    if GetSpellAbilityId() != FR_SPELL_ID then
+    if caster == null or not FR_HasItem(caster) then
+        set caster = null
         return
     endif
-    set caster = GetTriggerUnit()
     set x = GetUnitX(caster)
     set y = GetUnitY(caster)
-    set bonus = I2R(FR_HighestStat(caster)) * FR_SPELL_STAT_MULT
+    set bonus = 100.0 + I2R(GetHeroStr(caster, true)) * FR_SPELL_STAT_MULT
     if bonus <= 0.0 then
         set caster = null
         return
     endif
-    call FR_TrySoulDrain(caster)
+    call FR_PayActiveLife(caster)
+    call SetUnitAnimation(caster, "stand")
+    call FR_ShowTimedEffect("war3campImported\\IceStompRaised.mdx", x, y, 1.5)
     call TriggerSleepAction(0.05)
     set g = CreateGroup()
     call GroupEnumUnitsInRange(g, x, y, FR_SPELL_RADIUS, null)
@@ -381,19 +535,14 @@ function FR_OnSpell takes nothing returns nothing
         set target = FirstOfGroup(g)
         exitwhen target == null
         if target != caster and IsUnitAliveBJ(target) and FR_CanAffect(caster, target) then
-            if IsUnitType(target, UNIT_TYPE_STRUCTURE) then
-                call FR_FreezeAir(target, 5.0)
+            if IsUnitType(target, UNIT_TYPE_HERO) then
+                set freeze_duration = 3.0
+            else
+                set freeze_duration = 5.0
             endif
+            call FR_FreezeUnit(target, freeze_duration)
             if not IsUnitType(target, UNIT_TYPE_MAGIC_IMMUNE) then
                 call UnitDamageTarget(caster, target, bonus, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_MAGIC, WEAPON_TYPE_WHOKNOWS)
-                if IsUnitType(target, UNIT_TYPE_FLYING) then
-                    if IsUnitType(target, UNIT_TYPE_HERO) then
-                        set freeze_duration = 3.0
-                    else
-                        set freeze_duration = 5.0
-                    endif
-                    call FR_FreezeAir(target, freeze_duration)
-                endif
             endif
         endif
         call GroupRemoveUnit(g, target)
@@ -404,23 +553,55 @@ function FR_OnSpell takes nothing returns nothing
     set caster = null
 endfunction
 
+function FR_OnStompCast takes nothing returns nothing
+    local unit caster = GetTriggerUnit()
+    local integer unitKey
+    local real now
+    if GetSpellAbilityId() != FR_SPELL_ID then
+        return
+    endif
+    if caster == null or not FR_HasItem(caster) then
+        set caster = null
+        return
+    endif
+    set unitKey = GetHandleId(caster)
+    set now = TimerGetElapsed(fr_clock)
+    if now < LoadReal(fr_cast_guard_table, unitKey, 0) then
+        set caster = null
+        return
+    endif
+    call SaveReal(fr_cast_guard_table, unitKey, 0, TimerGetElapsed(fr_clock) + FR_CAST_GUARD_SECONDS)
+    call FR_CastStomp(caster)
+    set caster = null
+endfunction
+
 function FR_Init takes nothing returns nothing
+    local integer i = 0
+    local group initialGroup
     if fr_inited then
         return
     endif
     set fr_inited = true
-    set fr_slow_group = CreateGroup()
-    set fr_slow_table = InitHashtable()
-    set fr_soul_table = InitHashtable()
     set fr_freeze_table = InitHashtable()
     set fr_freeze_timer_table = InitHashtable()
-    set fr_slow_timer = CreateTimer()
-    call TimerStart(fr_slow_timer, 0.10, true, function FR_SlowStep)
+    set fr_soul_source_table = InitHashtable()
+    set fr_soul_timer_table = InitHashtable()
+    set fr_cooldown_table = InitHashtable()
+    set fr_active_fx_table = InitHashtable()
+    set fr_cast_guard_table = InitHashtable()
+    set fr_clock = CreateTimer()
+    call TimerStart(fr_clock, 8640000.0, false, function FR_NoOp)
     set fr_world = GetWorldBounds()
     set fr_ground_table = InitHashtable()
     set fr_pickup_trigger = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(fr_pickup_trigger, EVENT_PLAYER_UNIT_PICKUP_ITEM)
     call TriggerAddAction(fr_pickup_trigger, function FR_OnItemPickup)
+    set fr_drop_trigger = CreateTrigger()
+    call TriggerRegisterAnyUnitEventBJ(fr_drop_trigger, EVENT_PLAYER_UNIT_DROP_ITEM)
+    call TriggerAddAction(fr_drop_trigger, function FR_OnItemDrop)
+    set fr_revive_trigger = CreateTrigger()
+    call TriggerRegisterAnyUnitEventBJ(fr_revive_trigger, EVENT_PLAYER_HERO_REVIVE_FINISH)
+    call TriggerAddAction(fr_revive_trigger, function FR_OnHeroRevive)
     set fr_ground_timer = CreateTimer()
     call TimerStart(fr_ground_timer, 0.25, true, function FR_GroundAuraStep)
 
@@ -429,8 +610,22 @@ function FR_Init takes nothing returns nothing
     call TriggerAddAction(fr_attack_trigger, function FR_OnAttack)
 
     set fr_spell_trigger = CreateTrigger()
+    call TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_CAST)
     call TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_EFFECT)
-    call TriggerAddAction(fr_spell_trigger, function FR_OnSpell)
+    call TriggerAddAction(fr_spell_trigger, function FR_OnStompCast)
 
-    call DisplayTextToPlayer(Player(0), 0, 0, "|cff66ccff[霜之哀伤]|r 已加载")
+    set fr_soul_trigger = CreateTrigger()
+    loop
+        exitwhen i >= 12
+        call TriggerRegisterPlayerUnitEvent(fr_soul_trigger, Player(i), EVENT_PLAYER_UNIT_DEATH, null)
+        set i = i + 1
+    endloop
+    call TriggerRegisterPlayerUnitEvent(fr_soul_trigger, Player(PLAYER_NEUTRAL_AGGRESSIVE), EVENT_PLAYER_UNIT_DEATH, null)
+    call TriggerAddAction(fr_soul_trigger, function FR_OnSoulDeath)
+
+    set initialGroup = CreateGroup()
+    call GroupEnumUnitsInRect(initialGroup, bj_mapInitialPlayableArea, null)
+    call ForGroup(initialGroup, function FR_InitialAbilityUnit)
+    call DestroyGroup(initialGroup)
+    set initialGroup = null
 endfunction

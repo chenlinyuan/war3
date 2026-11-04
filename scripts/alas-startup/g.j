@@ -1,0 +1,1 @@
+// No globals required.

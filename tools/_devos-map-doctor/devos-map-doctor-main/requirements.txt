@@ -1,0 +1,10 @@
+numpy>=1.24
+pillow>=10.0
+pywebview>=6.2
+pyinstaller>=6.0
+ziglang>=0.16
+zopfli==0.4.3
+lupa==2.8
+ctranslate2==4.8.2
+sentencepiece==0.2.2
+onnxruntime==1.31.0

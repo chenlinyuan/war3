@@ -27,6 +27,8 @@ sys.path.insert(0, HERE)
 
 TEMPLATE_W3T = os.path.join(HERE, "_hand.w3t")
 TEMPLATE_W3A = os.path.join(HERE, "_lt_hand.w3a")
+ITEM_PASSIVE_COLOR = "|cff5ddf26"
+ITEM_ACTIVE_COLOR = "|cff66ccff"
 
 # 模板里的原始 ID（固定不变）
 TPL_ITEM = "I000"
@@ -129,6 +131,45 @@ def _patch_string(val, mapping):
     return ",".join(out)
 
 
+def _canonical_hand_text(text, skill_line, soul_line, keep_lore):
+    """统一阿克蒙德之手说明：被动、装备技能、剧情，剧情固定放最后。"""
+    lore = ""
+    if keep_lore:
+        marker = "|cffffcc00阿克蒙德"
+        position = text.find(marker)
+        if position >= 0:
+            lore = text[position:]
+            text = text[:position]
+
+    body_lines = []
+    passives = {"重击": "", "掠夺": ""}
+    for line in text.split("|n"):
+        if "装备后获得技能：死亡之指（F）" in line or "夺魂" in line:
+            continue
+        line = line.replace("，可主动释放死亡之指。", "。")
+        line = line.replace("可主动释放死亡之指。", "")
+        plain = re.sub(r"\|c[0-9a-fA-F]{8}", "", line).replace("|r", "")
+        matched = [label for label in passives if label in plain]
+        if matched:
+            label = matched[0]
+            passives[label] = ITEM_PASSIVE_COLOR + plain + "|r"
+        else:
+            body_lines.append(line)
+    while body_lines and not body_lines[-1]:
+        body_lines.pop()
+    body_lines.extend(
+        passives[label] for label in ("重击", "掠夺") if passives[label]
+    )
+    body = "|n".join(body_lines)
+    body = re.sub(r"^(?:\|n)+|(?:\|n)+$", "", body)
+
+    sections = [section for section in (body, soul_line, skill_line) if section]
+    result = "|n".join(sections)
+    if lore:
+        result += "|n|n" + lore
+    return result
+
+
 def build(out_w3t, out_w3a, cfg=None):
     """按配置里的 ID 重写"阿克蒙德之手"模板，写出 w3t / w3a。"""
     if cfg is None:
@@ -153,6 +194,17 @@ def build(out_w3t, out_w3a, cfg=None):
         for mid, t, lv, col, val in mods:
             if t == 3 and isinstance(val, str) and mid in ("iabi", "icid"):
                 val = _patch_string(val, mapping)
+            if mid == "icid":
+                continue
+            if mid == "iabi":
+                val = ",".join(
+                    part for part in val.split(",")
+                    if part != mapping[TPL_FINGER]
+                )
+            elif mid == "iusa":
+                val = 0
+            elif mid == "ihot":
+                val = ""
             mods2.append((mid, t, lv, col, val))
         # 地面模型：燃烧里的神器掉在地上是"发光宝箱"（作者那套 Chest_*.mdx），
         #   这里也给阿克蒙德之手换成传说款（配置 GROUND["hand"]，老配置没有就跳过）。
@@ -182,18 +234,35 @@ def build(out_w3t, out_w3a, cfg=None):
                         mods2[i] = (mid, t, lv, col, (val + "," + bash) if val else bash)
                 elif mid in ("utub", "ides") and t == 3 and isinstance(val, str):
                     mods2[i] = (mid, t, lv, col, val + line)
-        # 死亡之指的说明：模板里写的是"主动使用：死亡之指（秒杀目标单位）。"——
-        #   2026-10-15 玩家把它从"绝对秒杀"改成"按最高属性算的混沌伤害"，
-        #   所以这句要换成新公式（技能本体由 gen_wing.py 生成，数值由 f.j 施加）。
-        fh = float(common.get("finger_dmg_hero_mult", 25.0))
-        fo = float(common.get("finger_dmg_other_mult", 50.0))
+        tooltip = getattr(cfg, "HAND_ITEM_TOOLTIP", "")
+        description = getattr(cfg, "HAND_ITEM_DESCRIPTION", "")
+        item_name = getattr(cfg, "HAND_ITEM_NAME", "")
+        for i, (mid, t, lv, col, val) in enumerate(mods2):
+            if mid == "utub" and t == 3 and tooltip:
+                mods2[i] = (mid, t, lv, col, tooltip)
+            elif mid == "ides" and t == 3 and description:
+                mods2[i] = (mid, t, lv, col, description)
+            elif mid == "unam" and t == 3 and item_name:
+                mods2[i] = (mid, t, lv, col, item_name)
+        soul_line = ""
+        if int(common.get("hand_soul_gain", 1) or 0) > 0:
+            elite_chance = int(common.get("hand_soul_elite_chance", 25))
+            min_level = int(common.get("hand_soul_min_level", 8))
+            min_hp = int(common.get("hand_soul_min_hp", 2000))
+            soul_line = (
+                ITEM_PASSIVE_COLOR + "夺魂：死亡之指击杀英雄时永久 +1 智力；"
+                "击杀等级≥%d或生命≥%d的非英雄强敌有%d%%概率永久 +1 智力。|r"
+                % (min_level, min_hp, elite_chance)
+            )
+        skill_line = ITEM_ACTIVE_COLOR + "装备后获得技能：死亡之指（F）。|r"
         for i, (mid, t, lv, col, val) in enumerate(mods2):
             if mid in ("utub", "ides") and t == 3 and isinstance(val, str):
-                mods2[i] = (mid, t, lv, col, re.sub(
-                    r"主动使用：死亡之指（[^）]*）。",
-                    "主动使用：死亡之指 —— 对英雄造成 最高属性×%g 的混沌伤害，"
-                    "非英雄单位翻倍（×%g）；无视护甲与魔法免疫。" % (fh, fo),
-                    val))
+                mods2[i] = (
+                    mid, t, lv, col,
+                    _canonical_hand_text(
+                        val, skill_line, soul_line, mid == "utub"
+                    ),
+                )
         out_cust.append((old, new2, mods2))
     write_entries(out_w3t, ver, orig, out_cust)
 

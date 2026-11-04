@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# third-party tools fetched by scripts/get-unluac.*
+tools/unluac/
+tools/unluac.jar
+unluac-src/
+unluac.jar
+
+# game data and anything derived from it -- never commit these
+*.w3x
+*.w3m
+*.w3n
+*.w3xd
+*.luac
+*.mpq
+*.dmp
+*.files/
+*.w3xd.files/
+*.w3x.files/
+
+# scratch
+*.stock.luac
+_tmp/
+tmp/
+scratch/

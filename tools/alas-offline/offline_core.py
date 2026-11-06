@@ -50,8 +50,12 @@ sys.path.insert(0, str(DOCTOR))
 import fix_alas_campaign_names as NAMES  # noqa: E402
 import alas_item_rules as ITEM_RULES  # noqa: E402
 import port_alas_jass_campaign as JASS_CAMPAIGN  # noqa: E402
+import universal_talents as TALENT_BUNDLE  # noqa: E402
+import wild_equipment_drops as WILD_DROPS  # noqa: E402
 import war3mpq as W  # noqa: E402
+from wing_copy_contract import wing_copy_failures  # noqa: E402
 from doctor.data import w3i as W3I  # noqa: E402
+from doctor.data import objects as OBJ  # noqa: E402
 from doctor.triggers import wtg  # noqa: E402
 
 
@@ -62,12 +66,140 @@ class OfflineToolError(RuntimeError):
     pass
 
 
+def runtime_compact(script: bytes) -> str:
+    return re.sub(
+        r"[^A-Za-z0-9_]+",
+        "",
+        script.decode("latin-1", "replace"),
+    )
+
+
+def runtime_marker_matches(
+    script: bytes,
+    compact_script: str,
+    marker: bytes,
+) -> bool:
+    if marker in script:
+        return True
+    text = marker.decode("ascii", "replace")
+    function = re.fullmatch(r"function (\w+) takes", text)
+    if function:
+        text = "function " + function.group(1) + "("
+    elif "function " in text:
+        text = text.replace("function ", "")
+    text = re.sub(
+        r"^(?:call|real|integer|boolean|string) ",
+        "",
+        text,
+    )
+    compact_marker = re.sub(r"[^A-Za-z0-9_]+", "", text)
+    return compact_marker in compact_script
+
+
+def require_wing_copy(
+    item_fields: dict[str, dict[str, object]],
+    config: object,
+    label: str,
+) -> None:
+    wing_ids = {
+        wing["key"]: wing["item"]
+        for wing in config.WINGS
+    }
+    issues = wing_copy_failures(item_fields, wing_ids)
+    if issues:
+        raise OfflineToolError(
+            "%s: 翅膀神器文案审计失败：%s" % (label, "; ".join(issues))
+        )
+
+
+def require_frost_control(
+    ability_fields: dict[str, dict[str, object]],
+    ability_origins: dict[str, str],
+    script: bytes,
+    label: str,
+) -> None:
+    tooltip = ability_fields.get("A105", {}).get("aub1", "")
+    if isinstance(tooltip, bytes):
+        tooltip = tooltip.decode("utf-8", "replace")
+    tooltip = str(tooltip)
+    required = (
+        "核心 0～300",
+        "中环 300～550",
+        "外环 550～750",
+        "同时附加冰缓 60%，共持续 9 秒",
+        "空中单位不冰冻，但仍受伤害和减速",
+    )
+    missing = [token for token in required if token not in tooltip]
+    if missing:
+        raise OfflineToolError(
+            "%s: 冰封践踏说明缺少：%s" % (label, ", ".join(missing))
+        )
+    if ability_origins.get("A171") != "Aslo":
+        raise OfflineToolError("%s: A171 不是原生 Slow 基底" % label)
+    slow = ability_fields.get("A171", {})
+    slow_buff = slow.get("abuf", "")
+    if isinstance(slow_buff, bytes):
+        slow_buff = slow_buff.decode("utf-8", "replace")
+    if str(slow_buff) != "Bfro":
+        raise OfflineToolError("%s: A171 没有使用霜冻新星 Buff" % label)
+    try:
+        slow_factor = float(slow.get("Slo1", "nan"))
+        slow_duration = float(slow.get("adur", "nan"))
+    except (TypeError, ValueError):
+        raise OfflineToolError("%s: A171 减速字段无效" % label)
+    if abs(slow_factor - 0.4) > 0.0001:
+        raise OfflineToolError("%s: A171 核心减速不是 60%%" % label)
+    if abs(slow_duration - 9.0) > 0.0001:
+        raise OfflineToolError("%s: A171 核心减速不是 9 秒" % label)
+    compact_script = runtime_compact(script)
+    for marker in (
+        b"function FR_IsAliveTarget takes",
+        b"GetWidgetLife(u) <= 0.405",
+        b"not IsUnitType(u, UNIT_TYPE_DEAD)",
+        b"function FR_ApplySlow takes",
+        b"call FR_ApplySlow(GetOwningPlayer(caster), target, slowLevel)",
+        b"call FR_FreezeUnit(target, freeze_duration)",
+        b"function FR_OnFrozenDeath takes",
+        b"call PauseUnit(u, false)",
+        b"call SetUnitTimeScale(u, 1.0)",
+        b"IssueTargetOrder(dummy, \"slow\", target)",
+        b"real FR_RING_CORE_RADIUS = 300.0",
+        b"real FR_RING_MID_RADIUS = 550.0",
+        b"real FR_FREEZE_CORE = 6.0",
+        b"real FR_FREEZE_MID = 4.0",
+        b"real FR_FREEZE_OUTER = 2.0",
+    ):
+        if not runtime_marker_matches(
+            script,
+            compact_script,
+            marker,
+        ):
+            raise OfflineToolError(
+                "%s: 冰封践踏缺少运行时标记 %s"
+                % (label, marker.decode("ascii"))
+            )
+    if runtime_marker_matches(
+        script,
+        compact_script,
+        b"call FR_FreezeUnit(caster, target, freeze_duration, slowLevel)",
+    ):
+        raise OfflineToolError("%s: 冰封践踏仍使用旧的延迟减速调用" % label)
+
+
 @dataclass
 class CampaignInfo:
     source: str
     source_kind: str
     title: str
     script_type: str
+    map_info_versions: dict[str, int | None]
+    new_backpack_supported: bool
+    new_backpack_reason: str
+    universal_talents_supported: bool
+    universal_talents_reason: str
+    reforged_migration_required: bool
+    reforged_migration_supported: bool
+    reforged_migration_reason: str
     chapters: list[str]
     source_sha256: str
     source_bytes: int
@@ -82,7 +214,13 @@ class BuildResult:
     output: str
     compact_archive: bool
     ft_data: bool
+    reforged_migrate: bool
     equipment_mode: str
+    new_backpack: bool
+    new_backpack_panels: tuple[str, ...]
+    universal_talents: bool
+    wild_equipment_drops: bool
+    campaign_equipment_drops: bool
     follow_game_graphics: bool
     script_type: str
     chapters: int
@@ -218,6 +356,106 @@ def discover_save_directories(
     return found
 
 
+def _read_map_info_version(data: bytes) -> int | None:
+    if not data:
+        return None
+    try:
+        return int(W3I.parse_or_tolerant(data).get("version", 0))
+    except Exception:
+        return None
+
+
+def _format_map_info_versions(
+    versions: dict[str, int | None],
+) -> str:
+    values = sorted(
+        {
+            int(version)
+            for version in versions.values()
+            if version is not None
+        }
+    )
+    if not values:
+        return "未知"
+    if len(values) == 1:
+        return "v%d" % values[0]
+    return "v%d-v%d" % (values[0], values[-1])
+
+
+def _new_backpack_compatibility(
+    versions: dict[str, int | None],
+) -> tuple[bool, str]:
+    missing = sum(version is None for version in versions.values())
+    if missing:
+        return (
+            False,
+            "有 %d 个地图无法读取 war3map.w3i" % missing,
+        )
+    if versions and all(
+        int(version) >= 31
+        for version in versions.values()
+        if version is not None
+    ):
+        return True, "全部地图均为 Reforged map-info v31+"
+    return (
+        False,
+        "需要 Reforged map-info v31+，当前为 "
+        + _format_map_info_versions(versions),
+    )
+
+
+def _reforged_migration_compatibility(
+    versions: dict[str, int | None],
+) -> tuple[bool, bool, str]:
+    missing = sum(version is None for version in versions.values())
+    if missing:
+        return (
+            True,
+            False,
+            "有 %d 个地图无法读取 war3map.w3i" % missing,
+        )
+    values = [
+        int(version)
+        for version in versions.values()
+        if version is not None
+    ]
+    if not values:
+        return True, False, "没有可读取的 map-info 数据"
+    if all(version >= 31 for version in values):
+        return False, False, "当前已经是 Reforged map-info v31+"
+    if any(version < 25 for version in values):
+        return (
+            True,
+            False,
+            "包含低于 v25 的 map-info，不支持自动迁移",
+        )
+    legacy = sum(version < 31 for version in values)
+    return (
+        True,
+        True,
+        "可将 %d 个旧版地图迁移到 Reforged map-info v31+/2/2"
+        % legacy,
+    )
+
+
+def _universal_talents_compatibility(
+    source_kind: str,
+    script_type: str,
+    new_backpack_supported: bool,
+    migration_supported: bool,
+) -> tuple[bool, str]:
+    label = (
+        "Lua" if script_type == "lua" else "JASS"
+    ) + (
+        " 战役" if source_kind == "campaign" else " 单图"
+    )
+    if new_backpack_supported:
+        return True, "Reforged " + label
+    if migration_supported:
+        return True, "Reforged 数据迁移后可用（" + label + "）"
+    return False, "需要 Reforged map-info v31+"
+
+
 def analyze_source(path: Path) -> CampaignInfo:
     path = path.resolve()
     if not path.is_file():
@@ -232,6 +470,7 @@ def analyze_source(path: Path) -> CampaignInfo:
     script_types: set[str] = set()
     already_injected = False
     chapters: list[str] = []
+    map_info_versions: dict[str, int | None] = {}
     try:
         chapters = sorted(
             name for name in outer.listfile
@@ -250,6 +489,9 @@ def analyze_source(path: Path) -> CampaignInfo:
                 temp.write_bytes(data)
                 chapter = W.MPQArchive(str(temp))
                 try:
+                    map_info_versions[name] = _read_map_info_version(
+                        chapter.read_file("war3map.w3i") or b""
+                    )
                     jass = chapter.read_file("war3map.j") or b""
                     lua = chapter.read_file("war3map.lua") or b""
                     script = lua or jass
@@ -281,11 +523,33 @@ def analyze_source(path: Path) -> CampaignInfo:
     if not NAMES.read_campaign_title(path)[0]:
         raise OfflineToolError("无法读取战役标题。")
 
+    new_backpack_supported, new_backpack_reason = (
+        _new_backpack_compatibility(map_info_versions)
+    )
+    (
+        reforged_migration_required,
+        reforged_migration_supported,
+        reforged_migration_reason,
+    ) = _reforged_migration_compatibility(map_info_versions)
+    talent_supported, talent_reason = _universal_talents_compatibility(
+        "campaign",
+        script_type,
+        new_backpack_supported,
+        reforged_migration_supported,
+    )
     return CampaignInfo(
         source=str(path),
         source_kind="campaign",
         title=NAMES.read_campaign_title(path)[0] or "",
         script_type=script_type,
+        map_info_versions=map_info_versions,
+        new_backpack_supported=new_backpack_supported,
+        new_backpack_reason=new_backpack_reason,
+        universal_talents_supported=talent_supported,
+        universal_talents_reason=talent_reason,
+        reforged_migration_required=reforged_migration_required,
+        reforged_migration_supported=reforged_migration_supported,
+        reforged_migration_reason=reforged_migration_reason,
         chapters=chapters,
         source_sha256=sha256_file(path),
         source_bytes=path.stat().st_size,
@@ -296,6 +560,7 @@ def analyze_source(path: Path) -> CampaignInfo:
 def analyze_map(path: Path) -> CampaignInfo:
     archive = W.MPQArchive(str(path))
     try:
+        map_info_data = archive.read_file("war3map.w3i") or b""
         jass = archive.read_file("war3map.j") or b""
         if not jass:
             jass = (
@@ -328,6 +593,23 @@ def analyze_map(path: Path) -> CampaignInfo:
             "源地图已经包含 ALAS 模块。请选择未注入的干净源文件，不能二次追加。"
         )
     header_title = NAMES.read_hm3w(path)
+    map_info_versions = {
+        path.name: _read_map_info_version(map_info_data),
+    }
+    new_backpack_supported, new_backpack_reason = (
+        _new_backpack_compatibility(map_info_versions)
+    )
+    (
+        reforged_migration_required,
+        reforged_migration_supported,
+        reforged_migration_reason,
+    ) = _reforged_migration_compatibility(map_info_versions)
+    talent_supported, talent_reason = _universal_talents_compatibility(
+        "map",
+        script_type,
+        new_backpack_supported,
+        reforged_migration_supported,
+    )
     return CampaignInfo(
         source=str(path),
         source_kind="map",
@@ -337,6 +619,14 @@ def analyze_map(path: Path) -> CampaignInfo:
             else path.stem
         ),
         script_type=script_type,
+        map_info_versions=map_info_versions,
+        new_backpack_supported=new_backpack_supported,
+        new_backpack_reason=new_backpack_reason,
+        universal_talents_supported=talent_supported,
+        universal_talents_reason=talent_reason,
+        reforged_migration_required=reforged_migration_required,
+        reforged_migration_supported=reforged_migration_supported,
+        reforged_migration_reason=reforged_migration_reason,
         chapters=[],
         source_sha256=sha256_file(path),
         source_bytes=path.stat().st_size,
@@ -356,7 +646,13 @@ class OfflineBuilder:
         *,
         compact_archive: bool = True,
         ft_data: bool = False,
+        reforged_migrate: bool = False,
         equipment_mode: str = "command",
+        new_backpack: bool = False,
+        new_backpack_panels: tuple[str, ...] | None = None,
+        universal_talents: bool = False,
+        wild_equipment_drops: bool = False,
+        campaign_equipment_drops: bool = False,
         follow_game_graphics: bool = False,
         repair_saves: bool = True,
         repair_save_dir: Path | None = None,
@@ -364,11 +660,54 @@ class OfflineBuilder:
         self.log = log or print
         self.compact_archive = compact_archive
         self.ft_data = ft_data
+        self.reforged_migrate = reforged_migrate
+        if self.ft_data and self.reforged_migrate:
+            raise OfflineToolError(
+                "游戏数据改为 FT 与 Reforged 数据迁移不能同时启用。"
+            )
         if equipment_mode not in ("item", "command"):
             raise OfflineToolError(
                 "equipment_mode must be item or command"
             )
         self.equipment_mode = equipment_mode
+        self.universal_talents = bool(universal_talents)
+        self.wild_equipment_drops = bool(wild_equipment_drops)
+        self.campaign_equipment_drops = bool(
+            campaign_equipment_drops
+        )
+        self.new_backpack = bool(new_backpack)
+        if self.universal_talents and not self.new_backpack:
+            raise OfflineToolError(
+                "通用天赋树必须与新背包系统一起启用"
+            )
+        if self.wild_equipment_drops and not self.new_backpack:
+            raise OfflineToolError(
+                "wild equipment drops require the new backpack"
+            )
+        if self.campaign_equipment_drops and not self.new_backpack:
+            raise OfflineToolError(
+                "campaign equipment drops require the new backpack"
+            )
+        if self.wild_equipment_drops and self.campaign_equipment_drops:
+            raise OfflineToolError(
+                "wild map drops and campaign drops are mutually exclusive"
+            )
+        panels = tuple(new_backpack_panels or ("inventory", "stats"))
+        allowed_panels = ("inventory", "equipment", "stats", "talents")
+        if any(panel not in allowed_panels for panel in panels):
+            raise OfflineToolError("unknown new-backpack panel")
+        if len(set(panels)) != len(panels):
+            raise OfflineToolError("duplicate new-backpack panel")
+        if (
+            self.wild_equipment_drops
+            or self.campaign_equipment_drops
+        ) and "equipment" not in panels:
+            panels = tuple(panels) + ("equipment",)
+        if self.new_backpack and not panels:
+            raise OfflineToolError(
+                "new backpack requires at least one selected panel"
+            )
+        self.new_backpack_panels = panels
         self.follow_game_graphics = follow_game_graphics
         self.repair_saves = repair_saves
         self.repair_save_dir = repair_save_dir
@@ -378,6 +717,12 @@ class OfflineBuilder:
         self._process: subprocess.Popen[str] | None = None
         self._cancel = threading.Event()
         self._last_command: list[str] = []
+        self._campaign_drop_bundle: (
+            WILD_DROPS.CampaignDropBundle | None
+        ) = None
+        self._talent_bundle: (
+            TALENT_BUNDLE.TalentBundle | None
+        ) = None
 
     @property
     def cancelled(self) -> bool:
@@ -403,7 +748,23 @@ class OfflineBuilder:
             "1" if self.compact_archive else "0"
         )
         env["ALAS_FT_DATA"] = "1" if self.ft_data else "0"
+        env["ALAS_REFORGED_MIGRATE"] = (
+            "1" if self.reforged_migrate else "0"
+        )
         env["ALAS_EQUIPMENT_MODE"] = self.equipment_mode
+        env["ALAS_NEW_BACKPACK"] = "1" if self.new_backpack else "0"
+        env["ALAS_NEW_BACKPACK_PANELS"] = ",".join(
+            self.new_backpack_panels
+        )
+        env["ALAS_UNIVERSAL_TALENTS"] = (
+            "1" if self.universal_talents else "0"
+        )
+        env["ALAS_WILD_EQUIPMENT_DROPS"] = (
+            "1" if self.wild_equipment_drops else "0"
+        )
+        env["ALAS_CAMPAIGN_EQUIPMENT_DROPS"] = (
+            "1" if self.campaign_equipment_drops else "0"
+        )
         env["ALAS_FOLLOW_GAME_GRAPHICS"] = (
             "1" if self.follow_game_graphics else "0"
         )
@@ -602,8 +963,13 @@ class OfflineBuilder:
                 self.log("单图已足够紧凑，无需替换成品")
 
     def _audit_lua_release(
-        self, output: Path, expected_chapters: list[str]
+        self, output: Path, expected_chapters: list[str], config_name: str
     ) -> None:
+        config = importlib.import_module(config_name)
+        avatar_id = config.ABIL["act_blink"]
+        demon_wing = next(
+            wing for wing in config.WINGS if wing.get("key") == "demon"
+        )
         outer = W.MPQArchive(str(output))
         try:
             title, _hm3w = NAMES.read_campaign_title(output)
@@ -721,12 +1087,216 @@ class OfflineBuilder:
                             }
                             for entry in item_entries
                         }
+                        require_wing_copy(item_fields, config, name)
                         ability_fields = {
                             entry[2].strip("\0"): {
                                 mod[0]: mod[4] for mod in entry[3]
                             }
                             for entry in ability_entries
                         }
+                        ability_origins = {
+                            entry[2].replace("\0", ""): entry[1].replace(
+                                "\0", ""
+                            )
+                            for entry in ability_entries
+                            if entry[2].replace("\0", "")
+                        }
+                        avatar_fields = ability_fields.get(avatar_id, {})
+                        if ability_origins.get(avatar_id) != "ANcl":
+                            raise OfflineToolError(
+                                "%s: %s must use the inert ANcl base"
+                                % (name, avatar_id)
+                            )
+                        expected_avatar_strings = {
+                            "aite": "1",
+                            "anam": "\u5929\u795e\u4e0b\u51e1",
+                            "aord": "avatar",
+                            "aani": "stand",
+                            "Ncl2": "0",
+                            "Ncl6": "avatar",
+                            "acat": "",
+                            "aart": (
+                                "ReplaceableTextures\\CommandButtons"
+                                "\\BTNMetamorphosis.blp"
+                            ),
+                            "arar": (
+                                "ReplaceableTextures\\CommandButtons"
+                                "\\BTNMetamorphosis.blp"
+                            ),
+                        }
+                        for field, expected in expected_avatar_strings.items():
+                            actual = avatar_fields.get(field)
+                            if isinstance(actual, bytes):
+                                actual = actual.decode(
+                                    "utf-8", "replace"
+                                )
+                            if str(actual) != str(expected):
+                                raise OfflineToolError(
+                                    "%s: %s.%s=%r, expected %r"
+                                    % (
+                                        name,
+                                        avatar_id,
+                                        field,
+                                        actual,
+                                        expected,
+                                    )
+                                )
+                        if (
+                            "abuf" in avatar_fields
+                            or "Hav1" in avatar_fields
+                        ):
+                            raise OfflineToolError(
+                                "%s: %s still contains Vampiric Aura data"
+                                % (name, avatar_id)
+                            )
+                        expected_avatar_numbers = {
+                            "adur": float(
+                                config.COMMON["act_avatar_duration"]
+                            ),
+                            "ahdu": float(
+                                config.COMMON["act_avatar_duration"]
+                            ),
+                            "acdn": float(
+                                config.COMMON["act_avatar_cd"]
+                            ),
+                            "amcs": int(
+                                config.COMMON["act_avatar_mana"]
+                            ),
+                        }
+                        for field, expected in expected_avatar_numbers.items():
+                            try:
+                                actual = float(
+                                    avatar_fields.get(field, "nan")
+                                )
+                            except (TypeError, ValueError):
+                                actual = float("nan")
+                            if abs(actual - float(expected)) > 0.0001:
+                                raise OfflineToolError(
+                                    "%s: %s.%s=%r, expected %r"
+                                    % (
+                                        name,
+                                        avatar_id,
+                                        field,
+                                        avatar_fields.get(field),
+                                        expected,
+                                    )
+                                )
+                        demon_fields = item_fields.get(
+                            demon_wing["item"], {}
+                        )
+                        demon_abilities = demon_fields.get("iabi", b"")
+                        if isinstance(demon_abilities, bytes):
+                            demon_abilities = demon_abilities.decode(
+                                "utf-8", "replace"
+                            )
+                        expected_demon_abilities = ",".join(
+                            demon_wing["iabi"]
+                        )
+                        if demon_abilities != expected_demon_abilities:
+                            raise OfflineToolError(
+                                "%s: %s.iabi=%r, expected %r"
+                                % (
+                                    name,
+                                    demon_wing["item"],
+                                    demon_abilities,
+                                    expected_demon_abilities,
+                                )
+                            )
+                        if str(demon_fields.get("idrp")) != "0":
+                            raise OfflineToolError(
+                                "%s: %s.idrp=%r, expected 0"
+                                % (
+                                    name,
+                                    demon_wing["item"],
+                                    demon_fields.get("idrp"),
+                                )
+                            )
+                        avatar_markers = (
+                            b"function WG_OnAvatarSimple takes",
+                            b"function WG_AvatarSimpleExpires takes",
+                            b"function WG_OnAvatarDropItem takes",
+                            b"BlzGetUnitIntegerField(u, "
+                            b"UNIT_IF_DEFENSE_TYPE)",
+                            b"BlzSetUnitIntegerField(u, "
+                            b"UNIT_IF_DEFENSE_TYPE, "
+                            b"WG_AVATAR_DIVINE_DEFENSE)",
+                            b"WG_AVATAR_MAGIC_IMMUNITY",
+                            b"AvatarActive=",
+                            b"UnitRemoveAbility(u, "
+                            b"WG_AVATAR_WING_MODEL_ABILITY)",
+                            b"UnitAddAbility(u, "
+                            b"WG_AVATAR_WING_MODEL_ABILITY)",
+                            b"BlzUnitDisableAbility(u, "
+                            b"WG_AVATAR_WING_MODEL_ABILITY, true, true)",
+                            b"SaveItemHandle(wg_avatarTable, key, 10, it)",
+                            b"SetItemDroppable(it, false)",
+                            b"SetItemDroppable(it, true)",
+                            b"TimerStart(t, WG_AVATAR_DURATION, false, "
+                            b"function WG_AvatarSimpleExpires)",
+                            b"TriggerAddAction(t, function WG_OnAvatarSimple)",
+                            b"real WG_AVATAR_ATTACK_SPEED_PCT = 1.0",
+                            b"real WG_AVATAR_MOVE_SPEED_PCT = 1.0",
+                            b"real WG_AVATAR_MODEL_SCALE_MULT = 3.0",
+                            b"UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN",
+                            b"BlzGetUnitRealField(u, "
+                            b"UNIT_RF_SCALING_VALUE)",
+                            b"SetUnitScale(u, targetScale, targetScale, "
+                            b"targetScale)",
+                            b"SetUnitMoveSpeed(u, originalSpeed * "
+                            b"(1.0 + WG_AVATAR_MOVE_SPEED_PCT))",
+                            b"LoadReal(wg_avatarTable, key, 50)",
+                            b"LoadReal(wg_avatarTable, key, 51)",
+                        )
+                        compact_script = runtime_compact(script)
+                        for marker in avatar_markers:
+                            marker_text = marker.decode("ascii")
+                            match = re.fullmatch(
+                                r"function (\w+) takes",
+                                marker_text,
+                            )
+                            if match:
+                                marker_text = (
+                                    "function " + match.group(1) + "("
+                                )
+                            elif "function " in marker_text:
+                                marker_text = marker_text.replace(
+                                    "function ",
+                                    "",
+                                )
+                            marker_text = re.sub(
+                                r"^(?:real|integer|boolean|string) ",
+                                "",
+                                marker_text,
+                            )
+                            if not runtime_marker_matches(
+                                script,
+                                compact_script,
+                                marker,
+                            ):
+                                raise OfflineToolError(
+                                    "%s: Avatar runtime token is missing: %s"
+                                    % (name, marker_text)
+                                )
+                        bash_fields = ability_fields.get(
+                            config.HAND["bash"], {}
+                        )
+                        if (
+                            abs(
+                                float(bash_fields.get("Hbh1", "nan"))
+                                - 20.0
+                            )
+                            > 0.0001
+                        ):
+                            raise OfflineToolError(
+                                "%s: 阿克蒙德之手重击概率不是 20%%"
+                                % name
+                            )
+                        require_frost_control(
+                            ability_fields,
+                            ability_origins,
+                            script,
+                            name,
+                        )
                         if item_active:
                             expected_items = {
                                 "I103": ("A100,A101,A102,W091", "A100"),
@@ -961,6 +1531,10 @@ class OfflineBuilder:
             ability_entries = ITEM_RULES.O.read_objects_bytes(
                 ability_data, True, fname="map.w3a", with_end=True
             )[1]
+            buff_data = archive.read_file("war3map.w3h") or b""
+            buff_entries = ITEM_RULES.O.read_objects_bytes(
+                buff_data, False, fname="map.w3h", with_end=True
+            )[1]
             item_ids = {
                 entry[2].replace("\0", "")
                 for entry in item_entries
@@ -969,6 +1543,52 @@ class OfflineBuilder:
                 entry[2].replace("\0", "")
                 for entry in ability_entries
             }
+            avatar = next(
+                (
+                    entry for entry in ability_entries
+                    if entry[2].replace("\0", "") == config.ABIL["act_blink"]
+                ),
+                None,
+            )
+            if avatar is None or avatar[1].replace("\0", "") != "ANcl":
+                raise OfflineToolError(
+                    "单图恶魔降临必须使用无被动效果的 ANcl 基底。"
+                )
+            avatar_fields = {mod[0]: mod[4] for mod in avatar[3]}
+            expected_avatar = {
+                "aord": b"avatar",
+                "aani": b"stand",
+                "Ncl2": 0,
+                "Ncl6": b"avatar",
+                "acat": b"",
+                "aefs": b"",
+                "aefl": b"",
+            }
+            if "abuf" in avatar_fields or "Hav1" in avatar_fields:
+                raise OfflineToolError(
+                    "单图恶魔降临仍含吸血光环数据。"
+                )
+            for field, expected in expected_avatar.items():
+                if avatar_fields.get(field) != expected:
+                    raise OfflineToolError(
+                        "单图恶魔降临字段 %s 不正确。" % field
+                    )
+            for marker in (
+                b"real WG_AVATAR_ATTACK_SPEED_PCT = 1.0",
+                b"real WG_AVATAR_MOVE_SPEED_PCT = 1.0",
+                b"real WG_AVATAR_MODEL_SCALE_MULT = 3.0",
+                b"BlzGetUnitRealField(u, UNIT_RF_SCALING_VALUE)",
+                b"SetUnitScale(u, targetScale, targetScale, targetScale)",
+                b"SetUnitMoveSpeed(u, originalSpeed * "
+                b"(1.0 + WG_AVATAR_MOVE_SPEED_PCT))",
+                b"LoadReal(wg_avatarTable, key, 50)",
+                b"LoadReal(wg_avatarTable, key, 51)",
+            ):
+                if marker not in script:
+                    raise OfflineToolError(
+                        "单图恶魔降临缺少运行时字段：%s"
+                        % marker.decode("ascii")
+                    )
             item_active = self.equipment_mode == "item"
             mode_value = b"true" if item_active else b"false"
             for mode_name in (
@@ -1021,6 +1641,27 @@ class OfflineBuilder:
                 }
                 for entry in item_entries
             }
+            ability_fields = {
+                entry[2].strip("\0"): {
+                    mod[0]: mod[4] for mod in entry[3]
+                }
+                for entry in ability_entries
+            }
+            ability_origins = {
+                entry[2].replace("\0", ""): entry[1].replace("\0", "")
+                for entry in ability_entries
+                if entry[2].replace("\0", "")
+            }
+            require_wing_copy(item_fields, config, output.name)
+            bash_fields = ability_fields.get(config.HAND["bash"], {})
+            if abs(float(bash_fields.get("Hbh1", "nan")) - 20.0) > 0.0001:
+                raise OfflineToolError("单图阿克蒙德之手重击概率不是 20%。")
+            require_frost_control(
+                ability_fields,
+                ability_origins,
+                script,
+                output.name,
+            )
             if item_active:
                 expected_items = {
                     "I103": ("A100,A101,A102,W091", "A100"),
@@ -1125,6 +1766,41 @@ class OfflineBuilder:
         self.log(
             "单图成品审计通过：标题、入口、完整装备、不可出售规则、"
             "澄海 3C 传送配置及关键资源。"
+        )
+
+    def _audit_lua_map_release(self, output: Path) -> None:
+        archive = W.MPQArchive(str(output))
+        try:
+            script = archive.read_file("war3map.lua") or b""
+            item_data = archive.read_file("war3map.w3t") or b""
+            ability_data = archive.read_file("war3map.w3a") or b""
+        finally:
+            archive.close()
+        if not script or not item_data or not ability_data:
+            raise OfflineToolError(
+                "Lua 单图成品缺少脚本或对象数据。"
+            )
+        for marker in (
+            b"function IB_Init()",
+            b"function WG_Init()",
+            b"function FR_Init()",
+            b"function WGL_Init()",
+            b'__alasRunInit("LOAD", ALAS_InitLoadSync)',
+        ):
+            if marker not in script:
+                raise OfflineToolError(
+                    "Lua 单图成品缺少运行时入口："
+                    + marker.decode("ascii")
+                )
+        for marker in (b"__alasOnQtCommand", b'"qt"', b"FogEnable(false)"):
+            if marker not in script:
+                raise OfflineToolError(
+                    "Lua 单图成品缺少 qt 开全图代码。"
+                )
+        ITEM_RULES.validate_item_bytes(item_data)
+        ITEM_RULES.validate_ability_bytes(ability_data)
+        self.log(
+            "Lua 单图成品审计通过：运行时、物品规则与 qt 命令。"
         )
 
     def _audit_ft_data(
@@ -1235,6 +1911,178 @@ class OfflineBuilder:
         if code:
             raise OfflineToolError("Reforged hero graphics audit failed.")
 
+    def _audit_universal_talents(self, output: Path) -> None:
+        if not self.universal_talents:
+            return
+        try:
+            if self._talent_bundle is None:
+                raise ValueError("universal talent bundle is missing")
+            TALENT_BUNDLE.verify_bundle(output, self._talent_bundle)
+        except Exception as exc:
+            raise OfflineToolError(
+                "通用天赋树审计失败：" + str(exc)
+            ) from exc
+        self.log("通用天赋树审计通过：64 套独立天赋与专属背包。")
+
+    def _audit_wild_equipment_drops(
+        self,
+        output: Path,
+        source_kind: str,
+        script_type: str,
+    ) -> None:
+        if not (
+            self.wild_equipment_drops
+            or self.campaign_equipment_drops
+        ):
+            return
+        try:
+            if self.campaign_equipment_drops:
+                if self._campaign_drop_bundle is None:
+                    raise ValueError("campaign drop bundle is missing")
+                WILD_DROPS.verify_campaign_bundle(
+                    output,
+                    self._campaign_drop_bundle,
+                    script_type,
+                )
+            else:
+                WILD_DROPS.verify_bundle(output)
+        except Exception as exc:
+            raise OfflineToolError(
+                "wild equipment drop audit failed: " + str(exc)
+            ) from exc
+        self.log(
+            (
+                "campaign equipment drops: neutral hostile + enemy heroes"
+                if self.campaign_equipment_drops
+                else (
+                    "wild equipment drops: neutral hostile only; "
+                    "white/green/blue/purple + boss orange"
+                )
+            )
+        )
+
+    def _audit_new_backpack(
+        self,
+        output: Path,
+        source_kind: str,
+        chapters: list[str],
+    ) -> None:
+        if not self.new_backpack or self.universal_talents:
+            return
+        expected = ",".join(
+            {
+                "inventory": "AIni",
+                "equipment": "AEqu",
+                "stats": "ASde",
+                "talents": "ATal",
+            }[panel]
+            for panel in self.new_backpack_panels
+        )
+        outer = W.MPQArchive(str(output))
+        names = chapters if source_kind == "campaign" else ["<map>"]
+        checked = 0
+        try:
+            for name in names:
+                if source_kind == "campaign":
+                    data = outer.read_file(name)
+                    if not data:
+                        raise OfflineToolError(
+                            "新背包审计无法读取章节：" + name
+                        )
+                    fd, temp_name = tempfile.mkstemp(
+                        suffix=Path(name).suffix
+                    )
+                    os.close(fd)
+                    temp = Path(temp_name)
+                    try:
+                        temp.write_bytes(data)
+                        inner = W.MPQArchive(str(temp))
+                        try:
+                            item_data = inner.read_file("war3map.w3t") or b""
+                            info_data = inner.read_file("war3map.w3i") or b""
+                            script = (
+                                inner.read_file("war3map.j")
+                                or inner.read_file(r"scripts\war3map.j")
+                                or inner.read_file(r"Scripts\war3map.j")
+                                or inner.read_file("war3map.lua")
+                                or inner.read_file(r"scripts\war3map.lua")
+                                or inner.read_file(r"Scripts\war3map.lua")
+                                or b""
+                            )
+                        finally:
+                            inner.close()
+                    finally:
+                        temp.unlink(missing_ok=True)
+                else:
+                    item_data = outer.read_file("war3map.w3t") or b""
+                    info_data = outer.read_file("war3map.w3i") or b""
+                    script = (
+                        outer.read_file("war3map.j")
+                        or outer.read_file(r"scripts\war3map.j")
+                        or outer.read_file(r"Scripts\war3map.j")
+                        or outer.read_file("war3map.lua")
+                        or outer.read_file(r"scripts\war3map.lua")
+                        or outer.read_file(r"Scripts\war3map.lua")
+                        or b""
+                    )
+                _version, entries, consumed = OBJ.read_objects_bytes(
+                    item_data,
+                    False,
+                    fname=name + ".w3t",
+                    with_end=True,
+                )
+                if consumed != len(item_data):
+                    raise OfflineToolError(
+                        "新背包对象数据有尾随字节：" + name
+                    )
+                item = next(
+                    (
+                        mods
+                        for _table, _old, new, mods in entries
+                        if new.replace("\0", "") == "B30B"
+                    ),
+                    None,
+                )
+                if item is None:
+                    raise OfflineToolError(
+                        "新背包缺少 B30B：" + name
+                    )
+                fields = {
+                    mod[0]: (
+                        mod[4].decode("utf-8", "replace")
+                        if isinstance(mod[4], bytes)
+                        else mod[4]
+                    )
+                    for mod in item
+                }
+                if fields.get("iabi") != expected:
+                    raise OfflineToolError(
+                        "%s 的新背包页签不正确：%r"
+                        % (name, fields.get("iabi"))
+                    )
+                info = W3I.parse_or_tolerant(info_data)
+                if (
+                    info.get("game_data_set"),
+                    info.get("game_data_version"),
+                ) != (2, 2):
+                    raise OfflineToolError(
+                        name + " 未设置 Reforged 2/2 数据版本"
+                    )
+                if (
+                    b"ALAS_B30B_Init" not in script
+                    and b"local function ensureHero" not in script
+                ):
+                    raise OfflineToolError(
+                        name + " 缺少新背包英雄发放脚本"
+                    )
+                checked += 1
+        finally:
+            outer.close()
+        self.log(
+            "新背包审计通过：%d 个地图，页签=%s。"
+            % (checked, ",".join(self.new_backpack_panels))
+        )
+
     def _run_audits(
         self,
         source: Path,
@@ -1245,6 +2093,15 @@ class OfflineBuilder:
         source_kind: str,
         config: str,
     ) -> None:
+        self._audit_universal_talents(output)
+        self._audit_wild_equipment_drops(
+            output,
+            source_kind,
+            script_type,
+        )
+        self._audit_new_backpack(
+            output, source_kind, chapters
+        )
         terms = ["阿克蒙德", "霜之哀伤", "埃辛诺斯战刃"]
         args: list[object] = [
             self.python_executable, INJECTOR / "audit_item_catalog.py",
@@ -1256,7 +2113,10 @@ class OfflineBuilder:
         if self.run(args):
             raise OfflineToolError("物品目录审计失败。")
         if source_kind == "map":
-            self._audit_map_release(output, config)
+            if script_type == "lua":
+                self._audit_lua_map_release(output)
+            else:
+                self._audit_map_release(output, config)
             self._audit_ft_data(output, source_kind, chapters)
             self._audit_graphics_mode(output, source_kind, chapters)
             return
@@ -1264,7 +2124,7 @@ class OfflineBuilder:
         self._audit_ft_data(output, source_kind, chapters)
         self._audit_graphics_mode(output, source_kind, chapters)
         if script_type == "lua":
-            self._audit_lua_release(output, chapters)
+            self._audit_lua_release(output, chapters, config)
             return
         if not LOCAL_AUDIT.is_file():
             raise OfflineToolError("缺少离线战役审计脚本。")
@@ -1458,6 +2318,53 @@ class OfflineBuilder:
         source = source.resolve()
         output = output.resolve()
         info = analyze_source(source)
+        if self.universal_talents:
+            if not info.universal_talents_supported:
+                raise OfflineToolError(
+                    "通用天赋树不可用："
+                    + info.universal_talents_reason
+                    + "。"
+                )
+            if (
+                not info.new_backpack_supported
+                and not self.reforged_migrate
+            ):
+                raise OfflineToolError(
+                    "通用天赋树需要 Reforged 数据；请先启用 Reforged 数据迁移。"
+                )
+        if self.new_backpack and not info.new_backpack_supported:
+            if not self.reforged_migrate:
+                raise OfflineToolError(
+                    "新背包系统不可用："
+                    + info.new_backpack_reason
+                    + "；请先启用 Reforged 数据迁移。"
+                )
+            if not info.reforged_migration_supported:
+                raise OfflineToolError(
+                    "无法迁移到 Reforged："
+                    + info.reforged_migration_reason
+                )
+        if (
+            self.reforged_migrate
+            and info.reforged_migration_required
+            and not info.reforged_migration_supported
+        ):
+            raise OfflineToolError(
+                "无法迁移到 Reforged："
+                + info.reforged_migration_reason
+            )
+        if self.wild_equipment_drops and (
+            info.source_kind != "map" or info.script_type != "jass"
+        ):
+            raise OfflineToolError(
+                "wild equipment drops currently require a JASS single map"
+            )
+        if self.campaign_equipment_drops and (
+            info.source_kind != "campaign"
+        ):
+            raise OfflineToolError(
+                "campaign equipment drops require a campaign source"
+            )
         forsaken_lua = self._is_forsaken_lua_campaign(info)
         forsaken_fixes = False
         chapter_compaction = False
@@ -1470,12 +2377,60 @@ class OfflineBuilder:
         self.log("游戏标题: " + info.title)
         self.log("脚本类型: " + info.script_type)
         self.log(
+            "新背包兼容性: "
+            + (
+                "可用（" + info.new_backpack_reason + "）"
+                if info.new_backpack_supported
+                else "不可用（" + info.new_backpack_reason + "）"
+            )
+        )
+        self.log(
+            "Reforged 数据迁移: "
+            + (
+                "开启（" + info.reforged_migration_reason + "）"
+                if self.reforged_migrate
+                else "关闭"
+            )
+        )
+        self.log(
             "紧凑归档: " + ("开启" if self.compact_archive else "关闭")
         )
         self.log("FT 游戏数据: " + ("开启" if self.ft_data else "关闭"))
         self.log(
+            "新背包系统: "
+            + (
+                "开启（" + ", ".join(self.new_backpack_panels) + "）"
+                if self.new_backpack
+                else "关闭"
+            )
+        )
+        self.log(
+            "通用天赋树: "
+            + (
+                "开启（" + info.universal_talents_reason + "）"
+                if self.universal_talents
+                else "关闭"
+            )
+        )
+        self.log(
             "画面模式跟随游戏设置: "
             + ("开启" if self.follow_game_graphics else "关闭")
+        )
+        self.log(
+            "wild equipment drops: "
+            + (
+                "enabled (neutral hostile only)"
+                if self.wild_equipment_drops
+                else "disabled"
+            )
+        )
+        self.log(
+            "campaign equipment drops: "
+            + (
+                "enabled (neutral hostile + enemy heroes)"
+                if self.campaign_equipment_drops
+                else "disabled"
+            )
         )
         if info.source_kind == "campaign":
             self.log("章节数量: %d" % len(info.chapters))
@@ -1488,18 +2443,13 @@ class OfflineBuilder:
                     "单图成品扩展名必须与源地图一致（%s）。"
                     % source.suffix.lower()
                 )
-            if info.script_type == "lua":
-                raise OfflineToolError(
-                    "暂未支持 Lua 单图。当前单图模式仅处理 JASS .w3x/.w3m；"
-                    "Lua 不会被生成成半成品。"
-                )
         if info.script_type == "jass":
             self.log(
-                "JASS 技能归属: "
+                "JASS 装备技能归属: "
                 + (
-                    "新背包（装备栏）"
+                    "装备栏物品技能"
                     if self.equipment_mode == "item"
-                    else "普通背包 + 英雄命令栏"
+                    else "普通背包 + 英雄技能"
                 )
             )
         if output == source:
@@ -1548,6 +2498,20 @@ class OfflineBuilder:
         build_source = Path(compatibility["output"])
         if compatibility.get("changed"):
             self.log("已应用源文件兼容修复: " + str(build_source))
+        if self.reforged_migrate:
+            migrated_source = work / "compat" / (
+                "reforged-" + build_source.name
+            )
+            code = self.run([
+                self.python_executable,
+                INJECTOR / "apply_reforged_migration.py",
+                str(build_source),
+                "--output", str(migrated_source),
+                "--work", str(work / "reforged-migration"),
+            ])
+            if code:
+                raise OfflineToolError("Reforged 数据迁移失败。")
+            build_source = migrated_source
         if self.ft_data and info.source_kind == "map":
             ft_source = work / "compat" / ("ft-" + source.name)
             code = self.run([
@@ -1574,28 +2538,138 @@ class OfflineBuilder:
             if code:
                 raise OfflineToolError("单图画面模式转换失败。")
             build_source = graphics_source
+        if self.new_backpack and not self.universal_talents:
+            backpack_source = work / "compat" / (
+                "backpack-" + build_source.name
+            )
+            code = self.run([
+                self.python_executable,
+                INJECTOR / "apply_new_backpack.py",
+                str(build_source),
+                "--output", str(backpack_source),
+                "--work", str(work / "new-backpack"),
+                "--panels", ",".join(self.new_backpack_panels),
+            ])
+            if code:
+                raise OfflineToolError("新背包系统注入失败。")
+            build_source = backpack_source
         config = self.prepare_config(
             source, output, info.source_kind
         )
+        talent_bundle = None
+        if self.universal_talents:
+            talent_bundle = TALENT_BUNDLE.prepare_bundle(
+                build_source,
+                work / "universal-talents",
+                info.chapters,
+            )
+            self._talent_bundle = talent_bundle
+        talent_script_manifest = None
+        if talent_bundle is not None and info.source_kind == "campaign":
+            talent_script_manifest = (
+                work / "universal-talents" / "chapter-scripts.json"
+            )
+            talent_script_manifest.write_text(
+                json.dumps(
+                    {
+                        chapter: str(
+                            talent_bundle.script_for(chapter)
+                        )
+                        for chapter in info.chapters
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+        wild_drop_bundle = None
+        if self.wild_equipment_drops:
+            wild_drop_bundle = WILD_DROPS.prepare_bundle(
+                build_source,
+                work / "wild-equipment-drops",
+            )
+            self.log(
+                "wild drop level cap=%d; pools: "
+                % wild_drop_bundle.level_cap
+                + ", ".join(
+                    "%s=%d" % (name, count)
+                    for name, count in wild_drop_bundle.counts.items()
+                )
+            )
+        campaign_drop_bundle = None
+        if self.campaign_equipment_drops:
+            campaign_drop_bundle = WILD_DROPS.prepare_campaign_bundle(
+                build_source,
+                work / "campaign-equipment-drops",
+                info.chapters,
+            )
+            self._campaign_drop_bundle = campaign_drop_bundle
+            self.log(
+                "campaign drop profiles: "
+                + ", ".join(
+                    "%s(wild=%d,hero=%d,%d%%)"
+                    % (
+                        profile.chapter,
+                        profile.level_cap,
+                        profile.hero_level_cap,
+                        profile.chapter_progress,
+                    )
+                    for profile in campaign_drop_bundle.profiles
+                )
+            )
         if self.cancelled:
             raise OfflineToolError("用户取消。")
 
         if info.source_kind == "map":
-            code = self.run([
+            port_args: list[object] = [
                 self.python_executable, INJECTOR / "port_alas_jass_map.py",
                 "--map", build_source,
                 "--work", build_work,
                 "--config", config,
                 "--output", output,
-            ])
+            ]
+            if talent_bundle is not None:
+                port_args.extend([
+                    "--extra-script", talent_bundle.script_for(),
+                    "--extra-object",
+                    "w3a=" + str(talent_bundle.ability_object),
+                    "--extra-object",
+                    "w3t=" + str(talent_bundle.item_object),
+                    "--suppress-source-backpack-auto",
+                ])
+            if wild_drop_bundle is not None:
+                port_args.extend([
+                    "--extra-script", wild_drop_bundle.script_dir,
+                ])
+            code = self.run(port_args)
         elif info.script_type == "jass":
-            code = self.run([
+            campaign_args: list[object] = [
                 self.python_executable, INJECTOR / "port_alas_jass_campaign.py",
                 "--campaign", build_source,
                 "--work", build_work,
                 "--config", config,
                 "--output", output,
-            ])
+            ]
+            if campaign_drop_bundle is not None:
+                campaign_args.extend([
+                    "--campaign-loot-manifest",
+                    campaign_drop_bundle.manifest,
+                ])
+            if talent_bundle is not None:
+                campaign_args.extend([
+                    "--extra-script-manifest",
+                    talent_script_manifest,
+                    "--suppress-source-backpack-auto",
+                ])
+                for extension, path in (
+                    ("w3a", talent_bundle.ability_object),
+                    ("w3t", talent_bundle.item_object),
+                ):
+                    campaign_args.extend([
+                        "--extra-object",
+                        extension + "=" + str(path),
+                    ])
+            code = self.run(campaign_args)
         else:
             code = self.run([
                 self.python_executable, INJECTOR / "port_wings_campaign.py",
@@ -1610,14 +2684,33 @@ class OfflineBuilder:
                 self._prepare_forsaken_source(build_work)
                 forsaken_fixes = True
             if not code:
-                code = self.run([
+                lua_args: list[object] = [
                     self.python_executable, INJECTOR / "port_item_skill_campaign.py",
                     "--campaign", build_source,
                     "--work", build_work,
                     "--config", config,
                     "--output", output,
                     "--no-deploy",
-                ])
+                ]
+                if campaign_drop_bundle is not None:
+                    lua_args.extend([
+                        "--campaign-loot-manifest",
+                        campaign_drop_bundle.manifest,
+                    ])
+                if talent_bundle is not None:
+                    lua_args.extend([
+                        "--extra-lua-script-manifest",
+                        talent_script_manifest,
+                    ])
+                    for extension, path in (
+                        ("w3a", talent_bundle.ability_object),
+                        ("w3t", talent_bundle.item_object),
+                    ):
+                        lua_args.extend([
+                            "--extra-object",
+                            extension + "=" + str(path),
+                        ])
+                code = self.run(lua_args)
         if code:
             raise OfflineToolError("构建失败，退出码 %d。工作目录已保留。" % code)
         if self.cancelled:
@@ -1667,7 +2760,13 @@ class OfflineBuilder:
             output=str(output),
             compact_archive=self.compact_archive,
             ft_data=self.ft_data,
+            reforged_migrate=self.reforged_migrate,
             equipment_mode=self.equipment_mode,
+            new_backpack=self.new_backpack,
+            new_backpack_panels=self.new_backpack_panels,
+            universal_talents=self.universal_talents,
+            wild_equipment_drops=self.wild_equipment_drops,
+            campaign_equipment_drops=self.campaign_equipment_drops,
             follow_game_graphics=self.follow_game_graphics,
             script_type=info.script_type,
             chapters=1 if info.source_kind == "map" else len(info.chapters),

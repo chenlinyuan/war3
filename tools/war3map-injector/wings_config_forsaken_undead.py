@@ -41,7 +41,8 @@ ABIL = {
     # 主动技能（放在物品 iabi 的第一位，物品图标才会显示冷却转圈）
     "act_invul": "W022",        # 暗影庇护：6 秒无敌
     "act_tele": "W023",         # 群体传送
-    "act_blink": "W024",        # 闪烁
+    # Compatibility key name: W024 is now the Demon Wings Avatar active.
+    "act_blink": "W024",
     # 「试穿」专用（只挂模型 + 移速，没有光环/被动/主动）
     "wing_model_awing": "W030",
     "wing_model_angel": "W031",
@@ -147,6 +148,8 @@ BUFFS = {
     "heal_show": "B644",
     # 法术护盾（W090）的 buff（底子 BNss；护盾本身是引擎行为，buff 只管图标/说明）
     "spell_shield": "B645",
+    # 恶魔降临的状态栏 buff（底子 BHav）
+    "avatar": "B64C",
 }
 
 # ---------------------------------------------------------------------------
@@ -372,8 +375,27 @@ COMMON = dict(
     act_invul_dur=6.0,          # 暗影庇护：无敌时长（adur/ahdu）
     act_invul_cd=50.0,          # 暗影庇护：冷却
     act_tele_cd=2.0,            # 群体传送：冷却
-    act_blink_cd=12.0,          # 闪烁：冷却
-    act_blink_range=1300.0,     # 闪烁：最远距离
+    # Demon Wings active: Avatar + scripted Divine defense type.
+    act_avatar_duration=30.0,
+    act_avatar_cd=120.0,
+    act_avatar_mana=100,
+    act_avatar_defense_bonus=0.0,
+    act_avatar_hp_bonus=500.0,
+    act_avatar_damage_bonus=20.0,
+    act_avatar_magic_reduction=0.0,
+    act_avatar_life_cost_pct=0.20,
+    act_avatar_attack_range=500.0,
+    act_avatar_projectile_speed=1200.0,
+    act_avatar_acquisition_range=800.0,
+    act_avatar_air_target_flag=4,
+    act_avatar_splash_full=50.0,
+    act_avatar_splash_medium=150.0,
+    act_avatar_splash_small=250.0,
+    act_avatar_splash_medium_factor=0.5,
+    act_avatar_splash_small_factor=0.25,
+    act_avatar_missile=(
+        r"Abilities\Weapons\DemonHunterMissile\DemonHunterMissile.mdx"
+    ),
     # 星魂之力（第 4 件翅膀）：2026-10-15 玩家改需求 —— 原来的 +1000 生命 /
     #   +20 全属性 / +500 魔法 全部去掉，改成"移动速度顶满"。
     #   （引擎的速度上限是 522，所以写 522 就等于"全满"，多少基础速度都到顶。）

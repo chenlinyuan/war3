@@ -1,1085 +1,381 @@
-﻿function Trig_ou99_CS_Actions takes nothing returns nothing
-set udg_ou99_zi[23]="www.ou99.com"
-set bj_forLoopAIndex=1
-set bj_forLoopAIndexEnd=12
+﻿function BigMan_ID2S takes integer value returns string
+local string charMap =BigMan_AllString
+local string result = ""
+local integer remainingValue = value
+local integer charValue
+local integer byteno
+set byteno = 0
 loop
-exitwhen bj_forLoopAIndex>bj_forLoopAIndexEnd
-call TriggerRegisterPlayerChatEvent(gg_trg_ou99__0,Player(-1+(bj_forLoopAIndex)),"",true)
-set bj_forLoopAIndex=bj_forLoopAIndex+1
+set charValue = ModuloInteger(remainingValue, 256)
+set remainingValue = remainingValue / 256
+set result = SubString(charMap, charValue, charValue + 1) + result
+set byteno = byteno + 1
+exitwhen byteno == 4
 endloop
+return result
 endfunction
-function Trig_ou99__0_Conditions takes nothing returns boolean
-return(GetEventPlayerChatString()==udg_ou99_zi[23])
-endfunction
-function Trig_ou99__0_Actions takes nothing returns nothing
-set udg_ou99lkxin=GetTriggerPlayer()
-set udg_suiji=GetPlayers()
-set udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]=udg_suiji
-set udg_ou99_B[100]="|Cff00ff00你已经开启YD作弊     作者：淫贼     输入-a查看MOD帮助 输入-y查看淫荡功能说明|R "
-set udg_ou99_B[102]="|Cff00ff00如果你喜欢欢迎到www.ou99.com关注此脚本|R                 偶久会员交流群78615503"
-set udg_ou99_B[101]="|CFF8080FF输入bbs.ou99.com或者按↓打开作弊菜单|R"
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,(udg_ou99_B[100]+(udg_ou99_B[102]+udg_ou99_B[101])))
-call TriggerExecute(gg_trg_ou99_BBBB)
-call ConditionalTriggerExecute(gg_trg_ou99_K)
-call EnableTrigger(gg_trg_ou99_BH)
-set udg_xunhuan=1
+
+function BigMan_S2ID takes string targetstr returns integer
+local string originstr=BigMan_AllString
+local integer strlength=StringLength(targetstr)
+local integer bmloca=0
+local integer bmlocb=0
+local integer bmlocnumx=1
+local integer result=0
 loop
-exitwhen udg_xunhuan>12
-call TriggerRegisterPlayerChatEvent(gg_trg_ou99__1,Player(-1+(udg_xunhuan)),"",true)
-call TriggerRegisterPlayerKeyEventBJ(gg_trg_ou99__2,Player(-1+(udg_xunhuan)),0,2)
-call TriggerRegisterPlayerSelectionEventBJ(gg_trg_ou99_XC,Player(-1+(udg_xunhuan)),true)
-call TriggerRegisterPlayerEventEndCinematic(gg_trg_ou99_esc,Player(-1+(udg_xunhuan)))
-call TriggerRegisterPlayerChatEvent(gg_trg_ou99_E,Player(-1+(udg_xunhuan)),"",true)
-call TriggerRegisterPlayerUnitEventSimple(gg_trg_ou99_CD,Player(-1+(udg_xunhuan)),EVENT_PLAYER_UNIT_SPELL_FINISH)
-call TriggerRegisterPlayerUnitEventSimple(gg_trg_ou99_P,Player(-1+(udg_xunhuan)),EVENT_PLAYER_UNIT_ISSUED_POINT_ORDER)
-call TriggerRegisterPlayerSelectionEventBJ(gg_trg_ou99_ZD_X______u,Player(-1+(udg_xunhuan)),true)
-call TriggerRegisterPlayerSelectionEventBJ(gg_trg_ou99_ZD_L______u,Player(-1+(udg_xunhuan)),true)
-call TriggerRegisterPlayerUnitEventSimple(gg_trg_ou99_F,Player(-1+(udg_xunhuan)),EVENT_PLAYER_UNIT_DEATH)
-call TriggerRegisterPlayerSelectionEventBJ(gg_trg_ou99_JY_______u,Player(-1+(udg_xunhuan)),true)
-call TriggerRegisterPlayerChatEvent(gg_trg_ou99_CMD,Player(-1+(udg_xunhuan)),"+",false)
-call TriggerRegisterPlayerChatEvent(gg_trg_ou99_B,Player(-1+(udg_xunhuan)),"",true)
-call TriggerRegisterPlayerChatEvent(gg_trg_ou99_SY,Player(-1+(udg_xunhuan)),"+",false)
-set udg_xunhuan=udg_xunhuan+1
+exitwhen bmlocb>strlength-1
+set bmlocnumx=R2I(Pow(256,strlength-1-bmlocb))
+set bmloca=1
+loop
+exitwhen bmloca>255
+if SubString(targetstr,bmlocb,bmlocb+1)==SubString(originstr,bmloca,bmloca+1) then
+set result=result+bmloca*bmlocnumx
+set bmloca=256
+endif
+set bmloca=bmloca+1
 endloop
-call DisableTrigger(GetTriggeringTrigger())
-endfunction
-function Trig_ou99__1_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)and(GetEventPlayerChatString()==udg_ou99_zi[21])
-endfunction
-function Trig_ou99__1_Actions takes nothing returns nothing
-call ConditionalTriggerExecute(gg_trg_ou99_C)
-endfunction
-function Trig_ou99__2_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99__2_Actions takes nothing returns nothing
-call ConditionalTriggerExecute(gg_trg_ou99_C)
-endfunction
-function Trig_ou99_XC_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_XC_Actions takes nothing returns nothing
-set udg_ou99_ZB=GetTriggerUnit()
-endfunction
-function Trig_ou99_C_Func001C takes nothing returns boolean
-return(GetPlayerController(udg_ou99lkxin)==MAP_CONTROL_USER)and(GetPlayerSlotState(udg_ou99lkxin)==PLAYER_SLOT_STATE_PLAYING)and(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_C_Actions takes nothing returns nothing
-if(Trig_ou99_C_Func001C())then
-set udg_ou99_a=DialogCreate()
-call DialogSetMessage(udg_ou99_a,udg_ou99_zi[0])
-set udg_ou99_b1[1]=DialogAddButton(udg_ou99_a,udg_ou99_zi[1],0)
-set udg_ou99_b1[2]=DialogAddButton(udg_ou99_a,udg_ou99_zi[2],0)
-set udg_ou99_b1[3]=DialogAddButton(udg_ou99_a,udg_ou99_zi[3],0)
-set udg_ou99_b1[4]=DialogAddButton(udg_ou99_a,udg_ou99_zi[4],0)
-set udg_ou99_b1[5]=DialogAddButton(udg_ou99_a,udg_ou99_zi[5],0)
-set udg_ou99_b1[6]=DialogAddButton(udg_ou99_a,udg_ou99_zi[50],0)
-call TriggerRegisterDialogEvent(gg_trg_ou99_C1,udg_ou99_a)
-call DialogDisplayBJ(true,udg_ou99_a,udg_ou99lkxin)
-endif
-endfunction
-function Trig_ou99_C1_Func001C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b1[6])
-endfunction
-function Trig_ou99_C1_Func003C takes nothing returns boolean
-return(udg_ou99_b1[1]==GetClickedButton())
-endfunction
-function Trig_ou99_C1_Func005C takes nothing returns boolean
-return(udg_ou99_b1[2]==GetClickedButton())
-endfunction
-function Trig_ou99_C1_Func007C takes nothing returns boolean
-return(udg_ou99_b1[3]==GetClickedButton())
-endfunction
-function Trig_ou99_C1_Func009C takes nothing returns boolean
-return(udg_ou99_b1[4]==GetClickedButton())
-endfunction
-function Trig_ou99_C1_Func011C takes nothing returns boolean
-return(udg_ou99_b1[5]==GetClickedButton())
-endfunction
-function Trig_ou99_C1_Actions takes nothing returns nothing
-if(Trig_ou99_C1_Func001C())then
-call DialogClear(udg_ou99_a)
-endif
-if(Trig_ou99_C1_Func003C())then
-call DialogClear(udg_ou99_a)
-call DialogSetMessage(udg_ou99_a,udg_ou99_zi[0])
-set udg_ou99_b2[1]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[1],0)
-set udg_ou99_b2[2]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[2],0)
-set udg_ou99_b2[3]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[3],0)
-set udg_ou99_b2[4]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[4],0)
-set udg_ou99_b2[5]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[5],0)
-set udg_ou99_b2[6]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[6],0)
-set udg_ou99_b2[7]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[7],0)
-set udg_ou99_b2[8]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[8],0)
-set udg_ou99_b2[0]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[0],0)
-set udg_ou99_b2[100]=DialogAddButton(udg_ou99_a,udg_ou99_zi0[50],0)
-call TriggerRegisterDialogEvent(gg_trg_ou99_CY,udg_ou99_a)
-call DialogDisplayBJ(true,udg_ou99_a,udg_ou99lkxin)
-endif
-if(Trig_ou99_C1_Func005C())then
-call DialogClear(udg_ou99_a)
-call DialogSetMessage(udg_ou99_a,udg_ou99_zi[0])
-set udg_ou99_b3[1]=DialogAddButton(udg_ou99_a,udg_ou99_zi1[1],0)
-set udg_ou99_b3[2]=DialogAddButton(udg_ou99_a,udg_ou99_zi1[2],0)
-set udg_ou99_b3[3]=DialogAddButton(udg_ou99_a,udg_ou99_zi1[3],0)
-set udg_ou99_b3[4]=DialogAddButton(udg_ou99_a,udg_ou99_zi1[4],0)
-set udg_ou99_b3[5]=DialogAddButton(udg_ou99_a,udg_ou99_zi1[5],0)
-set udg_ou99_b3[0]=DialogAddButton(udg_ou99_a,udg_ou99_zi1[0],0)
-set udg_ou99_b3[100]=DialogAddButton(udg_ou99_a,udg_ou99_zi1[50],0)
-call TriggerRegisterDialogEvent(gg_trg_ou99_Z_D,udg_ou99_a)
-call DialogDisplayBJ(true,udg_ou99_a,udg_ou99lkxin)
-endif
-if(Trig_ou99_C1_Func007C())then
-call DialogClear(udg_ou99_a)
-call DialogSetMessage(udg_ou99_a,udg_ou99_zi[0])
-set udg_ou99_b4[1]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[1],0)
-set udg_ou99_b4[2]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[2],0)
-set udg_ou99_b4[3]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[3],0)
-set udg_ou99_b4[4]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[4],0)
-set udg_ou99_b4[5]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[5],0)
-set udg_ou99_b4[6]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[6],0)
-set udg_ou99_b4[7]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[7],0)
-set udg_ou99_b4[8]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[8],0)
-set udg_ou99_b4[9]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[9],0)
-set udg_ou99_b4[10]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[10],0)
-set udg_ou99_b4[0]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[0],0)
-set udg_ou99_b4[100]=DialogAddButton(udg_ou99_a,udg_ou99_zi2[50],0)
-call TriggerRegisterDialogEvent(gg_trg_ou99_J,udg_ou99_a)
-call DialogDisplayBJ(true,udg_ou99_a,udg_ou99lkxin)
-endif
-if(Trig_ou99_C1_Func009C())then
-call DialogClear(udg_ou99_a)
-call DialogSetMessage(udg_ou99_a,udg_ou99_zi[0])
-set udg_ou99_b5[1]=DialogAddButton(udg_ou99_a,udg_ou99_zi3[1],0)
-set udg_ou99_b5[2]=DialogAddButton(udg_ou99_a,udg_ou99_zi3[2],0)
-set udg_ou99_b5[3]=DialogAddButton(udg_ou99_a,udg_ou99_zi3[3],0)
-set udg_ou99_b5[4]=DialogAddButton(udg_ou99_a,udg_ou99_zi3[4],0)
-set udg_ou99_b5[5]=DialogAddButton(udg_ou99_a,udg_ou99_zi3[5],0)
-set udg_ou99_b5[6]=DialogAddButton(udg_ou99_a,udg_ou99_zi3[6],0)
-set udg_ou99_b5[7]=DialogAddButton(udg_ou99_a,udg_ou99_zi3[7],0)
-set udg_ou99_b5[0]=DialogAddButton(udg_ou99_a,("|Cffff00ff目前没有取消功能(可无视)|R"+""),0)
-set udg_ou99_b5[100]=DialogAddButton(udg_ou99_a,udg_ou99_zi3[50],0)
-call TriggerRegisterDialogEvent(gg_trg_ou99_T,udg_ou99_a)
-call DialogDisplayBJ(true,udg_ou99_a,udg_ou99lkxin)
-endif
-if(Trig_ou99_C1_Func011C())then
-call DialogClear(udg_ou99_a)
-call DialogSetMessage(udg_ou99_a,udg_ou99_zi[0])
-set udg_ou99_b6[1]=DialogAddButton(udg_ou99_a,udg_ou99_zi4[1],0)
-set udg_ou99_b6[2]=DialogAddButton(udg_ou99_a,udg_ou99_zi4[2],0)
-set udg_ou99_b6[3]=DialogAddButton(udg_ou99_a,udg_ou99_zi4[3],0)
-set udg_ou99_b6[0]=DialogAddButton(udg_ou99_a,udg_ou99_zi4[0],0)
-set udg_ou99_b6[100]=DialogAddButton(udg_ou99_a,udg_ou99_zi4[50],0)
-call TriggerRegisterDialogEvent(gg_trg_ou99_YD,udg_ou99_a)
-call DialogDisplayBJ(true,udg_ou99_a,udg_ou99lkxin)
-endif
-endfunction
-function Trig_ou99_K_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==(1+GetPlayerId(udg_ou99lkxin)))
-endfunction
-function Trig_ou99_K_Actions takes nothing returns nothing
-set udg_ou99_SU=1000000000.
-set udg_ou99_qm[1]=10000
-set udg_ou99_qm[2]='d'
-set udg_ou99_zi[20]="ESC"
-set udg_ou99_zi[19]="esc"
-set udg_ou99_zi[21]="bbs.ou99.com"
-set udg_ou99_zi[0]="|cFFFF0000YD作弊4.0  by:淫贼|r"
-set udg_ou99_zi[50]=("|Cffff00ff退出菜单|R"+"")
-set udg_ou99_zi[1]=("|Cff00ff00常用功能|R"+"")
-set udg_ou99_zi[2]=("|Cff00ff00自动功能|R"+"")
-set udg_ou99_zi[3]=("|Cff00ff00添加技能|R"+"")
-set udg_ou99_zi[4]=("|Cff00ff00特殊功能|R"+"")
-set udg_ou99_zi[5]=("|Cffffff00YD功能|R"+"")
-set udg_ou99_zi0[0]=("|Cffff00ff关闭功能退出菜单|R"+"")
-set udg_ou99_zi0[50]=("|Cffff00ff返回菜单|R"+"")
-set udg_ou99_zi0[1]=("|Cffffff00开启全图|R"+"")
-set udg_ou99_zi0[2]=("|Cffffff00经验3倍|R"+"")
-set udg_ou99_zi0[3]=("|Cffffff00无敌|R"+"")
-set udg_ou99_zi0[4]=("|Cffffff00无CD无限蓝|R"+"")
-set udg_ou99_zi0[5]=("|Cffffff00P闪|R"+"")
-set udg_ou99_zi0[6]=("|Cffffff00快速移动|R"+"")
-set udg_ou99_zi0[7]=("|Cffffff00共享该单位视野|R"+"")
-set udg_ou99_zi0[8]=("|Cffffff00穿越物体|R"+"")
-set udg_ou99_zi1[0]=("|Cffff00ff关闭功能退出菜单|R"+"")
-set udg_ou99_zi1[50]=("|Cffff00ff返回菜单|R"+"")
-set udg_ou99_zi1[1]=("|Cffffff00自动加钱|R"+"")
-set udg_ou99_zi1[2]=("|Cffffff00自动加木头|R"+"")
-set udg_ou99_zi1[3]=("|Cffffff00自动清人口|R"+"")
-set udg_ou99_zi1[4]=("|Cffffff00选择生命低于20%自动加满|R"+"")
-set udg_ou99_zi1[5]=("|Cffffff00选择魔法低于20%自动加满|R"+"")
-set udg_ou99_zi2[0]=("|Cffff00ff关闭功能退出菜单|R"+"")
-set udg_ou99_zi2[50]=("|Cffff00ff返回菜单|R"+"")
-set udg_ou99_zi2[1]=("|Cffffff00100%闪避|R"+"")
-set udg_ou99_zi2[2]=("|Cffffff00魔法免疫|R"+"")
-set udg_ou99_zi2[3]=("|Cffffff00分裂攻击|R"+"")
-set udg_ou99_zi2[4]=("|Cffffff00反弹攻击|R"+"")
-set udg_ou99_zi2[5]=("|Cffffff00减少魔法伤害33%|R"+"")
-set udg_ou99_zi2[6]=("|Cffffff00真实视域|R(查看隐形单位)"+"")
-set udg_ou99_zi2[7]=("|Cffffff00修理|R(修理建筑技能)"+"")
-set udg_ou99_zi2[8]=("|Cffffff00霜冻攻击|R(可以减慢速度)"+"")
-set udg_ou99_zi2[9]=("|Cffffff00致命一击|R"+"")
-set udg_ou99_zi2[10]=("|CFFFF0000光环技能|R"+"")
-set udg_ou99_zi3[0]=("|Cffff00ff关闭功能退出菜单|R"+"")
-set udg_ou99_zi3[50]=("|Cffff00ff返回菜单|R"+"")
-set udg_ou99_zi3[1]=("|CFFFF8000复制物品|R"+"")
-set udg_ou99_zi3[2]=("|CFFFF8000复制单位|R"+"")
-set udg_ou99_zi3[3]=("|CFFFF8000控制单位|R"+"")
-set udg_ou99_zi3[4]=("|CFFFF8000杀死单位|R"+"")
-set udg_ou99_zi3[5]=("|CFFFF8000恢复暂停单位|R"+"")
-set udg_ou99_zi3[6]=("|CFFFF8000建筑立即建造完成|R"+"")
-set udg_ou99_zi3[7]=("|CFFFF8000建筑立即升级完成|R"+"")
-set udg_ou99_zi4[0]=("|Cffff00ff关闭功能退出菜单|R"+"")
-set udg_ou99_zi4[50]=("|Cffff00ff返回菜单|R"+"")
-set udg_ou99_zi4[1]=("|CFFFF8000信春哥(单位无限原地复活)|R"+"")
-set udg_ou99_zi4[2]=("|CFFFF8000杀敌获得1点属性|R"+"")
-set udg_ou99_zi4[3]=("|CFFFF8000禁止英雄获得经验(很邪恶的)|R"+"")
-set udg_ou99_zi5[0]=("|Cffff00ff关闭功能退出菜单|R"+"")
-set udg_ou99_zi5[50]=("|Cffff00ff返回菜单|R"+"")
-set udg_ou99_zi5[1]=("|Cffffff00耐久光环|R"+"")
-set udg_ou99_zi5[2]=("|Cffffff00邪恶光环|R"+"")
-set udg_ou99_zi5[3]=("|Cffffff00吸血光环|R"+"")
-set udg_ou99_zi5[4]=("|Cffffff00强击光环|R"+"")
-set udg_ou99_zi5[5]=("|Cffffff00命令光环|R"+"")
-set udg_ou99_zi5[6]=("|Cffffff00荆棘光环|R"+"")
-set udg_ou99_jn[1]='ACes'
-set udg_ou99_jn[2]='Amim'
-set udg_ou99_jn[3]='ANca'
-set udg_ou99_jn[4]='AUts'
-set udg_ou99_jn[5]='AIsr'
-set udg_ou99_jn[6]='Agyv'
-set udg_ou99_jn[7]='Ahrp'
-set udg_ou99_jn[8]='AIft'
-set udg_ou99_jn[9]='AOcr'
-set udg_ou99_jn[10]='AOr2'
-set udg_ou99_jn[11]='AUau'
-set udg_ou99_jn[12]='AUav'
-set udg_ou99_jn[13]='AEar'
-set udg_ou99_jn[14]='ACac'
-set udg_ou99_jn[15]='AEah'
-endfunction
-function Trig_ou99_B_u_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_B_u_Actions takes nothing returns nothing
-set udg_ou99_B[1]="欢迎查看|CFFFF0000YD作弊4.0|RCMD帮助  关注YD作弊|Cff00ff00www.ou99.com|R"
-set udg_ou99_B[0]="|Cffff00ff下面是CMD功能说明 所有指令没有空格直接在后面输入你想要的数字即可！|R"
-set udg_ou99_B[2]="|CFFFF8000加金钱：输入+q金钱数量   加木头：输入+m木头数量|R"
-set udg_ou99_B[3]="|CFFFF8000加力量：输入+li力量数量  加敏捷：输入+min敏捷数量   加智力：输入+zhi智力数量 |R"
-set udg_ou99_B[4]="|CFFFF8000提升等级：输入+dj级数  三围增加：输入+san三围数量  金矿金钱:+jk金钱数量|R"
-set udg_ou99_B[5]="|CFFFF8000自动加钱:+mj金钱数量   自动加木:+mm木头数量   设置单位主动攻击范围：+fw范围数字|R"
-set udg_ou99_B[6]="|CFFFF8000物品使用次数：+cs 设置第一格物品的使用次数 |R"
-set udg_ou99_B[20]=("欢迎查看|CFFFF0000YD作弊4.0|RCMD帮助  关注YD作弊|Cff00ff00www.ou99.com|R"+"")
-set udg_ou99_B[21]="|Cffff00ff下面说明淫荡功能的介绍：|R"
-set udg_ou99_B[22]=("|cFFFF0033信春哥|r："+"|cFFFFFF00当属于玩家一的英雄死亡后立即在原地复活|r")
-set udg_ou99_B[23]=("|cFFFF0033杀敌得属性|r："+"|cFFFFFF00当属于玩家一的英雄杀死敌人时可获得1点属性|r")
-set udg_ou99_B[24]=("|cFFFF0033禁止英雄获得经验|r："+"|cFFFFFF00一个很邪恶又YD功能，被设置的英雄无法获得经验|r")
-endfunction
-function Trig_ou99_E_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==(1+GetPlayerId(udg_ou99lkxin)))
-endfunction
-function Trig_ou99_E_Func002C takes nothing returns boolean
-return(GetEventPlayerChatString()==udg_ou99_zi[20])
-endfunction
-function Trig_ou99_E_Func003C takes nothing returns boolean
-return(GetEventPlayerChatString()==udg_ou99_zi[19])
-endfunction
-function Trig_ou99_E_Actions takes nothing returns nothing
-if(Trig_ou99_E_Func002C())then
-call EnableTrigger(gg_trg_ou99_esc)
-endif
-if(Trig_ou99_E_Func003C())then
-call DisableTrigger(gg_trg_ou99_esc)
-endif
-endfunction
-function Trig_ou99_esc_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_esc_Actions takes nothing returns nothing
-call UnitRemoveBuffsBJ(1,udg_ou99_ZB)
-call SetUnitLifePercentBJ(udg_ou99_ZB,'d')
-call SetUnitManaPercentBJ(udg_ou99_ZB,'d')
-endfunction
-function Trig_ou99_CY_Func001C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[1])
-endfunction
-function Trig_ou99_CY_Func002C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[2])
-endfunction
-function Trig_ou99_CY_Func003C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[3])
-endfunction
-function Trig_ou99_CY_Func004C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[4])
-endfunction
-function Trig_ou99_CY_Func005C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[5])
-endfunction
-function Trig_ou99_CY_Func006C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[6])
-endfunction
-function Trig_ou99_CY_Func007C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[7])
-endfunction
-function Trig_ou99_CY_Func008C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[8])
-endfunction
-function Trig_ou99_CY_Func010C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2[0])
-endfunction
-function Trig_ou99_CY_Func011C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b2['d'])
-endfunction
-function Trig_ou99_CY_Actions takes nothing returns nothing
-if(Trig_ou99_CY_Func001C())then
-call DialogClear(udg_ou99_a)
-call CreateFogModifierRectBJ(true,udg_ou99lkxin,FOG_OF_WAR_VISIBLE,GetWorldBounds())
-endif
-if(Trig_ou99_CY_Func002C())then
-call DialogClear(udg_ou99_a)
-call SetPlayerHandicapXP(udg_ou99lkxin,3.)
-endif
-if(Trig_ou99_CY_Func003C())then
-call DialogClear(udg_ou99_a)
-call SetUnitInvulnerable(udg_ou99_ZB,true)
-endif
-if(Trig_ou99_CY_Func004C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_CD)
-endif
-if(Trig_ou99_CY_Func005C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_P)
-endif
-if(Trig_ou99_CY_Func006C())then
-call DialogClear(udg_ou99_a)
-call SetUnitMoveSpeed(udg_ou99_ZB,udg_ou99_SU)
-endif
-if(Trig_ou99_CY_Func007C())then
-call DialogClear(udg_ou99_a)
-call UnitShareVision(udg_ou99_ZB,udg_ou99lkxin,true)
-endif
-if(Trig_ou99_CY_Func008C())then
-call DialogClear(udg_ou99_a)
-call SetUnitPathing(udg_ou99_ZB,false)
-endif
-if(Trig_ou99_CY_Func010C())then
-call DialogClear(udg_ou99_a)
-call SetUnitPathing(udg_ou99_ZB,true)
-call UnitShareVision(udg_ou99_ZB,udg_ou99lkxin,false)
-call SetUnitMoveSpeed(udg_ou99_ZB,GetUnitDefaultMoveSpeed(udg_ou99_ZB))
-call DestroyFogModifier(bj_lastCreatedFogModifier)
-call SetUnitInvulnerable(udg_ou99_ZB,false)
-call SetPlayerHandicapXP(udg_ou99lkxin,1.)
-call DisableTrigger(gg_trg_ou99_CD)
-call DisableTrigger(gg_trg_ou99_P)
-endif
-if(Trig_ou99_CY_Func011C())then
-call DialogClear(udg_ou99_a)
-call ConditionalTriggerExecute(gg_trg_ou99_C)
-endif
-endfunction
-function Trig_ou99_CD_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_CD_Actions takes nothing returns nothing
-call UnitResetCooldown(udg_ou99_ZB)
-call SetUnitManaPercentBJ(udg_ou99_ZB,'d')
-endfunction
-function Trig_ou99_P_Conditions takes nothing returns boolean
-return(GetIssuedOrderId()==String2OrderIdBJ("Patrol"))and(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_P_Actions takes nothing returns nothing
-set udg_ou99_D=GetOrderPointLoc()
-call SetUnitPositionLoc(udg_ou99_ZB,udg_ou99_D)
-call RemoveLocation(udg_ou99_D)
-endfunction
-function Trig_ou99_Z_D_Func001C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b3[1])
-endfunction
-function Trig_ou99_Z_D_Func002C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b3[2])
-endfunction
-function Trig_ou99_Z_D_Func003C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b3[3])
-endfunction
-function Trig_ou99_Z_D_Func004C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b3[4])
-endfunction
-function Trig_ou99_Z_D_Func005C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b3[5])
-endfunction
-function Trig_ou99_Z_D_Func007C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b3[0])
-endfunction
-function Trig_ou99_Z_D_Func008C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b3['d'])
-endfunction
-function Trig_ou99_Z_D_Actions takes nothing returns nothing
-if(Trig_ou99_Z_D_Func001C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_ZD_Q)
-endif
-if(Trig_ou99_Z_D_Func002C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_ZD_M)
-endif
-if(Trig_ou99_Z_D_Func003C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_ZD_R)
-endif
-if(Trig_ou99_Z_D_Func004C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_ZD_X)
-call DisableTrigger(gg_trg_ou99_ZD_X______u)
-endif
-if(Trig_ou99_Z_D_Func005C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_ZD_L)
-call DisableTrigger(gg_trg_ou99_ZD_L______u)
-endif
-if(Trig_ou99_Z_D_Func007C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_ZD_X______u)
-call EnableTrigger(gg_trg_ou99_ZD_L______u)
-call DisableTrigger(gg_trg_ou99_ZD_L)
-call DisableTrigger(gg_trg_ou99_ZD_M)
-call DisableTrigger(gg_trg_ou99_ZD_Q)
-call DisableTrigger(gg_trg_ou99_ZD_R)
-call DisableTrigger(gg_trg_ou99_ZD_X)
-endif
-if(Trig_ou99_Z_D_Func008C())then
-call DialogClear(udg_ou99_a)
-call ConditionalTriggerExecute(gg_trg_ou99_C)
-endif
-endfunction
-function Trig_ou99_ZD_Q_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_ZD_Q_Actions takes nothing returns nothing
-call AdjustPlayerStateBJ(udg_ou99_qm[1],udg_ou99lkxin,PLAYER_STATE_RESOURCE_GOLD)
-endfunction
-function Trig_ou99_ZD_M_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_ZD_M_Actions takes nothing returns nothing
-call AdjustPlayerStateBJ(udg_ou99_qm[2],udg_ou99lkxin,PLAYER_STATE_RESOURCE_LUMBER)
-endfunction
-function Trig_ou99_ZD_R_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_ZD_R_Func002C takes nothing returns boolean
-return(GetPlayerState(Player(0),PLAYER_STATE_RESOURCE_FOOD_USED)>=50)
-endfunction
-function Trig_ou99_ZD_R_Actions takes nothing returns nothing
-if(Trig_ou99_ZD_R_Func002C())then
-call SetPlayerStateBJ(udg_ou99lkxin,PLAYER_STATE_RESOURCE_FOOD_USED,0)
-endif
-endfunction
-function Trig_ou99_ZD_X______u_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_ZD_X______u_Actions takes nothing returns nothing
-set udg_ou99_ZB_______u[1]=GetTriggerUnit()
-endfunction
-function Trig_ou99_ZD_X_Conditions takes nothing returns boolean
-return(GetUnitLifePercent(udg_ou99_ZB_______u[1])<=20.)
-endfunction
-function Trig_ou99_ZD_X_Actions takes nothing returns nothing
-call SetUnitLifePercentBJ(udg_ou99_ZB_______u[1],'d')
-endfunction
-function Trig_ou99_ZD_L______u_Actions takes nothing returns nothing
-set udg_ou99_ZB_______u[2]=GetTriggerUnit()
-endfunction
-function Trig_ou99_ZD_L_Conditions takes nothing returns boolean
-return(GetUnitManaPercent(udg_ou99_ZB_______u[2])<=20.)
-endfunction
-function Trig_ou99_ZD_L_Actions takes nothing returns nothing
-call SetUnitManaPercentBJ(udg_ou99_ZB_______u[2],'d')
-endfunction
-function Trig_ou99_J_Func001C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[1])
-endfunction
-function Trig_ou99_J_Func002C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[2])
-endfunction
-function Trig_ou99_J_Func003C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[3])
-endfunction
-function Trig_ou99_J_Func004C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[4])
-endfunction
-function Trig_ou99_J_Func005C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[5])
-endfunction
-function Trig_ou99_J_Func006C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[6])
-endfunction
-function Trig_ou99_J_Func007C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[7])
-endfunction
-function Trig_ou99_J_Func008C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[8])
-endfunction
-function Trig_ou99_J_Func009C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[9])
-endfunction
-function Trig_ou99_J_Func010C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[10])
-endfunction
-function Trig_ou99_J_Func012C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4[0])
-endfunction
-function Trig_ou99_J_Func013C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b4['d'])
-endfunction
-function Trig_ou99_J_Actions takes nothing returns nothing
-if(Trig_ou99_J_Func001C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[1])
-endif
-if(Trig_ou99_J_Func002C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[2])
-endif
-if(Trig_ou99_J_Func003C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[3])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[3],'d')
-endif
-if(Trig_ou99_J_Func004C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[4])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[4],'d')
-endif
-if(Trig_ou99_J_Func005C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[5])
-endif
-if(Trig_ou99_J_Func006C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[6])
-endif
-if(Trig_ou99_J_Func007C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[7])
-endif
-if(Trig_ou99_J_Func008C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[8])
-endif
-if(Trig_ou99_J_Func009C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[9])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[9],'d')
-endif
-if(Trig_ou99_J_Func010C())then
-call DialogClear(udg_ou99_a)
-call TriggerExecute(gg_trg_ou99_G)
-endif
-if(Trig_ou99_J_Func012C())then
-call DialogClear(udg_ou99_a)
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[1])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[2])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[3])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[4])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[5])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[6])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[7])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[8])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[9])
-endif
-if(Trig_ou99_J_Func013C())then
-call DialogClear(udg_ou99_a)
-call ConditionalTriggerExecute(gg_trg_ou99_C)
-endif
-endfunction
-function Trig_ou99_G_Actions takes nothing returns nothing
-call DialogSetMessage(udg_ou99_a,udg_ou99_zi[0])
-set udg_ou99_b7[1]=DialogAddButton(udg_ou99_a,udg_ou99_zi5[1],0)
-set udg_ou99_b7[2]=DialogAddButton(udg_ou99_a,udg_ou99_zi5[2],0)
-set udg_ou99_b7[3]=DialogAddButton(udg_ou99_a,udg_ou99_zi5[3],0)
-set udg_ou99_b7[4]=DialogAddButton(udg_ou99_a,udg_ou99_zi5[4],0)
-set udg_ou99_b7[5]=DialogAddButton(udg_ou99_a,udg_ou99_zi5[5],0)
-set udg_ou99_b7[6]=DialogAddButton(udg_ou99_a,udg_ou99_zi5[6],0)
-set udg_ou99_b7[0]=DialogAddButton(udg_ou99_a,udg_ou99_zi5[0],0)
-set udg_ou99_b7['d']=DialogAddButton(udg_ou99_a,udg_ou99_zi5[50],0)
-call TriggerRegisterDialogEvent(gg_trg_ou99_GH,udg_ou99_a)
-call DialogDisplayBJ(true,udg_ou99_a,udg_ou99lkxin)
-endfunction
-function Trig_ou99_GH_Func001C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b7[1])
-endfunction
-function Trig_ou99_GH_Func002C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b7[2])
-endfunction
-function Trig_ou99_GH_Func003C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b7[3])
-endfunction
-function Trig_ou99_GH_Func004C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b7[4])
-endfunction
-function Trig_ou99_GH_Func005C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b7[5])
-endfunction
-function Trig_ou99_GH_Func006C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b7[6])
-endfunction
-function Trig_ou99_GH_Func008C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b7[0])
-endfunction
-function Trig_ou99_GH_Func009C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b7['d'])
-endfunction
-function Trig_ou99_GH_Actions takes nothing returns nothing
-if(Trig_ou99_GH_Func001C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[10])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[10],'d')
-endif
-if(Trig_ou99_GH_Func002C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[11])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[11],'d')
-endif
-if(Trig_ou99_GH_Func003C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[12])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[12],'d')
-endif
-if(Trig_ou99_GH_Func004C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[13])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[13],'d')
-endif
-if(Trig_ou99_GH_Func005C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[14])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[14],'d')
-endif
-if(Trig_ou99_GH_Func006C())then
-call DialogClear(udg_ou99_a)
-call UnitAddAbility(udg_ou99_ZB,udg_ou99_jn[15])
-call SetUnitAbilityLevel(udg_ou99_ZB,udg_ou99_jn[15],'d')
-endif
-if(Trig_ou99_GH_Func008C())then
-call DialogClear(udg_ou99_a)
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[10])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[11])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[12])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[13])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[14])
-call UnitRemoveAbility(udg_ou99_ZB,udg_ou99_jn[15])
-endif
-if(Trig_ou99_GH_Func009C())then
-call DialogClear(udg_ou99_a)
-call ConditionalTriggerExecute(gg_trg_ou99_C)
-endif
-endfunction
-function Trig_ou99_T_Func001C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5[1])
-endfunction
-function Trig_ou99_T_Func002C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5[2])
-endfunction
-function Trig_ou99_T_Func003C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5[3])
-endfunction
-function Trig_ou99_T_Func004C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5[4])
-endfunction
-function Trig_ou99_T_Func005C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5[5])
-endfunction
-function Trig_ou99_T_Func006C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5[6])
-endfunction
-function Trig_ou99_T_Func007C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5[7])
-endfunction
-function Trig_ou99_T_Func009C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5[0])
-endfunction
-function Trig_ou99_T_Func010C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b5['d'])
-endfunction
-function Trig_ou99_T_Actions takes nothing returns nothing
-if(Trig_ou99_T_Func001C())then
-call DialogClear(udg_ou99_a)
-set udg_ou99_D=GetUnitLoc(udg_ou99_ZB)
-call CreateItemLoc(GetItemTypeId(UnitItemInSlotBJ(udg_ou99_ZB,1)),udg_ou99_D)
-call CreateItemLoc(GetItemTypeId(UnitItemInSlotBJ(udg_ou99_ZB,2)),udg_ou99_D)
-call CreateItemLoc(GetItemTypeId(UnitItemInSlotBJ(udg_ou99_ZB,3)),udg_ou99_D)
-call CreateItemLoc(GetItemTypeId(UnitItemInSlotBJ(udg_ou99_ZB,4)),udg_ou99_D)
-call CreateItemLoc(GetItemTypeId(UnitItemInSlotBJ(udg_ou99_ZB,5)),udg_ou99_D)
-call CreateItemLoc(GetItemTypeId(UnitItemInSlotBJ(udg_ou99_ZB,6)),udg_ou99_D)
-call RemoveLocation(udg_ou99_D)
-endif
-if(Trig_ou99_T_Func002C())then
-call DialogClear(udg_ou99_a)
-set udg_ou99_D=GetUnitLoc(udg_ou99_ZB)
-call CreateNUnitsAtLoc(1,GetUnitTypeId(udg_ou99_ZB),udg_ou99lkxin,udg_ou99_D,bj_UNIT_FACING)
-call RemoveLocation(udg_ou99_D)
-endif
-if(Trig_ou99_T_Func003C())then
-call DialogClear(udg_ou99_a)
-call SetUnitOwner(udg_ou99_ZB,Player(0),true)
-endif
-if(Trig_ou99_T_Func004C())then
-call DialogClear(udg_ou99_a)
-call KillUnit(udg_ou99_ZB)
-endif
-if(Trig_ou99_T_Func005C())then
-call DialogClear(udg_ou99_a)
-call PauseUnit(udg_ou99_ZB,false)
-endif
-if(Trig_ou99_T_Func006C())then
-call DialogClear(udg_ou99_a)
-call UnitSetConstructionProgress(udg_ou99_ZB,'d')
-endif
-if(Trig_ou99_T_Func007C())then
-call DialogClear(udg_ou99_a)
-call UnitSetUpgradeProgress(udg_ou99_ZB,'d')
-endif
-if(Trig_ou99_T_Func009C())then
-call DialogClear(udg_ou99_a)
-endif
-if(Trig_ou99_T_Func010C())then
-call DialogClear(udg_ou99_a)
-call ConditionalTriggerExecute(gg_trg_ou99_C)
-endif
-endfunction
-function Trig_ou99_YD_Func001C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b6[1])
-endfunction
-function Trig_ou99_YD_Func002C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b6[2])
-endfunction
-function Trig_ou99_YD_Func003C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b6[3])
-endfunction
-function Trig_ou99_YD_Func005C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b6[0])
-endfunction
-function Trig_ou99_YD_Func006C takes nothing returns boolean
-return(GetClickedButton()==udg_ou99_b6['d'])
-endfunction
-function Trig_ou99_YD_Actions takes nothing returns nothing
-if(Trig_ou99_YD_Func001C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_F)
-endif
-if(Trig_ou99_YD_Func002C())then
-call DialogClear(udg_ou99_a)
-call EnableTrigger(gg_trg_ou99_S)
-endif
-if(Trig_ou99_YD_Func003C())then
-call DialogClear(udg_ou99_a)
-call SuspendHeroXP(udg_ou99_ZB_______u[3],true)
-call DisableTrigger(gg_trg_ou99_JY_______u)
-endif
-if(Trig_ou99_YD_Func005C())then
-call DialogClear(udg_ou99_a)
-call DisableTrigger(gg_trg_ou99_F)
-call DisableTrigger(gg_trg_ou99_S)
-call SuspendHeroXP(udg_ou99_ZB_______u[3],false)
-call EnableTrigger(gg_trg_ou99_JY_______u)
-endif
-if(Trig_ou99_YD_Func006C())then
-call DialogClear(udg_ou99_a)
-call ConditionalTriggerExecute(gg_trg_ou99_C)
-endif
-endfunction
-function Trig_ou99_F_Conditions takes nothing returns boolean
-return(IsUnitType(GetDyingUnit(),UNIT_TYPE_HERO))and(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_F_Actions takes nothing returns nothing
-call TriggerSleepAction(.1)
-call DestroyTimerDialog(bj_lastCreatedTimerDialog)
-set udg_ou99_D=GetUnitLoc(udg_ou99_ZB)
-call ReviveHeroLoc(GetDyingUnit(),udg_ou99_D,false)
-call RemoveLocation(udg_ou99_D)
-endfunction
-function Trig_ou99_S_Conditions takes nothing returns boolean
-return(IsUnitEnemy(GetDyingUnit(),GetOwningPlayer(GetKillingUnit())))and(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_S_Actions takes nothing returns nothing
-call ModifyHeroStat(0,GetKillingUnit(),0,1)
-call ModifyHeroStat(1,GetKillingUnit(),0,1)
-call ModifyHeroStat(2,GetKillingUnit(),0,1)
-endfunction
-function Trig_ou99_JY_______u_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_JY_______u_Actions takes nothing returns nothing
-set udg_ou99_ZB_______u[3]=GetTriggerUnit()
-endfunction
-function Trig_ou99_SY_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_SY_Func002C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,3)=="+cs")
-endfunction
-function Trig_ou99_SY_Func003C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,3)=="+fw")
-endfunction
-function Trig_ou99_SY_Actions takes nothing returns nothing
-if(Trig_ou99_SY_Func002C())then
-set udg_ou99_Q[0]=S2I(SubStringBJ(GetEventPlayerChatString(),4,'d'))
-call SetItemCharges(UnitItemInSlotBJ(udg_ou99_ZB,1),udg_ou99_Q[0])
-endif
-if(Trig_ou99_SY_Func003C())then
-set udg_ou99_Q[12]=S2I(SubStringBJ(GetEventPlayerChatString(),4,'d'))
-call SetUnitAcquireRange(udg_ou99_ZB,I2R(udg_ou99_Q[12]))
-endif
-endfunction
-function Trig_ou99_CMD_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_CMD_Func002C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,2)=="+q")
-endfunction
-function Trig_ou99_CMD_Func003C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,2)=="+m")
-endfunction
-function Trig_ou99_CMD_Func004C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,3)=="+li")
-endfunction
-function Trig_ou99_CMD_Func005C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,4)=="+min")
-endfunction
-function Trig_ou99_CMD_Func006C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,4)=="+zhi")
-endfunction
-function Trig_ou99_CMD_Func007C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,3)=="+dj")
-endfunction
-function Trig_ou99_CMD_Func008C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,4)=="+san")
-endfunction
-function Trig_ou99_CMD_Func009C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,3)=="+jk")
-endfunction
-function Trig_ou99_CMD_Func010C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,3)=="+mj")
-endfunction
-function Trig_ou99_CMD_Func011C takes nothing returns boolean
-return(SubStringBJ(GetEventPlayerChatString(),1,3)=="+mm")
-endfunction
-function Trig_ou99_CMD_Actions takes nothing returns nothing
-if(Trig_ou99_CMD_Func002C())then
-set udg_ou99_Q[1]=S2I(SubStringBJ(GetEventPlayerChatString(),3,'d'))
-call AdjustPlayerStateBJ(udg_ou99_Q[1],udg_ou99lkxin,PLAYER_STATE_RESOURCE_GOLD)
-endif
-if(Trig_ou99_CMD_Func003C())then
-set udg_ou99_Q[2]=S2I(SubStringBJ(GetEventPlayerChatString(),3,'d'))
-call AdjustPlayerStateBJ(udg_ou99_Q[1],udg_ou99lkxin,PLAYER_STATE_RESOURCE_LUMBER)
-endif
-if(Trig_ou99_CMD_Func004C())then
-set udg_ou99_Q[3]=S2I(SubStringBJ(GetEventPlayerChatString(),4,'d'))
-call ModifyHeroStat(0,udg_ou99_ZB,0,udg_ou99_Q[3])
-endif
-if(Trig_ou99_CMD_Func005C())then
-set udg_ou99_Q[4]=S2I(SubStringBJ(GetEventPlayerChatString(),5,'d'))
-call ModifyHeroStat(1,udg_ou99_ZB,0,udg_ou99_Q[4])
-endif
-if(Trig_ou99_CMD_Func006C())then
-set udg_ou99_Q[5]=S2I(SubStringBJ(GetEventPlayerChatString(),5,'d'))
-call ModifyHeroStat(2,udg_ou99_ZB,0,udg_ou99_Q[5])
-endif
-if(Trig_ou99_CMD_Func007C())then
-set udg_ou99_Q[6]=S2I(SubStringBJ(GetEventPlayerChatString(),4,'d'))
-call SetHeroLevel(udg_ou99_ZB,udg_ou99_Q[6],false)
-endif
-if(Trig_ou99_CMD_Func008C())then
-set udg_ou99_Q[7]=S2I(SubStringBJ(GetEventPlayerChatString(),5,'d'))
-call ModifyHeroStat(0,udg_ou99_ZB,0,udg_ou99_Q[7])
-call ModifyHeroStat(1,udg_ou99_ZB,0,udg_ou99_Q[7])
-call ModifyHeroStat(2,udg_ou99_ZB,0,udg_ou99_Q[7])
-endif
-if(Trig_ou99_CMD_Func009C())then
-set udg_ou99_Q[8]=S2I(SubStringBJ(GetEventPlayerChatString(),4,'d'))
-call AddResourceAmount(udg_ou99_ZB,udg_ou99_Q[8])
-endif
-if(Trig_ou99_CMD_Func010C())then
-set udg_ou99_Q[9]=S2I(SubStringBJ(GetEventPlayerChatString(),4,'d'))
-set udg_ou99_qm[1]=S2I(udg_ou99_B[9])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,10.,("每秒金钱增加："+I2S(udg_ou99_Q[9])))
-endif
-if(Trig_ou99_CMD_Func011C())then
-set udg_ou99_Q[10]=S2I(SubStringBJ(GetEventPlayerChatString(),4,'d'))
-set udg_ou99_qm[2]=S2I(udg_ou99_B[10])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,10.,("每秒木头增加："+I2S(udg_ou99_Q[10])))
-endif
-endfunction
-function Trig_ou99_B_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_B_Func002Func008001 takes nothing returns boolean
-return(GetEventPlayerChatString()=="-a")
-endfunction
-function Trig_ou99_B_Func002Func008002 takes nothing returns boolean
-return(GetEventPlayerChatString()=="-A")
-endfunction
-function Trig_ou99_B_Func002C takes nothing returns boolean
-return(GetBooleanOr(Trig_ou99_B_Func002Func008001(),Trig_ou99_B_Func002Func008002()))
-endfunction
-function Trig_ou99_B_Func003Func006001 takes nothing returns boolean
-return(GetEventPlayerChatString()=="-y")
-endfunction
-function Trig_ou99_B_Func003Func006002 takes nothing returns boolean
-return(GetEventPlayerChatString()=="-Y")
-endfunction
-function Trig_ou99_B_Func003C takes nothing returns boolean
-return(GetBooleanOr(Trig_ou99_B_Func003Func006001(),Trig_ou99_B_Func003Func006002()))
-endfunction
-function Trig_ou99_B_Actions takes nothing returns nothing
-if(Trig_ou99_B_Func002C())then
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[1])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[0])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[2])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[3])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[4])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[5])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[6])
-endif
-if(Trig_ou99_B_Func003C())then
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[20])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[21])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[22])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[23])
-call DisplayTimedTextToPlayer(udg_ou99lkxin,0,0,30,udg_ou99_B[24])
-endif
-endfunction
-function Trig_ou99_BBBB_Conditions takes nothing returns boolean
-return(udg_ou99liu[(1+GetPlayerId(udg_ou99lkxin))]==udg_suiji)
-endfunction
-function Trig_ou99_BBBB_Actions takes nothing returns nothing
-call TriggerExecute(gg_trg_ou99_B_u)
-call TriggerExecute(gg_trg_ou99_K)
-call EnableTrigger(gg_trg_ou99_B)
-call EnableTrigger(gg_trg_ou99_CMD)
-call EnableTrigger(gg_trg_ou99__1)
-call EnableTrigger(gg_trg_ou99__2)
-call EnableTrigger(gg_trg_ou99_XC)
-endfunction
-function Trig_ou99_BH_Func002C takes nothing returns boolean
-return(StringLength(udg_ou99_zi[23])==12)and(StringLength(udg_ou99_zi[20])==3)and(StringLength(udg_ou99_zi[21])==12)and(StringLength(udg_ou99_zi[19])==3)and(StringLength(udg_ou99_zi[0])==34)
-endfunction
-function Trig_ou99_BH_Actions takes nothing returns nothing
-if(Trig_ou99_BH_Func002C())then
-call DisableTrigger(GetTriggeringTrigger())
+set bmlocb=bmlocb+1
+endloop
+return result
+endfunction
+
+function BigMan_Item_Loop2 takes nothing returns nothing
+local integer bmlocc=BigMan_Item_Index[0]
+local integer bmlocc3=48
+local integer bmlocc4=48
+local integer bmlocid=0
+local item bmlocit
+loop
+exitwhen bmlocc3>90
+set bmlocc4=48
+loop
+exitwhen bmlocc4>90
+set bmlocid=(256*256*256*BigMan_Item_Index[1])+(256*256*BigMan_Item_Index[2])+(256*bmlocc3)+bmlocc4
+set bmlocit=CreateItem(bmlocid,0,0)
+if bmlocit!=null then
+call RemoveItem(bmlocit)
+set bmlocc=bmlocc+1
+set BigMan_ItemTypeId[bmlocc]=bmlocid
+set BigMan_ItemName[bmlocc]=GetObjectName(bmlocid)
+endif
+if bmlocc4==57 then
+set bmlocc4=65
 else
-set bj_forLoopBIndex=1
-set bj_forLoopBIndexEnd=12
-loop
-exitwhen bj_forLoopBIndex>bj_forLoopBIndexEnd
-call AdjustPlayerStateBJ(0,Player(-1+(udg_kkkkkkkk)),PLAYER_STATE_RESOURCE_GOLD)
-set bj_forLoopBIndex=bj_forLoopBIndex+1
+set bmlocc4=bmlocc4+1
+endif
 endloop
+if bmlocc3==57 then
+set bmlocc3=65
+else
+set bmlocc3=bmlocc3+1
+endif
+endloop
+set BigMan_Item_Index[0]=bmlocc
+set bmlocit=null
+endfunction
+
+function BigMan_Item_Loop1 takes nothing returns nothing
+local integer bmlocc=BigMan_Item_Index[0]
+local integer bmlocc3=48
+local integer bmlocc4=48
+local integer bmlocid=0
+local item bmlocit
+loop
+exitwhen bmlocc3>=123
+set bmlocc4=48
+loop
+exitwhen bmlocc4>=123
+set bmlocid=(256*256*256*BigMan_Item_Index[1])+(256*256*BigMan_Item_Index[2])+(256*bmlocc3)+bmlocc4
+set bmlocit=CreateItem(bmlocid,0,0)
+if bmlocit!=null then
+call RemoveItem(bmlocit)
+set bmlocc=bmlocc+1
+set BigMan_ItemTypeId[bmlocc]=bmlocid
+set BigMan_ItemName[bmlocc]=GetObjectName(bmlocid)
+endif
+if bmlocc4==57 then
+set bmlocc4=97
+else
+set bmlocc4=bmlocc4+1
+endif
+endloop
+if bmlocc3==57 then
+set bmlocc3=97
+else
+set bmlocc3=bmlocc3+1
+endif
+endloop
+set BigMan_Item_Index[0]=bmlocc
+set bmlocit=null
+endfunction
+
+function BigMan_Item_Name_Start takes nothing returns nothing
+if BigMan_Item_Index[1]==73 then
+call BigMan_Item_Loop2()
+if BigMan_Item_Index[2]>=90 then
+call PauseTimer(GetExpiredTimer())
+call DestroyTimer(GetExpiredTimer())
+call PauseTimer(BigMan_Item_tm)
+call DisplayTextToPlayer(GetLocalPlayer(), 0, 0,"|cffffcc00搜索结束，共找到物品：|r|cffff0000"+I2S(BigMan_Item_Index[0])+"|r  |cff00ff00搜索用时：|r"+R2S(TimerGetElapsed(BigMan_Item_tm)))
+call DestroyTimer(BigMan_Item_tm)
+elseif BigMan_Item_Index[2]==57 then
+set BigMan_Item_Index[2]=65
+else
+set BigMan_Item_Index[2]=BigMan_Item_Index[2]+1
+endif
+else
+call BigMan_Item_Loop1()
+if BigMan_Item_Index[2]==57 then
+set BigMan_Item_Index[2]=97
+else
+set BigMan_Item_Index[2]=BigMan_Item_Index[2]+1
+endif
+if BigMan_Item_Index[2]>=123 then
+set BigMan_Item_Index[2]=48
+set BigMan_Item_Index[1]=BigMan_Item_Index[1]+1
+endif
+if BigMan_Item_Index[1]>=123 then
+set BigMan_Item_Index[1]=73
+endif
 endif
 endfunction
-function yd takes nothing returns nothing
-local integer i
-set i=0
-set i=0
+
+function BigMan_Item_Name takes nothing returns nothing
+local timer bmloct=CreateTimer()
+set BigMan_Item_Index[1]=97
+set BigMan_Item_Index[2]=48
+set BigMan_Item_Index[0]=0
+//********************************
+//要提高搜索速度修改下面的0.01数值，修改为0.007时，总搜索速度为6.804
+call TimerStart(bmloct,0.01,true,function BigMan_Item_Name_Start)
+//Up
+//********************************
+set bmloct=null
+endfunction
+
+function BigMan_CleanItem_Fun takes nothing returns nothing
+if IsItemVisible(GetEnumItem()) then
+if GetWidgetLife(GetEnumItem())<=0.401 then
+call SetWidgetLife(GetEnumItem(),1)
+endif
+call RemoveItem(GetEnumItem())
+endif
+endfunction
+function BigMan_CleanItem takes nothing returns nothing
+call EnumItemsInRect(GetWorldBounds(),null,function BigMan_CleanItem_Fun)
+endfunction
+
+function BigMan_ItemName_Init takes nothing returns nothing
+if BigMan_TOF[7777] then
+set BigMan_TOF[7777]=false
+call BigMan_Item_Name()
+set BigMan_Item_tm=CreateTimer()
+call TimerStart(BigMan_Item_tm,20,false,null)
+endif
+endfunction
+
+function BigMan_Item_Query takes nothing returns nothing
+local integer bmloci=1
+local integer bmlocc=0
+local string bmlocs=GetEventPlayerChatString()
+local integer bmlock=StringLength(bmlocs)
+local integer bmlocpage=BigMan_Item_Page[GetPlayerId(GetTriggerPlayer())]
+local integer totalpage=BigMan_Item_Index[0]/75+1
+local string array bmlocname
+if(bmlocs=="查询")then
+if BigMan_TOF[7777] then
+set bmlocs=null
+call DisplayTextToPlayer(GetLocalPlayer(), 0, 0,"|cffffcc00开始地图内物品检索，预计搜索需要用时为9.718秒，请耐心等待！")
+call BigMan_ItemName_Init()
+return
+endif
+if bmlocpage>=totalpage then
+set bmlocpage=1
+else
+set bmlocpage=bmlocpage+1
+endif
+else
+if(S2I(SubString(bmlocs,6,bmlock))>totalpage)then
+if bmlocpage>=totalpage then
+set bmlocpage=totalpage
+else
+set bmlocpage=bmlocpage+1
+endif
+else
+if(S2I(SubString(bmlocs,6,bmlock))>0)then
+set bmlocpage=S2I(SubString(bmlocs,6,bmlock))
+endif
+endif
+endif
+if bmlocpage==0 then
+set bmlocpage=1
+endif
+set BigMan_Item_Page[GetPlayerId(GetTriggerPlayer())]=bmlocpage
 loop
-exitwhen(i>1)
-set udg_ou99_zi[i]=""
-set udg_ou99_zi0[i]=""
-set udg_ou99_zi1[i]=""
-set udg_ou99_zi2[i]=""
-set udg_ou99_zi3[i]=""
-set udg_ou99_zi4[i]=""
-set udg_ou99_qm[i]=0
-set udg_ou99_Q[i]=0
-set udg_ou99_B[i]=""
-set udg_ou99_zi5[i]=""
-set udg_ou99liu[i]=0
-set i=i+1
+exitwhen bmlocc>14
+set bmlocname[bmlocc]=bmlocname[bmlocc]+BigMan_ItemName[(bmlocpage-1)*75+1+(bmlocc*5)]+" |cffff0000"+BigMan_ID2S(BigMan_ItemTypeId[(bmlocpage-1)*75+1+(bmlocc*5)])+"|r "
+set bmlocname[bmlocc]=bmlocname[bmlocc]+BigMan_ItemName[(bmlocpage-1)*75+2+(bmlocc*5)]+" |cffff0000"+BigMan_ID2S(BigMan_ItemTypeId[(bmlocpage-1)*75+2+(bmlocc*5)])+"|r "
+set bmlocname[bmlocc]=bmlocname[bmlocc]+BigMan_ItemName[(bmlocpage-1)*75+3+(bmlocc*5)]+" |cffff0000"+BigMan_ID2S(BigMan_ItemTypeId[(bmlocpage-1)*75+3+(bmlocc*5)])+"|r "
+set bmlocname[bmlocc]=bmlocname[bmlocc]+BigMan_ItemName[(bmlocpage-1)*75+4+(bmlocc*5)]+" |cffff0000"+BigMan_ID2S(BigMan_ItemTypeId[(bmlocpage-1)*75+4+(bmlocc*5)])+"|r "
+set bmlocname[bmlocc]=bmlocname[bmlocc]+BigMan_ItemName[(bmlocpage-1)*75+5+(bmlocc*5)]+" |cffff0000"+BigMan_ID2S(BigMan_ItemTypeId[(bmlocpage-1)*75+5+(bmlocc*5)])+"|r "
+set bmlocc=bmlocc+1
 endloop
-set udg_ou99_a=DialogCreate()
-call TriggerRegisterTimerEventSingle(gg_trg_ou99_CS,.0)
-call TriggerAddAction(gg_trg_ou99_CS,function Trig_ou99_CS_Actions)
-call TriggerAddCondition(gg_trg_ou99__0,Condition(function Trig_ou99__0_Conditions))
-call TriggerAddAction(gg_trg_ou99__0,function Trig_ou99__0_Actions)
-call DisableTrigger(gg_trg_ou99__1)
-call TriggerAddCondition(gg_trg_ou99__1,Condition(function Trig_ou99__1_Conditions))
-call TriggerAddAction(gg_trg_ou99__1,function Trig_ou99__1_Actions)
-call DisableTrigger(gg_trg_ou99__2)
-call TriggerAddCondition(gg_trg_ou99__2,Condition(function Trig_ou99__2_Conditions))
-call TriggerAddAction(gg_trg_ou99__2,function Trig_ou99__2_Actions)
-call DisableTrigger(gg_trg_ou99_XC)
-call TriggerAddCondition(gg_trg_ou99_XC,Condition(function Trig_ou99_XC_Conditions))
-call TriggerAddAction(gg_trg_ou99_XC,function Trig_ou99_XC_Actions)
-call TriggerAddAction(gg_trg_ou99_C,function Trig_ou99_C_Actions)
-call TriggerAddAction(gg_trg_ou99_C1,function Trig_ou99_C1_Actions)
-call TriggerAddCondition(gg_trg_ou99_K,Condition(function Trig_ou99_K_Conditions))
-call TriggerAddAction(gg_trg_ou99_K,function Trig_ou99_K_Actions)
-call TriggerAddCondition(gg_trg_ou99_B_u,Condition(function Trig_ou99_B_u_Conditions))
-call TriggerAddAction(gg_trg_ou99_B_u,function Trig_ou99_B_u_Actions)
-call DisableTrigger(gg_trg_ou99_E)
-call TriggerAddCondition(gg_trg_ou99_E,Condition(function Trig_ou99_E_Conditions))
-call TriggerAddAction(gg_trg_ou99_E,function Trig_ou99_E_Actions)
-call DisableTrigger(gg_trg_ou99_esc)
-call TriggerAddCondition(gg_trg_ou99_esc,Condition(function Trig_ou99_esc_Conditions))
-call TriggerAddAction(gg_trg_ou99_esc,function Trig_ou99_esc_Actions)
-call TriggerAddAction(gg_trg_ou99_CY,function Trig_ou99_CY_Actions)
-call DisableTrigger(gg_trg_ou99_CD)
-call TriggerAddCondition(gg_trg_ou99_CD,Condition(function Trig_ou99_CD_Conditions))
-call TriggerAddAction(gg_trg_ou99_CD,function Trig_ou99_CD_Actions)
-call DisableTrigger(gg_trg_ou99_P)
-call TriggerAddCondition(gg_trg_ou99_P,Condition(function Trig_ou99_P_Conditions))
-call TriggerAddAction(gg_trg_ou99_P,function Trig_ou99_P_Actions)
-call TriggerAddAction(gg_trg_ou99_Z_D,function Trig_ou99_Z_D_Actions)
-call DisableTrigger(gg_trg_ou99_ZD_Q)
-call TriggerRegisterTimerEventPeriodic(gg_trg_ou99_ZD_Q,2)
-call TriggerAddCondition(gg_trg_ou99_ZD_Q,Condition(function Trig_ou99_ZD_Q_Conditions))
-call TriggerAddAction(gg_trg_ou99_ZD_Q,function Trig_ou99_ZD_Q_Actions)
-call DisableTrigger(gg_trg_ou99_ZD_M)
-call TriggerRegisterTimerEventPeriodic(gg_trg_ou99_ZD_M,2)
-call TriggerAddCondition(gg_trg_ou99_ZD_M,Condition(function Trig_ou99_ZD_M_Conditions))
-call TriggerAddAction(gg_trg_ou99_ZD_M,function Trig_ou99_ZD_M_Actions)
-call DisableTrigger(gg_trg_ou99_ZD_R)
-call TriggerRegisterTimerEventPeriodic(gg_trg_ou99_ZD_R,2)
-call TriggerAddCondition(gg_trg_ou99_ZD_R,Condition(function Trig_ou99_ZD_R_Conditions))
-call TriggerAddAction(gg_trg_ou99_ZD_R,function Trig_ou99_ZD_R_Actions)
-call TriggerAddCondition(gg_trg_ou99_ZD_X______u,Condition(function Trig_ou99_ZD_X______u_Conditions))
-call TriggerAddAction(gg_trg_ou99_ZD_X______u,function Trig_ou99_ZD_X______u_Actions)
-call DisableTrigger(gg_trg_ou99_ZD_X)
-call TriggerRegisterTimerEventPeriodic(gg_trg_ou99_ZD_X,.5)
-call TriggerAddCondition(gg_trg_ou99_ZD_X,Condition(function Trig_ou99_ZD_X_Conditions))
-call TriggerAddAction(gg_trg_ou99_ZD_X,function Trig_ou99_ZD_X_Actions)
-call TriggerAddAction(gg_trg_ou99_ZD_L______u,function Trig_ou99_ZD_L______u_Actions)
-call DisableTrigger(gg_trg_ou99_ZD_L)
-call TriggerRegisterTimerEventPeriodic(gg_trg_ou99_ZD_L,.5)
-call TriggerAddCondition(gg_trg_ou99_ZD_L,Condition(function Trig_ou99_ZD_L_Conditions))
-call TriggerAddAction(gg_trg_ou99_ZD_L,function Trig_ou99_ZD_L_Actions)
-call TriggerAddAction(gg_trg_ou99_J,function Trig_ou99_J_Actions)
-call TriggerAddAction(gg_trg_ou99_G,function Trig_ou99_G_Actions)
-call TriggerAddAction(gg_trg_ou99_GH,function Trig_ou99_GH_Actions)
-call TriggerAddAction(gg_trg_ou99_T,function Trig_ou99_T_Actions)
-call TriggerAddAction(gg_trg_ou99_YD,function Trig_ou99_YD_Actions)
-call DisableTrigger(gg_trg_ou99_F)
-call TriggerAddCondition(gg_trg_ou99_F,Condition(function Trig_ou99_F_Conditions))
-call TriggerAddAction(gg_trg_ou99_F,function Trig_ou99_F_Actions)
-call DisableTrigger(gg_trg_ou99_S)
-call TriggerRegisterAnyUnitEventBJ(gg_trg_ou99_S,EVENT_PLAYER_UNIT_DEATH)
-call TriggerAddCondition(gg_trg_ou99_S,Condition(function Trig_ou99_S_Conditions))
-call TriggerAddAction(gg_trg_ou99_S,function Trig_ou99_S_Actions)
-call TriggerAddCondition(gg_trg_ou99_JY_______u,Condition(function Trig_ou99_JY_______u_Conditions))
-call TriggerAddAction(gg_trg_ou99_JY_______u,function Trig_ou99_JY_______u_Actions)
-call TriggerAddCondition(gg_trg_ou99_SY,Condition(function Trig_ou99_SY_Conditions))
-call TriggerAddAction(gg_trg_ou99_SY,function Trig_ou99_SY_Actions)
-call DisableTrigger(gg_trg_ou99_CMD)
-call TriggerAddCondition(gg_trg_ou99_CMD,Condition(function Trig_ou99_CMD_Conditions))
-call TriggerAddAction(gg_trg_ou99_CMD,function Trig_ou99_CMD_Actions)
-call DisableTrigger(gg_trg_ou99_B)
-call TriggerAddCondition(gg_trg_ou99_B,Condition(function Trig_ou99_B_Conditions))
-call TriggerAddAction(gg_trg_ou99_B,function Trig_ou99_B_Actions)
-call TriggerAddCondition(gg_trg_ou99_BBBB,Condition(function Trig_ou99_BBBB_Conditions))
-call TriggerAddAction(gg_trg_ou99_BBBB,function Trig_ou99_BBBB_Actions)
-call DisableTrigger(gg_trg_ou99_BH)
-call TriggerRegisterTimerEventPeriodic(gg_trg_ou99_BH,1.)
-call TriggerAddAction(gg_trg_ou99_BH,function Trig_ou99_BH_Actions)
+set bmlocc=0
+loop
+exitwhen bmlocc>14
+call DisplayTimedTextToPlayer(GetTriggerPlayer(),0,0,60.,bmlocname[bmlocc])
+set bmlocname[bmlocc]=null
+set bmlocc=bmlocc+1
+endloop
+call DisplayTimedTextToPlayer(GetTriggerPlayer(),0,0,60,("|CFFFF0000当|CFFFF6600前|CFFFFFF00为|CFF00FF00第|CFF00FFFF "+I2S(bmlocpage)+"/"+I2S(totalpage)+" |r|CFF0000FF页|r|CFFFF0000查询|r"+" |r|CFFFF6600输入@物品+物品ID，可获得物品。(@可为任意字符。)"))
+set bmlocs=null
+endfunction
+
+function BigMan_PlayerBag takes nothing returns boolean
+local integer bmlocc = 0
+local integer bmloci = 0
+local integer bmlocpi = GetPlayerId(GetTriggerPlayer())
+local integer bmlocbt = BigMan_BagTotal[bmlocpi]
+if GetWidgetLife(BigMan_HERO[bmlocpi]) > 1 and bmlocbt>1 and IsUnitType(BigMan_HERO[bmlocpi],ConvertUnitType(0)) and GetOwningPlayer(BigMan_HERO[bmlocpi]) == Player(bmlocpi) then
+loop
+exitwhen bmlocc > 5
+set BigMan_BagItem[bmlocpi*6+bmlocc] = UnitItemInSlot(BigMan_HERO[bmlocpi],bmlocc)
+call SetItemPlayer( BigMan_BagItem[bmlocpi*6+bmlocc],Player(bmlocpi), true )
+call SetItemPosition( BigMan_BagItem[bmlocpi*6+bmlocc], GetUnitX(BigMan_HERO[bmlocpi]), GetUnitY(BigMan_HERO[bmlocpi]) )
+call SetItemVisible( BigMan_BagItem[bmlocpi*6+bmlocc], false )
+if BigMan_BagItem[bmlocpi*6+bmlocc] != null then
+call DisplayTextToPlayer( GetTriggerPlayer(),0,0,(GetPlayerName(GetTriggerPlayer())+"|cffffcc00将：|r"+GetItemName(BigMan_BagItem[bmlocpi*6+bmlocc])+" |cffffcc00物品ID：|r"+BigMan_ID2S(GetItemTypeId(BigMan_BagItem[bmlocpi*6+bmlocc]))+" |cffffcc00放入背包中！|r"))
+endif
+loop
+exitwhen bmloci == bmlocbt
+set BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*(bmlocbt-bmloci))] = BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*(bmlocbt-bmloci-1))]
+set BigMan_BagItemId[(bmlocpi*6+bmlocc)+(72*(bmlocbt-bmloci))]=GetItemTypeId(BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*(bmlocbt-bmloci-1))])
+set bmloci =bmloci+ 1
+endloop
+set bmloci=0
+set bmlocc = bmlocc + 1
+endloop
+set bmlocc=0
+loop
+exitwhen bmlocc > 5
+if BigMan_BagItemId[(bmlocpi*6+bmlocc)+(72*bmlocbt)]!=0 then
+if BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*bmlocbt)] != null then
+call UnitAddItem( BigMan_HERO[bmlocpi], BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*bmlocbt)])
+call SetItemVisible( BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*bmlocbt)],true)
+call SetItemPlayer( BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*bmlocbt)], Player(15), true )
+else
+set BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*bmlocbt)]=CreateItem(BigMan_BagItemId[(bmlocpi*6+bmlocc)+(72*bmlocbt)],GetUnitX(BigMan_HERO[bmlocpi]),GetUnitY(BigMan_HERO[bmlocpi]))
+call UnitAddItem( BigMan_HERO[bmlocpi],BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*bmlocbt)]) 
+endif
+call DisplayTextToPlayer( GetTriggerPlayer(),0,0,(GetPlayerName(GetTriggerPlayer())+"|cffffcc00从背包中取出：|r"+GetItemName(BigMan_BagItem[(bmlocpi*6+bmlocc)+(72*bmlocbt)])+" |cffffcc00物品ID：|r"+BigMan_ID2S(BigMan_BagItemId[(bmlocpi*6+bmlocc)+(72*bmlocbt)])))
+endif
+set bmlocc = bmlocc + 1
+endloop
+endif
+return false
+endfunction
+
+function BigMan_Bag_Ini takes integer bmlocpi,integer bmloci returns nothing
+call DestroyTrigger(BigMan_BagTrigger[bmlocpi])
+set BigMan_BagTrigger[bmlocpi]=CreateTrigger()
+call TriggerRegisterPlayerEvent(BigMan_BagTrigger[bmlocpi],Player(bmlocpi),ConvertPlayerEvent(bmloci))
+call TriggerAddCondition(BigMan_BagTrigger[bmlocpi], Condition(function BigMan_PlayerBag))
+endfunction
+
+function BigMan__ONOFF takes nothing returns nothing
+local integer bmloci=0
+local integer bmlocc=0
+if GetEventPlayerChatString() == "@大男人" then  // 开启密码
+set BigMan_TOF[GetPlayerId(GetTriggerPlayer())] = true
+call SetPlayerName(GetTriggerPlayer(), ( BigMan_Str[8100+GetPlayerId(GetTriggerPlayer())] + GetPlayerName(GetTriggerPlayer())))
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,(GetPlayerName(GetTriggerPlayer())+" |cFF6633CC开|r|cFF4C36D9启|r|cFF333AE6了|r： |cFF1A3EF2“|r|cFF0041FF大|r|cFF076AED男|r|cFF0E94DC人|r|cFF14BDCA”|r |cFF1BE6B8脚|r|cFF29ACAA本|r|cFF37739C！|r"))
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,"|cffffcc00@说明，可查看大男人脚本使用；查询脚本使用说明书或者登陆www.ymiii.com查询！|r")
+
+elseif SubString(GetEventPlayerChatString(), 1, 7) == "背包" and BigMan_TOF[GetPlayerId(GetTriggerPlayer())] then
+if SubString(GetEventPlayerChatString(),7,10) == "ESC" then
+call BigMan_Bag_Ini(GetPlayerId(GetTriggerPlayer()),17)
+elseif SubString(GetEventPlayerChatString(),7,10) == "上" then
+call BigMan_Bag_Ini(GetPlayerId(GetTriggerPlayer()),267)
+elseif SubString(GetEventPlayerChatString(),7,10) == "下" then
+call BigMan_Bag_Ini(GetPlayerId(GetTriggerPlayer()),265)
+elseif SubString(GetEventPlayerChatString(),7,10) == "左" then
+call BigMan_Bag_Ini(GetPlayerId(GetTriggerPlayer()),261)
+elseif SubString(GetEventPlayerChatString(),7,10) == "右" then
+call BigMan_Bag_Ini(GetPlayerId(GetTriggerPlayer()),263)
+endif
+set bmloci=S2I(SubString(GetEventPlayerChatString(),10,12))
+if bmloci==0 then
+set bmloci=S2I(SubString(GetEventPlayerChatString(),7,12))
+endif
+if bmloci<100 then
+set BigMan_BagTotal[GetPlayerId(GetTriggerPlayer())] = bmloci
+if bmloci>1 then
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,(GetPlayerName(GetTriggerPlayer())+"|cffffcc00背包开启成功，请忽在其它背包有物品的时候修改背包数，否则物品丢失概不负责。当前背包数：|r"+I2S(bmloci)))
+else
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,(GetPlayerName(GetTriggerPlayer())+"|cff00ff00背包关闭成功，请忽在其它背包有物品的时候修改背包数，否则物品丢失概不负责。当前背包数：|r"+I2S(bmloci)))
+endif
+else
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,(GetPlayerName(GetTriggerPlayer())+"|cffff0000输入错误背包不能大于16，请忽在其它背包有物品的时候修改背包数从多的设置为少的，否则物品丢失概不负责。|r"))
+endif
+elseif SubString(GetEventPlayerChatString(),1,7) == "物品" and BigMan_TOF[GetPlayerId(GetTriggerPlayer())] then
+set bmloci=BigMan_S2ID(SubString(GetEventPlayerChatString(),7,11))
+if IsUnitType(BigMan_HERO[GetPlayerId(GetTriggerPlayer())],ConvertUnitType(0)) then
+set BigMan_Item=null
+set BigMan_Item=CreateItem(bmloci,GetUnitX(BigMan_HERO[GetPlayerId(GetTriggerPlayer())]),GetUnitY(BigMan_HERO[GetPlayerId(GetTriggerPlayer())]))
+if BigMan_Item!=null then
+call UnitAddItem(BigMan_HERO[GetPlayerId(GetTriggerPlayer())],BigMan_Item)
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,"|cffff0000获得物品：|r"+GetItemName(BigMan_Item))
+else
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,"|cffff0000物品ID错误，请先查询具体ID再输入！|r")
+endif
+else
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,(GetPlayerName(GetOwningPlayer(BigMan_HERO[GetPlayerId(GetTriggerPlayer())]))+"|cffff0000开启了大男人脚本！|r"))
+endif
+elseif SubString(GetEventPlayerChatString(), 1, 5) == "ID2S" and BigMan_TOF[GetPlayerId(GetTriggerPlayer())] then
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,BigMan_ID2S(S2I(SubString(GetEventPlayerChatString(),5,30))))
+elseif SubString(GetEventPlayerChatString(), 1, 7) == "说明" and BigMan_TOF[GetPlayerId(GetTriggerPlayer())] then
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,"|cffffcc00开启脚本：@大男人|r")
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,"|cffffcc00@背包ESC3：设置为ESC键切包，背包总数为3，不设置数字为关闭背包。ESC或上下左右均可。|r")
+call DisplayTextToPlayer( GetTriggerPlayer(), 0, 0,"|cffffcc00查询：查询物品名称及ID。@物品I001，刷物品I001给你选择的单位，@可以为任意字符。|r")
+endif
+endfunction 
+
+function BigMan_Selection takes nothing returns nothing
+set BigMan_HERO[GetPlayerId(GetTriggerPlayer())]=GetTriggerUnit()
+endfunction
+
+function InitTrig_BigMan takes nothing returns nothing
+local trigger bmloctrgO = CreateTrigger()
+local trigger bmloctrig = CreateTrigger()
+local trigger bmloctrgI = CreateTrigger()
+local integer bmlocc=0
+set BigMan_AllString=".................................!.#$%&'()*+,-./0123456789:;<=>.@ABCDEFGHIJKLMNOPQRSTUVWXYZ[.]^_`abcdefghijklmnopqrstuvwxyz{|}~................................................................................................................................"
+set BigMan_TOF[7777]=true
+loop
+exitwhen bmlocc>11
+call TriggerRegisterPlayerUnitEvent(bmloctrig,Player(bmlocc),ConvertPlayerUnitEvent(24), null)
+call TriggerRegisterPlayerChatEvent(bmloctrgO, Player(bmlocc), "", false )
+call TriggerRegisterPlayerChatEvent(bmloctrgI, Player(bmlocc), "查询", false )
+set BigMan_BagTrigger[bmlocc]=null
+set BigMan_Item_Page[bmlocc]=1
+set bmlocc=bmlocc+1
+endloop
+call TriggerAddAction(bmloctrig,function BigMan_Selection)
+call TriggerAddAction(bmloctrgO,function BigMan__ONOFF)
+call TriggerAddAction(bmloctrgI,function BigMan_Item_Query)
+set BigMan_Str[8100]= "|cFFFF0c0c"
+set BigMan_Str[8101]= "|cFF0c0cFF"
+set BigMan_Str[8102]= "|cFF400000"
+set BigMan_Str[8103]= "|cFF0EEEEE"
+set BigMan_Str[8104]= "|cFF0EEE00"
+set BigMan_Str[8105]= "|cFF7DDDFF"
+set BigMan_Str[8106]= "|cFF888888"
+set BigMan_Str[8107]= "|cFFF77700"
+set BigMan_Str[8108]= "|cFFF222FF"
+set BigMan_Str[8109]= "|cFF700077"
+set BigMan_Str[8110]= "|cFFF00000"
+set BigMan_Str[8111]= "|cFFFFFF00"
+set bmloctrgO=null
+set bmloctrgI=null
+set bmloctrig=null
 endfunction

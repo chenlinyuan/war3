@@ -102,6 +102,8 @@ def audit_archive(
     hand_id: str = "I103",
     frostmourne_id: str = "I105",
     warglaive_id: str = "I106",
+    bash_id: str = "W091",
+    slow_id: str = "A171",
 ) -> None:
     archive = war3mpq.MPQArchive(str(path))
     try:
@@ -171,6 +173,22 @@ def audit_archive(
         "消耗当前生命 20%" in frost_fields["aub1"][-1],
         "deployed Frost Stomp tooltip lost the current-life cost",
     )
+    require(
+        "空中单位不冰冻，但仍受伤害和减速"
+        in frost_fields["aub1"][-1]
+        and "地面与空中" not in frost_fields["aub1"][-1],
+        "deployed Frost Stomp tooltip lost the air slow rule",
+    )
+    for token in ("核心 0～300", "中环 300～550", "外环 550～750"):
+        require(
+            token in frost_fields["aub1"][-1],
+            "deployed Frost Stomp tooltip lacks " + token,
+        )
+    require(
+        "同时附加冰缓 60%，共持续 9 秒"
+        in frost_fields["aub1"][-1],
+        "deployed Frost Stomp tooltip lost the simultaneous slow",
+    )
     require(frost_fields.get("aord") == ["froststomp"],
             "A105 must use froststomp for its Profile order")
     require(frost_fields.get("Ncl6") == ["froststomp"],
@@ -208,6 +226,38 @@ def audit_archive(
         ],
         "A100 must use the original Death Finger disabled icon",
     )
+    require(bash_id in abilities, "deployed map is missing " + bash_id)
+    bash_fields = {
+        field[0]: ITEM.field_values(abilities[bash_id][3], field[0])
+        for field in abilities[bash_id][3]
+    }
+    require(
+        abs(float(bash_fields.get("Hbh1", ["nan"])[-1]) - 20.0) < 0.0001,
+        "deployed Archimonde Hand Bash chance is not 20%",
+    )
+    require(slow_id in abilities, "deployed map is missing " + slow_id)
+    slow_fields = {
+        field[0]: ITEM.field_values(abilities[slow_id][3], field[0])
+        for field in abilities[slow_id][3]
+    }
+    require(
+        abilities[slow_id][1].replace("\0", "") == "Aslo",
+        slow_id + " must use the Slow base",
+    )
+    require(
+        slow_fields.get("abuf") == ["Bfro", "Bfro", "Bfro"],
+        slow_id + " must use the Frost Nova buff",
+    )
+    for field_id, values in (
+        ("Slo1", (0.8, 0.6, 0.4)),
+        ("adur", (3.0, 6.0, 9.0)),
+    ):
+        actual = [float(value) for value in slow_fields.get(field_id, [])]
+        require(
+            len(actual) == len(values)
+            and all(abs(a - b) < 0.0001 for a, b in zip(actual, values)),
+            slow_id + "." + field_id + " levels are incorrect",
+        )
     require(b"FreezingBreathTargetArt.mdl" in script,
             "deployed map is missing the legacy freeze FX")
     require(b"function FR_CreateFreezeFx takes" in script,
@@ -220,8 +270,19 @@ def audit_archive(
             "deployed freeze FX cleanup is missing")
     require(b"DestroyEffect(fx)" in script,
             "deployed freeze FX is not destroyed")
-    require(b"call FR_FreezeUnit(target, freeze_duration)" in script,
-            "deployed spell does not freeze ground units")
+    require(
+        b"call FR_FreezeUnit(target, freeze_duration)" in script,
+        "deployed spell does not freeze ground units",
+    )
+    require(
+        b"call FR_ApplySlow(GetOwningPlayer(caster), target, slowLevel)"
+        in script,
+        "deployed spell does not apply the Frost Nova slow immediately",
+    )
+    require(
+        b"if IsUnitType(target, UNIT_TYPE_FLYING) then" in script,
+        "deployed Frost Stomp does not exclude flying units",
+    )
     require(b"call TriggerSleepAction(0.05)" in script,
             "deployed spell lost the requested script delay")
     require(b"set bonus = 100.0 + " in script,
@@ -276,6 +337,8 @@ def main() -> None:
     parser.add_argument("--hand-id", default="I103")
     parser.add_argument("--frostmourne-id", default="I105")
     parser.add_argument("--warglaive-id", default="I106")
+    parser.add_argument("--bash-id", default="W091")
+    parser.add_argument("--slow-id", default="A171")
     args = parser.parse_args()
     config = importlib.import_module("wings_config_offline_template")
     config_names = (
@@ -380,9 +443,27 @@ def main() -> None:
         "消耗当前生命 20%" in ITEM.FROSTMOURNE_ACTIVE_TOOLTIP,
         "A105 tooltip lost the current-life cost",
     )
+    require(
+        "空中单位不冰冻，但仍受伤害和减速"
+        in ITEM.FROSTMOURNE_ACTIVE_TOOLTIP
+        and "同时附加冰缓 60%，共持续 9 秒"
+        in ITEM.FROSTMOURNE_ACTIVE_TOOLTIP
+        and "地面与空中" not in ITEM.FROSTMOURNE_ACTIVE_TOOLTIP,
+        "A105 tooltip lost the air slow rule",
+    )
+    require(
+        int(config.COMMON.get("hand_bash_chance", 0)) == 20,
+        "Archimonde Hand Bash chance is not 20%",
+    )
 
-    frost_script = (ROOT / "scripts" / "frostmourne" / "f.j").read_text(
-        encoding="utf-8"
+    frost_script = (
+        (ROOT / "scripts" / "frostmourne" / "g.j").read_text(
+            encoding="utf-8"
+        )
+        + "\n"
+        + (ROOT / "scripts" / "frostmourne" / "f.j").read_text(
+            encoding="utf-8"
+        )
     )
     wings_script = (ROOT / "scripts" / "wings" / "f.j").read_text(
         encoding="utf-8"
@@ -403,8 +484,41 @@ def main() -> None:
     require("function FR_DestroyFreezeFx takes" in frost_script
             and "DestroyEffect(fx)" in frost_script,
             "freeze FX is not cleaned up")
-    require("call FR_FreezeUnit(target, freeze_duration)" in frost_script,
+    require(
+        "call FR_FreezeUnit(target, freeze_duration)" in frost_script,
             "spell does not freeze ground units")
+    require(
+        "call FR_ApplySlow(GetOwningPlayer(caster), target, slowLevel)"
+        in frost_script,
+        "spell does not apply the Frost Nova slow immediately",
+    )
+    require("if IsUnitType(target, UNIT_TYPE_FLYING) then"
+            in frost_script,
+            "spell does not exclude flying units")
+    for token in (
+        "function FR_IsAliveTarget takes",
+        "GetWidgetLife(u) <= 0.405",
+        "not IsUnitType(u, UNIT_TYPE_DEAD)",
+        "function FR_ApplySlow takes",
+        "SetUnitAbilityLevel(dummy, FR_SLOW_ABILITY, level)",
+        'IssueTargetOrder(dummy, "slow", target)',
+        "function FR_OnFrozenDeath takes",
+        "call PauseUnit(u, false)",
+        "call SetUnitTimeScale(u, 1.0)",
+        "call DestroyTimer(t)",
+        "real FR_RING_CORE_RADIUS = 300.0",
+        "real FR_RING_MID_RADIUS = 550.0",
+        "real FR_FREEZE_CORE = 6.0",
+        "real FR_FREEZE_MID = 4.0",
+        "real FR_FREEZE_OUTER = 2.0",
+        "real FR_SLOW_CORE = 3.0",
+        "real FR_SLOW_MID = 2.0",
+        "real FR_SLOW_OUTER = 1.0",
+        "real FR_DAMAGE_CORE_MULT = 1.0",
+        "real FR_DAMAGE_MID_MULT = 0.7",
+        "real FR_DAMAGE_OUTER_MULT = 0.4",
+    ):
+        require(token in frost_script, "freeze runtime token is missing: " + token)
     require("if FR_IsInvulnerable(target) then" in frost_script
             and "BlzIsUnitInvulnerable(u)" in frost_script,
             "invulnerable targets are not excluded")
@@ -464,6 +578,8 @@ def main() -> None:
             args.hand_id,
             args.frostmourne_id,
             args.warglaive_id,
+            args.bash_id,
+            args.slow_id,
         )
         print("deployed map item/skill copy and freeze FX checks passed")
     print("item/skill copy and freeze FX checks passed")

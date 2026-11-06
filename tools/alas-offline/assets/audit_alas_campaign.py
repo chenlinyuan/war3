@@ -27,12 +27,16 @@ sys.path[:0] = [str(INJECTOR), str(DOCTOR)]
 import war3mpq as W  # noqa: E402
 from doctor.data import campaign_info  # noqa: E402
 from doctor.data import objects as OBJ  # noqa: E402
+from wing_copy_contract import (  # noqa: E402
+    DEFAULT_WING_IDS,
+    wing_copy_failures,
+)
 
 ITEMS = {"I100", "I101", "I102", "I103", "I104", "I105", "I106"}
 ABILITIES = {
     "A100", "A101", "A102", "A105", "A106", "A108", "A109",
     "A110", "A111", "A113", "A116", "A117", "A118",
-    "A170", "W091",
+    "A170", "A171", "W091",
 }
 ASSETS = (
     "war3campImported\\Frostmourne.mdx",
@@ -295,6 +299,13 @@ def audit(path: Path, config_name: str | None = None) -> int:
     warglaive_item = "I106"
     invul_id = "W022"
     teleport_id = "W023"
+    avatar_id = "W024"
+    demon_wing_item = "I102"
+    avatar_duration = 45.0
+    avatar_cooldown = 150.0
+    avatar_mana = 100
+    demon_wing = {"item": "I102", "iabi": ("W024", "W002", "W021")}
+    wing_ids = dict(DEFAULT_WING_IDS)
     hand_aura = "A101"
     wing_aura_ids = {
         "W070": "B646",
@@ -331,7 +342,7 @@ def audit(path: Path, config_name: str | None = None) -> int:
             wing["item"] for wing in config.WINGS
         } | {hand_item, frostmourne_item, warglaive_item}
         expected_abilities = {
-            "A113", "A117", "A118",
+            "A113", "A117", "A118", "A171",
             *(config.HAND[key] for key in
               ("finger", "aura", "speed", "bash")
               if config.HAND.get(key)),
@@ -344,6 +355,19 @@ def audit(path: Path, config_name: str | None = None) -> int:
             expected_abilities.update(wing.get("book2_abils", ()))
         invul_id = config.ABIL["act_invul"]
         teleport_id = config.ABIL["act_tele"]
+        avatar_id = config.ABIL["act_blink"]
+        avatar_duration = float(
+            config.COMMON["act_avatar_duration"]
+        )
+        avatar_cooldown = float(config.COMMON["act_avatar_cd"])
+        avatar_mana = int(config.COMMON["act_avatar_mana"])
+        demon_wing = next(
+            wing for wing in config.WINGS if wing.get("key") == "demon"
+        )
+        demon_wing_item = demon_wing["item"]
+        wing_ids = {
+            wing["key"]: wing["item"] for wing in config.WINGS
+        }
         hand_aura = config.HAND["aura"]
         wing_aura_ids = {
             config.ABIL[key]: config.BUFFS[buff_key]
@@ -547,11 +571,15 @@ def audit(path: Path, config_name: str | None = None) -> int:
                         failures.append(
                             f"{name}: missing abilities {sorted(missing_abilities)}"
                         )
-                    item_fields = object_fields(
+                    all_item_fields = object_fields(
                         chapter.read_file("war3map.w3t"),
                         False,
                         name + ".w3t.fields",
-                    ).get(warglaive_item, {})
+                    )
+                    item_fields = all_item_fields.get(warglaive_item, {})
+                    demon_item_fields = all_item_fields.get(
+                        demon_wing_item, {}
+                    )
                     ability_data = chapter.read_file("war3map.w3a")
                     ability_entries = object_entries(
                         ability_data, True, name + ".w3a.fields"
@@ -690,6 +718,118 @@ def audit(path: Path, config_name: str | None = None) -> int:
                         failures.append(
                             f"{name}: {teleport_id} grouping flag is not enabled"
                         )
+                    avatar_fields = all_ability_fields.get(avatar_id, {})
+                    if ability_origins.get(avatar_id) != "ANcl":
+                        failures.append(
+                            f"{name}: {avatar_id} base is "
+                            f"{ability_origins.get(avatar_id)!r}, "
+                            "expected ANcl"
+                        )
+                    expected_avatar_strings = {
+                        "aite": "1",
+                        "anam": "天神下凡",
+                        "aord": "avatar",
+                        "aani": "stand",
+                        "Ncl2": "0",
+                        "Ncl6": "avatar",
+                        "acat": "",
+                        "aart": (
+                            "ReplaceableTextures\\CommandButtons"
+                            "\\BTNMetamorphosis.blp"
+                        ),
+                        "arar": (
+                            "ReplaceableTextures\\CommandButtons"
+                            "\\BTNMetamorphosis.blp"
+                        ),
+                    }
+                    for field, expected in expected_avatar_strings.items():
+                        if avatar_fields.get(field) != expected:
+                            failures.append(
+                                f"{name}: {avatar_id}.{field}="
+                                f"{avatar_fields.get(field)!r}, "
+                                f"expected {expected!r}"
+                            )
+                    if (
+                        "abuf" in avatar_fields
+                        or "Hav1" in avatar_fields
+                    ):
+                        failures.append(
+                            f"{name}: {avatar_id} still contains "
+                            "Vampiric Aura data"
+                        )
+                    expected_avatar_numbers = {
+                        "adur": avatar_duration,
+                        "ahdu": avatar_duration,
+                        "acdn": avatar_cooldown,
+                        "amcs": avatar_mana,
+                    }
+                    for field, expected in expected_avatar_numbers.items():
+                        try:
+                            actual = float(
+                                avatar_fields.get(field, "nan")
+                            )
+                        except (TypeError, ValueError):
+                            actual = float("nan")
+                        if abs(actual - float(expected)) > 0.0001:
+                            failures.append(
+                                f"{name}: {avatar_id}.{field}="
+                                f"{avatar_fields.get(field)!r}, "
+                                f"expected {expected!r}"
+                            )
+                    expected_demon_abilities = ",".join(
+                        demon_wing["iabi"]
+                    )
+                    if demon_item_fields.get("iabi") != (
+                        expected_demon_abilities
+                    ):
+                        failures.append(
+                            f"{name}: {demon_wing_item}.iabi="
+                            f"{demon_item_fields.get('iabi')!r}, "
+                            f"expected {expected_demon_abilities!r}"
+                        )
+                    if str(demon_item_fields.get("idrp")) != "0":
+                        failures.append(
+                            f"{name}: {demon_wing_item}.idrp="
+                            f"{demon_item_fields.get('idrp')!r}, "
+                            "expected 0"
+                        )
+                    for marker in (
+                        "function WG_OnAvatarSimple takes",
+                        "function WG_AvatarSimpleExpires takes",
+                        "function WG_OnAvatarDropItem takes",
+                        "BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)",
+                        "BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, "
+                        "WG_AVATAR_DIVINE_DEFENSE)",
+                        "WG_AVATAR_MAGIC_IMMUNITY",
+                        "AvatarActive=",
+                        "UnitRemoveAbility(u, "
+                        "WG_AVATAR_WING_MODEL_ABILITY)",
+                        "UnitAddAbility(u, "
+                        "WG_AVATAR_WING_MODEL_ABILITY)",
+                        "BlzUnitDisableAbility(u, "
+                        "WG_AVATAR_WING_MODEL_ABILITY, true, true)",
+                        "SaveItemHandle(wg_avatarTable, key, 10, it)",
+                        "SetItemDroppable(it, false)",
+                        "SetItemDroppable(it, true)",
+                        "TimerStart(t, WG_AVATAR_DURATION, false, "
+                        "function WG_AvatarSimpleExpires)",
+                        "TriggerAddAction(t, function WG_OnAvatarSimple)",
+                        "real WG_AVATAR_ATTACK_SPEED_PCT = 1.0",
+                        "real WG_AVATAR_MOVE_SPEED_PCT = 1.0",
+                        "real WG_AVATAR_MODEL_SCALE_MULT = 3.0",
+                        "UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN",
+                        "BlzGetUnitRealField(u, UNIT_RF_SCALING_VALUE)",
+                        "SetUnitScale(u, targetScale, targetScale, targetScale)",
+                        "SetUnitMoveSpeed(u, originalSpeed * "
+                        "(1.0 + WG_AVATAR_MOVE_SPEED_PCT))",
+                        "LoadReal(wg_avatarTable, key, 50)",
+                        "LoadReal(wg_avatarTable, key, 51)",
+                    ):
+                        if marker not in script:
+                            failures.append(
+                                f"{name}: missing Avatar runtime token "
+                                f"{marker}"
+                            )
                     if (
                         not lua_data
                         and "function WG_OnRangedVamp takes" not in script
@@ -909,6 +1049,9 @@ def audit(path: Path, config_name: str | None = None) -> int:
                         False,
                         name + ".w3t.all-fields",
                     )
+                    failures.extend(
+                        wing_copy_failures(all_item_fields, wing_ids)
+                    )
                     if item_active:
                         if "BlzUnitItemInEquipmentSlot" not in script:
                             failures.append(
@@ -1032,8 +1175,8 @@ def audit(path: Path, config_name: str | None = None) -> int:
                         )
                     bash_fields = all_ability_fields.get("W091", {})
                     try:
-                        if abs(float(bash_fields.get("Hbh1", "nan")) - 8.0) > 0.0001:
-                            failures.append(f"{name}: W091 chance is not 8%")
+                        if abs(float(bash_fields.get("Hbh1", "nan")) - 20.0) > 0.0001:
+                            failures.append(f"{name}: W091 chance is not 20%")
                         if abs(float(bash_fields.get("Hbh3", "nan")) - 600.0) > 0.0001:
                             failures.append(f"{name}: W091 damage is not 600")
                     except (TypeError, ValueError):
@@ -1128,12 +1271,71 @@ def audit(path: Path, config_name: str | None = None) -> int:
                     frost_skill_tooltip = frost_active_fields.get("aub1", "")
                     for required in (
                         "消耗当前生命 20%", "100 + 4×力量",
-                        "普通单位冰冻 5 秒", "英雄冰冻 3 秒",
+                        "核心 0～300", "中环 300～550", "外环 550～750",
+                        "同时附加冰缓 60%，共持续 9 秒",
+                        "空中单位不冰冻，但仍受伤害和减速",
                     ):
                         if required not in frost_skill_tooltip:
                             failures.append(
                                 f"{name}: A105 skill text lacks {required!r}"
                             )
+                    if "地面与空中" in frost_skill_tooltip:
+                        failures.append(
+                            f"{name}: A105 skill text still targets air units"
+                        )
+                    if (
+                        "if IsUnitType(target, UNIT_TYPE_FLYING) then"
+                        not in script
+                    ):
+                        failures.append(
+                            f"{name}: Frost Stomp does not separate air slows"
+                        )
+                    for token in (
+                        "function FR_IsAliveTarget takes",
+                        "GetWidgetLife(u) <= 0.405",
+                        "not IsUnitType(u, UNIT_TYPE_DEAD)",
+                        "function FR_ApplySlow takes",
+                        "call FR_ApplySlow(GetOwningPlayer(caster), target, slowLevel)",
+                        "call FR_FreezeUnit(target, freeze_duration)",
+                        "function FR_OnFrozenDeath takes",
+                        "call PauseUnit(u, false)",
+                        "call SetUnitTimeScale(u, 1.0)",
+                        "real FR_RING_CORE_RADIUS = 300.0",
+                        "real FR_RING_MID_RADIUS = 550.0",
+                        "real FR_FREEZE_CORE = 6.0",
+                        "real FR_FREEZE_MID = 4.0",
+                        "real FR_FREEZE_OUTER = 2.0",
+                    ):
+                        if token not in script:
+                            failures.append(
+                                f"{name}: missing Frost control token {token}"
+                            )
+                    slow_fields = all_ability_fields.get("A171", {})
+                    if ability_origins.get("A171") != "Aslo":
+                        failures.append(
+                            f"{name}: A171 must use the native Slow base"
+                        )
+                    if slow_fields.get("abuf") != "Bfro":
+                        failures.append(
+                            f"{name}: A171 must use the Frost Nova buff"
+                        )
+                    try:
+                        if abs(
+                            float(slow_fields.get("Slo1", "nan")) - 0.4
+                        ) > 0.0001:
+                            failures.append(
+                                f"{name}: A171 core slow is not 60%"
+                            )
+                        if abs(
+                            float(slow_fields.get("adur", "nan")) - 9.0
+                        ) > 0.0001:
+                            failures.append(
+                                f"{name}: A171 core slow is not 9 seconds"
+                            )
+                    except (TypeError, ValueError):
+                        failures.append(
+                            f"{name}: A171 slow fields are invalid"
+                        )
                     if any(
                         token in frost_skill_tooltip
                         for token in (

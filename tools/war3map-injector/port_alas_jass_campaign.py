@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib
+import json
 import os
 import subprocess
 import sys
@@ -30,6 +31,7 @@ import merge_w3obj as M  # noqa: E402
 import port_item_skill_campaign as ITEM  # noqa: E402
 import port_weapon_campaign as WPN  # noqa: E402
 import port_wings_campaign as PC  # noqa: E402
+import wild_equipment_drops as WILD_DROPS  # noqa: E402
 import war3mpq as W  # noqa: E402
 
 PY = sys.executable
@@ -61,6 +63,36 @@ def campaign_object_ids(path: Path) -> set[str]:
         return found
     finally:
         archive.close()
+
+
+def chapter_script(path: Path) -> tuple[str, bytes]:
+    archive = W.MPQArchive(str(path))
+    try:
+        for internal in (
+            "war3map.j",
+            r"scripts\war3map.j",
+            r"Scripts\war3map.j",
+        ):
+            data = archive.read_file(internal) or b""
+            if data:
+                return internal, data
+    finally:
+        archive.close()
+    raise SystemExit(str(path) + " has no JASS script")
+
+
+def validate_extra_script(path: Path, script_dir: Path | None) -> None:
+    if script_dir is None:
+        return
+    _internal, script = chapter_script(path)
+    if b"function TT_Init takes nothing returns nothing" not in script:
+        raise SystemExit(
+            "%s is missing the universal talent entry" % path.name
+        )
+    if b"function TT_SavedBackpackIndex takes unit u returns integer" not in script:
+        raise SystemExit(
+            "%s is missing campaign-safe talent registration" % path.name
+        )
 
 
 def merge_chapter_objects(
@@ -107,7 +139,7 @@ def required_item_ids(config) -> set[str]:
 
 
 def required_ability_ids(config) -> set[str]:
-    ids = {"A113", "A117", "A118"}
+    ids = {"A113", "A117", "A118", "A171"}
     ids.update(
         config.HAND[key]
         for key in ("finger", "aura", "speed", "bash")
@@ -126,6 +158,7 @@ def validate_chapter(
     path: Path,
     assets: list[tuple[Path, str]],
     config,
+    campaign_loot: bool = False,
 ) -> None:
     archive = W.MPQArchive(str(path))
     try:
@@ -140,6 +173,10 @@ def validate_chapter(
                 raise SystemExit(
                     "%s missing runtime marker %r" % (path.name, marker)
                 )
+        if campaign_loot and b"function WED_Init takes" not in script:
+            raise SystemExit(
+                "%s missing campaign equipment drops" % path.name
+            )
         item_active = ITEM.selected_equipment_mode() == "item"
         mode_value = b"true" if item_active else b"false"
         for mode_name in (
@@ -214,6 +251,35 @@ def build(args: argparse.Namespace) -> int:
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     env["WINGS_CONFIG"] = config
+    extra_objects: dict[str, list[Path]] = {}
+    for spec in args.extra_object:
+        extension, separator, source_text = spec.partition("=")
+        if not separator or extension not in ("w3a", "w3t"):
+            raise SystemExit("--extra-object must be w3a=PATH or w3t=PATH")
+        path = Path(source_text).resolve()
+        if not path.is_file():
+            raise SystemExit("extra object file missing: " + str(path))
+        extra_objects.setdefault(extension, []).append(path)
+    extra_scripts: dict[str, Path] = {}
+    if args.extra_script_manifest:
+        raw_manifest = json.loads(
+            args.extra_script_manifest.resolve().read_text(
+                encoding="utf-8"
+            )
+        )
+        if not isinstance(raw_manifest, dict):
+            raise SystemExit("extra JASS script manifest must be an object")
+        for key, value in raw_manifest.items():
+            script_dir = Path(str(value)).resolve()
+            if not all(
+                (script_dir / name).is_file()
+                for name in ("g.j", "f.j", "m.j")
+            ):
+                raise SystemExit(
+                    "extra JASS script directory is incomplete: "
+                    + str(script_dir)
+                )
+            extra_scripts[str(key)] = script_dir
 
     if not source.is_file():
         raise SystemExit("campaign not found: " + str(source))
@@ -264,6 +330,18 @@ def build(args: argparse.Namespace) -> int:
         path for path in base.iterdir()
         if path.suffix.lower() in (".w3x", ".w3m")
     )
+    if extra_scripts:
+        missing_scripts = (
+            {chapter.name for chapter in chapters}
+            - set(extra_scripts)
+        )
+        if "*" in extra_scripts:
+            missing_scripts = set()
+        if missing_scripts:
+            raise SystemExit(
+                "extra JASS script manifest is missing chapters: "
+                + ", ".join(sorted(missing_scripts))
+            )
 
     run([PY, HERE / "port_wings_campaign.py", "ib",
          "--work", work, "--config", config, "--mounts", "none"], env)
@@ -313,6 +391,20 @@ def build(args: argparse.Namespace) -> int:
         equipment_warglaive,
         startup_dir,
     ]
+    campaign_loot = None
+    if args.campaign_loot_manifest:
+        campaign_loot = WILD_DROPS.load_campaign_manifest(
+            args.campaign_loot_manifest.resolve()
+        )
+        missing_profiles = (
+            {chapter.name for chapter in chapters}
+            - {profile.chapter for profile in campaign_loot.profiles}
+        )
+        if missing_profiles:
+            raise SystemExit(
+                "campaign loot profiles missing chapters: "
+                + ", ".join(sorted(missing_profiles))
+            )
     combined_dir = work / "_combined_objects"
     combined_dir.mkdir(parents=True, exist_ok=True)
     combined_sources = {}
@@ -327,6 +419,8 @@ def build(args: argparse.Namespace) -> int:
             "w3h": "_wing_buff.w3h",
         }[extension]
         inputs.append(HERE / wing_name)
+        if extension in extra_objects:
+            inputs.extend(extra_objects[extension])
         combined = combined_dir / ("combined." + extension)
         M.merge_files(
             str(combined), [str(path) for path in inputs]
@@ -351,9 +445,49 @@ def build(args: argparse.Namespace) -> int:
         finally:
             archive.close()
 
+        chapter_loot = (
+            campaign_loot.profile_for(chapter.name)
+            if campaign_loot is not None
+            else None
+        )
         inject = [PY, HERE / "inject_native.py", chapter, "--no-backup"]
-        for script_dir in script_dirs:
+        chapter_scripts = list(script_dirs)
+        if chapter_loot is not None:
+            chapter_scripts.append(chapter_loot.script_dir)
+        extra_script = extra_scripts.get(
+            chapter.name,
+            extra_scripts.get("*"),
+        )
+        if extra_script is not None:
+            chapter_scripts.append(extra_script)
+        for script_dir in chapter_scripts:
             inject += ["--script", script_dir]
+        if args.suppress_source_backpack_auto:
+            script_internal, source_script = chapter_script(chapter)
+            source_call = (
+                b"call UnitAddItemByIdSwapped('B30B', u)"
+            )
+            call_count = source_script.count(source_call)
+            if call_count > 1:
+                raise SystemExit(
+                    "%s has %d source B30B autogrant calls"
+                    % (chapter.name, call_count)
+                )
+            if call_count == 1:
+                base_script = (
+                    work / "_base_no_source_backpack"
+                    / (chapter.stem + ".j")
+                )
+                base_script.parent.mkdir(parents=True, exist_ok=True)
+                base_script.write_bytes(
+                    source_script.replace(source_call, b"", 1)
+                )
+                inject += [
+                    "--base-script",
+                    str(base_script),
+                    "--script-internal",
+                    script_internal,
+                ]
         for local, internal in object_payloads:
             inject += ["--file", "%s=%s" % (local, internal)]
         for local, internal in assets:
@@ -364,7 +498,13 @@ def build(args: argparse.Namespace) -> int:
                 "--store", internal,
             ]
         run(inject)
-        validate_chapter(chapter, assets, config_module)
+        validate_chapter(
+            chapter,
+            assets,
+            config_module,
+            campaign_loot=chapter_loot is not None,
+        )
+        validate_extra_script(chapter, extra_script)
 
     run([PY, HERE / "port_wings_campaign.py", "pack", source,
          "--work", work, "--out", output])
@@ -386,6 +526,16 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--object-source", type=Path, default=WPN.DEFAULT_OBJECT_SOURCE
+    )
+    parser.add_argument(
+        "--campaign-loot-manifest",
+        type=Path,
+    )
+    parser.add_argument("--extra-object", action="append", default=[])
+    parser.add_argument("--extra-script-manifest", type=Path)
+    parser.add_argument(
+        "--suppress-source-backpack-auto",
+        action="store_true",
     )
     return build(parser.parse_args())
 

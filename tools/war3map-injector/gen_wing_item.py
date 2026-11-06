@@ -14,6 +14,13 @@ import struct, sys, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 CFG = __import__(os.environ.get("WINGS_CONFIG", "wings_config"))   # 移植到别的图时可用 WINGS_CONFIG=<别的配置模块名>
+from wing_copy_contract import (  # noqa: E402
+    ACTIVE_COLOR as WING_ACTIVE,
+    ARTIFACT_HEADER as WING_HEADER_ARTIFACT,
+    LORE_COLOR as WING_LORE,
+    PASSIVE_COLOR as WING_PASSIVE,
+    WING_COPY,
+)
 _C = CFG.COMMON
 
 
@@ -62,10 +69,6 @@ WING_ABILS_DEMON = ",".join(CFG.wing_by_key("demon")["iabi"])
 WING_ABILS_STAR = ",".join(CFG.wing_by_key("star")["iabi"])
 
 TREASURE = "Objects\\InventoryItems\\TreasureChest\\treasurechest.mdl"
-WING_HEADER_ARTIFACT = "|cffff8c00神器|r|n|n"
-WING_HEADER_RELIC = "|cffff8c00魔器|r|n|n"
-WING_PASSIVE = "|cff5ddf26"
-WING_ACTIVE = "|cff66ccff"
 
 
 def wing_passive(text):
@@ -76,6 +79,10 @@ def wing_passive(text):
 
 def wing_active(text):
     return WING_ACTIVE + text + "|r"
+
+
+def wing_lore(key):
+    return WING_LORE + WING_COPY[key]["lore"] + "|r"
 
 
 def ground_of(key):
@@ -114,7 +121,8 @@ def write_entry(old_id, new_id, mods):
 
 def item_entry(new_id, name, tip, ubertip, desc, icon, abilities,
                base_id="gcel", level=8, gold=1000, hp=75, class_="Artifact",
-               usable=False, hotkey="", cooldown_id=None, ground=TREASURE):
+               usable=False, hotkey="", cooldown_id=None, ground=TREASURE,
+               drop_on_death=True):
     mods = [
         mod("unam", 3, name),
         mod("utip", 3, tip),
@@ -136,6 +144,8 @@ def item_entry(new_id, name, tip, ubertip, desc, icon, abilities,
     if cooldown_id:
         # icid: 唯一冷却组 ID, 避免不同物品共享冷却
         mods.append(mod("icid", 3, cooldown_id))
+    if not drop_on_death:
+        mods.append(mod("idrp", 0, 0))
     return (base_id, new_id, mods)
 
 
@@ -147,10 +157,25 @@ def build(out_path):
     #     橙色类别 -> 白色基础数值 -> 绿色被动/光环 -> 浅蓝主动。
     #   数值全部从 CFG.COMMON 读取，避免技能数据改了而物品说明没跟上。
     aura_radius = int(_C["aura_radius"])
+    avatar_duration = int(_C.get("act_avatar_duration", 30.0))
+    avatar_cooldown = int(_C.get("act_avatar_cd", 120.0))
+    avatar_mana = int(_C.get("act_avatar_mana", 100))
+    avatar_life_cost = int(
+        float(_C.get("act_avatar_life_cost_pct", 0.20)) * 100
+    )
+    avatar_attack_speed = int(
+        float(_C.get("act_avatar_attack_speed_pct", 1.00)) * 100
+    )
+    avatar_move_speed = int(
+        float(_C.get("act_avatar_move_speed_pct", 1.00)) * 100
+    )
+    avatar_model_scale = float(
+        _C.get("act_avatar_model_scale_mult", 3.0)
+    )
 
     # 堕落天使之翼：生存与吸血。
     fallen_tip = (
-        WING_HEADER_RELIC
+        WING_HEADER_ARTIFACT
         + "移动速度 +100|n"
         + wing_passive("闪避 30%。|n")
         + wing_passive(
@@ -164,6 +189,8 @@ def build(out_path):
             f"主动·暗影庇护：{int(_C['act_invul_dur'])} 秒内免疫所有伤害；"
             f"冷却 {int(_C['act_invul_cd'])} 秒。"
         )
+        + "|n|n"
+        + wing_lore("fallen")
     )
     fallen_desc = (
         "移动速度 +100。|n"
@@ -200,6 +227,8 @@ def build(out_path):
             f"主动·群体传送：自身与 {aura_radius} 范围内最多 24 个友军"
             "传送到目标友军或建筑旁；冷却 15 秒，不耗魔。"
         )
+        + "|n|n"
+        + wing_lore("seraph")
     )
     seraph_desc = (
         "移动速度 +100。|n"
@@ -223,7 +252,7 @@ def build(out_path):
     ))
     # 恶魔之翼：输出与机动。
     demon_tip = (
-        WING_HEADER_RELIC
+        WING_HEADER_ARTIFACT
         + "移动速度 +100|n"
         + wing_passive("致命一击：35% 概率造成 3 倍伤害。|n")
         + wing_passive(
@@ -234,9 +263,14 @@ def build(out_path):
             f"耐久光环：{aura_radius} 范围内友军攻击速度 +40%。|n"
         )
         + wing_active(
-            f"主动·闪烁：最远 {int(_C['act_blink_range'])} 码；"
-            f"冷却 {int(_C['act_blink_cd'])} 秒。"
+            f"主动·天神下凡：献祭 {avatar_life_cost}% 当前生命；"
+            f"{avatar_duration} 秒内魔法免疫、神圣护甲、混乱攻击，"
+            f"模型放大为原来的 {avatar_model_scale:g} 倍，攻速 +{avatar_attack_speed}%、"
+            f"移动速度 +{avatar_move_speed}%；"
+            f"冷却 {avatar_cooldown} 秒、耗魔 {avatar_mana}。"
         )
+        + "|n|n"
+        + wing_lore("demon")
     )
     demon_desc = (
         "移动速度 +100。|n"
@@ -244,8 +278,10 @@ def build(out_path):
         + wing_passive("命令光环：友军攻击力 +50%。|n")
         + wing_passive("耐久光环：友军攻击速度 +40%。|n")
         + wing_active(
-            f"主动·闪烁：最远 {int(_C['act_blink_range'])} 码；"
-            f"冷却 {int(_C['act_blink_cd'])} 秒。"
+            f"主动·天神下凡：献祭 {avatar_life_cost}% 当前生命；"
+            f"{avatar_duration} 秒内魔法免疫、神圣护甲、混乱攻击，"
+            f"模型放大为原来的 {avatar_model_scale:g} 倍，攻速 +{avatar_attack_speed}%、"
+            f"移动速度 +{avatar_move_speed}%。"
         )
     )
     entries.append(item_entry(
@@ -253,7 +289,7 @@ def build(out_path):
         "|cff3E3E3E恶|cff696969魔|cff959595之|cffC0C0C0翼|r", "恶魔之翼",
         demon_tip, demon_desc,
         ICON_DEMON, WING_ABILS_DEMON, usable=True, hotkey="B", cooldown_id="wgd1",
-        ground=ground_of("demon"),
+        ground=ground_of("demon"), drop_on_death=False,
     ))
     # 星魂之力：最大移速、献祭与灰烬雷暴。
     #   物品浮窗高度有限，主动效果压成两行短句；数值全部从 COMMON 读取。
@@ -274,6 +310,8 @@ def build(out_path):
             f"每段 {int(_C['ash_wave_damage'])}+最高属性；"
             f"冷却 {int(_C['ash_cd'])} 秒，耗魔 {int(_C['ash_mana'])}。"
         )
+        + "|n|n"
+        + wing_lore("star")
     )
     star_desc = (
         "移动速度：最大。|n"
@@ -290,7 +328,7 @@ def build(out_path):
         # 图标用原版"火焰风衣"的图标（橙红色，和火焰翅膀一致）
         r"ReplaceableTextures\CommandButtons\BTNCloakOfFlames.blp",
         WING_ABILS_STAR, usable=True, hotkey="S", cooldown_id="wgst1",
-        ground=ground_of("star"), class_="",
+        ground=ground_of("star"), class_="Artifact",
     ))
 
     # === 坐骑蛋 / 骑乘中物品 ===

@@ -51,6 +51,7 @@ MODS = {
     #          —— 凤凰 hphx 的 regenHP = **-25**(每秒掉 25 血!), 1250 血约 50 秒掉死;
     #          而且 SetUnitInvulnerable 挡不住掉血, 所以坐骑会"过一会儿自己死"。
     "ufoo": 0, "ua1p": 3, "ua1b": 0, "ua1t": 3, "uhpr": 2,
+    "ua1c": 2, "ua1r": 2, "ua1w": 3,
 }
 
 
@@ -181,6 +182,20 @@ def build(out_path, foot=True):
             m("udtm", deathtime),
         ]
         entries.append(write_entry(base, new, mods))
+
+    # Demon Hunter native-metamorphosis target. Based on Edmm, but the
+    # alternate form itself owns the final combat state so f.j never mutates
+    # attack slots while the transform is active.
+    avatar_alt = CFG.COMMON.get("act_avatar_alt_unit")
+    if avatar_alt:
+        entries.append(write_entry("Edmm", avatar_alt, [
+            m("udty", "divine"),
+            m("ua1t", "chaos"),
+            m("ua1w", "msplash"),
+            m("ua1r", 500.0),
+            m("ua1c", 1.7),
+            m("ua1p", "ground,structure,debris,air,enemy"),
+        ]))
 
     # --- 隐身"马甲"单位（灰烬雷暴专用；照抄燃烧之怒里的 e60C / e641）---
     #   底子 = wisp `ewsp`；模型名故意写成非法名 '.mdl' → **不可见**；

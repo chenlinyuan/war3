@@ -142,6 +142,32 @@ integer WG_ASH_STAT = 0
 // >>> GENERATED:BEGIN g_aura_runtime (wings_config.py) >>>
 integer WG_FALLEN_ITEM = 'I100'
 integer WG_TELEPORT_ABILITY = 'W023'
+integer WG_AVATAR_ITEM = 'I102'
+integer WG_AVATAR_ABILITY = 'W024'
+integer WG_AVATAR_WING_MODEL_ABILITY = 'W021'
+integer WG_AVATAR_SPEED_ABILITY = 'W002'
+integer WG_AVATAR_WING_BOOK = 'W082'
+integer WG_AVATAR_WING_COMMAND = 'W076'
+integer WG_AVATAR_WING_ENDURANCE = 'W077'
+integer WG_AVATAR_WING_CRIT = 'W078'
+integer WG_AVATAR_DIVINE_DEFENSE = 6
+integer WG_AVATAR_CHAOS_ATTACK = 5
+integer WG_AVATAR_AIR_TARGET_FLAG = 4
+integer WG_AVATAR_MAGIC_IMMUNITY = 'Amim'
+real WG_AVATAR_DURATION = 45.0
+real WG_AVATAR_LIFE_COST_PCT = 0.5
+real WG_AVATAR_ATTACK_SPEED_PCT = 1.0
+real WG_AVATAR_MOVE_SPEED_PCT = 1.0
+real WG_AVATAR_MODEL_SCALE_MULT = 3.0
+real WG_AVATAR_RANGE = 500.0
+real WG_AVATAR_PROJECTILE_SPEED = 1200.0
+real WG_AVATAR_ACQUIRE_RANGE = 800.0
+real WG_AVATAR_SPLASH_FULL = 50.0
+real WG_AVATAR_SPLASH_MEDIUM = 150.0
+real WG_AVATAR_SPLASH_SMALL = 250.0
+real WG_AVATAR_SPLASH_MEDIUM_FACTOR = 0.5
+real WG_AVATAR_SPLASH_SMALL_FACTOR = 0.25
+string WG_AVATAR_MISSILE = "Abilities\\Weapons\\DemonHunterMissile\\DemonHunterMissile.mdx"
 real WG_VAMP_RADIUS = 700.0
 real WG_VAMP_PERCENT = 0.4
 real WG_TELEPORT_RADIUS = 700.0
@@ -150,6 +176,11 @@ real WG_TELEPORT_RADIUS = 700.0
 //   [计时器 id] -> [0]=单位, [1]=x, [2]=y, [3]=剩余次数（二阶落雷排程）
 //                  [4]=玩家（"一阶→二阶"的排程与屏幕震动清除用）
 hashtable wg_ashTable = null
+// Demon Wings Avatar state: timer handle -> unit, attack snapshot, held item.
+hashtable wg_avatarTable = null
+hashtable wg_avatarBookTable = null
+// Prevent scripted splash damage from recursively triggering itself.
+boolean wg_avatarSplashBusy = false
 
 // 死亡之指诊断用：最近一次施法读到的目标名 / 距离 / 两端坐标（`wginfo` 里会打出来）
 string wg_fingerLastTarget = "-"

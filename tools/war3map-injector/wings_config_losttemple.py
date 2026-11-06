@@ -15,4 +15,26 @@ COMMON["plunder_min_hp"] = 300     # 掠夺的门槛：只掠夺最大生命 ≥
 # 阿克蒙德之手的「重击」：概率触发额外伤害 + 眩晕（照抄燃烧里的"重击600 8%"那档）
 COMMON["hand_bash_chance"] = 8     # 触发概率（%）；0 = 不带这条
 COMMON["hand_bash_damage"] = 600   # 额外伤害
+
+# The core config now uses a reduced five-buffer set.  Keep the Lost Temple
+# compatibility build self-contained by mapping the legacy aura keys onto
+# those generated buffers.
+BUFFS = dict(BUFFS)
+BUFFS.update({
+    "aura_unholy": BUFFS["akmond"],
+    "aura_vamp": BUFFS["ash_slow"],
+    "aura_brill": BUFFS["spell_shield"],
+    "aura_heal": BUFFS["heal_native"],
+    "aura_show": BUFFS["heal_show"],
+    "aura_command": BUFFS["akmond"],
+    "aura_endur": BUFFS["ash_slow"],
+    "warglaive_charge": BUFFS["spell_shield"],
+})
+
+UNHOLY_BUFF_TEXT = "移动速度与生命恢复提高。"
+VAMP_BUFF_TEXT = "攻击时吸取生命。"
+BRILL_BUFF_TEXT = "提高魔法恢复速度。"
+COMMAND_BUFF_TEXT = "提高周围友军攻击力。"
+ENDUR_BUFF_TEXT = "提高周围友军攻击与移动速度。"
+WARGLAIVE_CHARGE_BUFF_TEXT = "邪能冲锋命中目标。"
 # 其余数值都跟着默认配置走，要调就照上面这样写一行覆盖。

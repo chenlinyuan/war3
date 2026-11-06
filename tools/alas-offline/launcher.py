@@ -7,6 +7,13 @@ import traceback
 from pathlib import Path
 
 
+_LAUNCH_ARGS = tuple(sys.argv[1:])
+_LAUNCH_EXE = Path(sys.executable).stem.casefold()
+_WORKER_LAUNCH = bool(_LAUNCH_ARGS) or _LAUNCH_EXE.endswith(
+    ("-worker", "-cli")
+)
+
+
 def bundle_root() -> Path:
     if hasattr(sys, "_MEIPASS"):
         return Path(sys._MEIPASS)
@@ -77,9 +84,17 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except Exception:
-        show_fatal(
-            "离线工具启动失败：\n\n"
-            + traceback.format_exc()
-            + "\n请把此窗口内容反馈给我。"
-        )
+        detail = traceback.format_exc()
+        if _WORKER_LAUNCH:
+            # Worker/CLI failures must be reported by the parent process or
+            # terminal. A GUI modal here can block subprocess completion and
+            # is misleading because the GUI itself did start successfully.
+            sys.stderr.write(detail + "\n")
+            sys.stderr.flush()
+        else:
+            show_fatal(
+                "离线工具启动失败：\n\n"
+                + detail
+                + "\n请把此窗口内容反馈给我。"
+            )
         raise SystemExit(1)

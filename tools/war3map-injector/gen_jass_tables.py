@@ -35,6 +35,10 @@ def q(idstr):
     return "'%s'" % idstr
 
 
+def jstr(value):
+    return '"%s"' % str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
 def rebuild(text, name, body):
     """把 <name> 生成段替换成 body（body 是去掉缩进的文本行列表）。"""
     pat = re.compile(
@@ -165,6 +169,67 @@ def body_g_aura_runtime():
     return [
         "integer WG_FALLEN_ITEM = " + q(CFG.ITEMS["wing_fallen"]),
         "integer WG_TELEPORT_ABILITY = " + q(CFG.ABIL["act_tele"]),
+        "integer WG_AVATAR_ITEM = " + q(CFG.ITEMS["wing_demon"]),
+        "integer WG_AVATAR_ABILITY = " + q(CFG.ABIL["act_blink"]),
+        "integer WG_AVATAR_WING_MODEL_ABILITY = "
+        + q(CFG.ABIL["wing_model_demon"]),
+        "integer WG_AVATAR_SPEED_ABILITY = "
+        + q(CFG.ABIL["wing_speed"]),
+        "integer WG_AVATAR_WING_BOOK = " + q(CFG.ABIL["book_demon"]),
+        "integer WG_AVATAR_WING_COMMAND = "
+        + q(CFG.ABIL["aura_command"]),
+        "integer WG_AVATAR_WING_ENDURANCE = "
+        + q(CFG.ABIL["aura_endur"]),
+        "integer WG_AVATAR_WING_CRIT = " + q(CFG.ABIL["crit"]),
+        "integer WG_AVATAR_DIVINE_DEFENSE = 6",
+        "integer WG_AVATAR_CHAOS_ATTACK = 5",
+        "integer WG_AVATAR_AIR_TARGET_FLAG = %d"
+        % int(C.get("act_avatar_air_target_flag", 4)),
+        "integer WG_AVATAR_MAGIC_IMMUNITY = 'Amim'",
+        "real WG_AVATAR_DURATION = " + num(C.get("act_avatar_duration", 30.0)),
+        "real WG_AVATAR_LIFE_COST_PCT = " + num(
+            C.get("act_avatar_life_cost_pct", 0.20)
+        ),
+        "real WG_AVATAR_ATTACK_SPEED_PCT = " + num(
+            C.get("act_avatar_attack_speed_pct", 1.00)
+        ),
+        "real WG_AVATAR_MOVE_SPEED_PCT = " + num(
+            C.get("act_avatar_move_speed_pct", 1.00)
+        ),
+        "real WG_AVATAR_MODEL_SCALE_MULT = " + num(
+            C.get("act_avatar_model_scale_mult", 3.0)
+        ),
+        "real WG_AVATAR_RANGE = " + num(
+            C.get("act_avatar_attack_range", 550.0)
+        ),
+        "real WG_AVATAR_PROJECTILE_SPEED = " + num(
+            C.get("act_avatar_projectile_speed", 1200.0)
+        ),
+        "real WG_AVATAR_ACQUIRE_RANGE = " + num(
+            C.get("act_avatar_acquisition_range", 800.0)
+        ),
+        "real WG_AVATAR_SPLASH_FULL = " + num(
+            C.get("act_avatar_splash_full", 50.0)
+        ),
+        "real WG_AVATAR_SPLASH_MEDIUM = " + num(
+            C.get("act_avatar_splash_medium", 150.0)
+        ),
+        "real WG_AVATAR_SPLASH_SMALL = " + num(
+            C.get("act_avatar_splash_small", 250.0)
+        ),
+        "real WG_AVATAR_SPLASH_MEDIUM_FACTOR = " + num(
+            C.get("act_avatar_splash_medium_factor", 0.5)
+        ),
+        "real WG_AVATAR_SPLASH_SMALL_FACTOR = " + num(
+            C.get("act_avatar_splash_small_factor", 0.25)
+        ),
+        "string WG_AVATAR_MISSILE = " + jstr(
+            C.get(
+                "act_avatar_missile",
+                r"Abilities\Weapons\DemonHunterMissile"
+                r"\DemonHunterMissile.mdx",
+            )
+        ),
         "real WG_VAMP_RADIUS = " + num(C["aura_radius"]),
         "real WG_VAMP_PERCENT = " + num(C["aura_vamp"]),
         "real WG_TELEPORT_RADIUS = " + num(C["aura_radius"]),

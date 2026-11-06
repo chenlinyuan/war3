@@ -141,6 +141,7 @@ def warglaive_attack_speed_mods():
                 ATTACK_SPEED_MIN + (level - 1) * ATTACK_SPEED_STEP,
                 2,
             ),
+            typ=objparse.T_UNREAL,
             level=level,
             column=1,
         )
@@ -1496,6 +1497,16 @@ def assert_patched(archive):
         for item in speed["mods"]
         if item[0] == "Isx1"
     }
+    speed_types = {
+        item[1]
+        for item in speed["mods"]
+        if item[0] == "Isx1"
+    }
+    if speed_types != {objparse.T_UNREAL}:
+        raise RuntimeError(
+            "%s.Isx1 must use unreal(2), got %r" %
+            (SPEED_ID, sorted(speed_types))
+        )
     if speed_fields.get("alev") != ATTACK_SPEED_LEVELS:
         raise RuntimeError(
             "%s.alev is %r, expected %r" %

@@ -1,1 +1,1 @@
-call yd()
+call InitTrig_BigMan()

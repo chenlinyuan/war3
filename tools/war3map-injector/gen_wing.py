@@ -37,6 +37,7 @@ BTN_PHOENIX = "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp"
 BTN_DRAGON_B = "ReplaceableTextures\\CommandButtons\\BTNAzureDragon.blp"
 BTN_DRAGON_K = "ReplaceableTextures\\CommandButtons\\BTNBlackDragon.blp"
 BTN_DRAGON_R = "ReplaceableTextures\\CommandButtons\\BTNRedDragon.blp"
+BTN_AVATAR = "ReplaceableTextures\\CommandButtons\\BTNMetamorphosis.blp"
 
 # ---------------------------------------------------------------------------
 # 技能 ID —— 全部从 wings_config.py 取（移植时用 pick_ids.py 自动挑空闲 ID）
@@ -60,7 +61,7 @@ WING_BOOK_SERAPH2 = CFG.ABIL["book_seraph2"]
 WING_BOOK_DEMON = CFG.ABIL["book_demon"]
 WING_ACT_INVUL = CFG.ABIL["act_invul"]
 WING_ACT_TELE = CFG.ABIL["act_tele"]
-WING_ACT_BLINK = CFG.ABIL["act_blink"]
+WING_ACT_AVATAR = CFG.ABIL["act_blink"]
 WING_BOOK_STAR = CFG.ABIL["book_star"]
 STAR_SPEED = CFG.ABIL["star_speed"]
 WING_ACT_ASHFALL = CFG.ABIL["act_ashfall"]
@@ -453,15 +454,49 @@ def build(out_path):
                 "传送到目标友军单位或建筑旁。|n冷却 15 秒，不消耗魔法。"
                 % C["aura_radius"],
     ))
+    avatarDuration = float(C.get("act_avatar_duration", 30.0))
+    avatarCooldown = float(C.get("act_avatar_cd", 120.0))
+    avatarMana = int(C.get("act_avatar_mana", 100))
+    avatarLifeCost = float(C.get("act_avatar_life_cost_pct", 0.20))
+    avatarAttackSpeedPct = int(
+        float(C.get("act_avatar_attack_speed_pct", 1.00)) * 100
+    )
+    avatarMoveSpeedPct = int(
+        float(C.get("act_avatar_move_speed_pct", 1.00)) * 100
+    )
+    avatarModelScale = float(C.get("act_avatar_model_scale_mult", 3.0))
+    # Avatar is script-driven.  AHav is the native Vampiric Aura and therefore
+    # applies an unintended passive while equipped; ANcl is the inert active
+    # shell used for the other scripted item abilities.
     entries.append(ability_entry(
-        WING_ACT_BLINK, "AIbk", "闪烁", BTN_BOOTS,
+        WING_ACT_AVATAR, "ANcl", "\u5929\u795e\u4e0b\u51e1", BTN_AVATAR,
         extra_mods=[
-            mod("Ebl1", 2, 1, 1, C["act_blink_range"]),
-            mod("acdn", 2, 1, 0, C["act_blink_cd"]),
+            mod("ahky", 3, 0, 0, "B"),
+            mod("aord", 3, 0, 0, "avatar"),
+            mod("aani", 3, 0, 0, "stand"),
+            mod("Ncl1", 2, 1, 1, 0.0),
+            mod("Ncl2", 0, 1, 2, 0),
+            mod("Ncl3", 0, 1, 3, 1),
+            mod("Ncl4", 2, 1, 4, 0.0),
+            mod("Ncl5", 0, 1, 5, 0),
+            mod("Ncl6", 3, 1, 6, "avatar"),
+            mod("adur", 2, 1, 0, avatarDuration),
+            mod("ahdu", 2, 1, 0, avatarDuration),
+            mod("acdn", 2, 1, 0, avatarCooldown),
+            mod("amcs", 0, 1, 0, avatarMana),
+            mod("acat", 3, 0, 0, ""),
+            mod("aeat", 3, 0, 0, ""),
+            mod("atat", 3, 0, 0, ""),
+            mod("aefs", 3, 0, 0, ""),
+            mod("aefl", 3, 0, 0, ""),
         ],
-        tip="闪烁(|cffffcc00B|r)",
-        ubertip="瞬间移动到指定地点(最远 %d)。|n冷却 %d 秒。" % (
-            C["act_blink_range"], C["act_blink_cd"]),
+        tip="\u5929\u795e\u4e0b\u51e1(|cffffcc00B|r)",
+        ubertip="献祭 %d%% 当前生命，%d 秒内获得魔法免疫、神圣护甲、混乱攻击，"
+                "模型放大为原来的 %g 倍，攻速 +%d%%、移动速度 +%d%%。|n冷却 %d 秒。" % (
+                    int(avatarLifeCost * 100),
+                    int(avatarDuration), avatarModelScale,
+                    avatarAttackSpeedPct, avatarMoveSpeedPct,
+                    int(avatarCooldown)),
     ))
     # 「星魂之力」的主动：灰烬雷暴（照抄 194213 里阿克蒙德的 A6V0）
     #   底子 ANcl = 游戏自带的"通道(Channel)"假技能：**本身没有任何原生效果**，

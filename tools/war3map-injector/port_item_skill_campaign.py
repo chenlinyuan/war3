@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import os
 import re
 import shutil
@@ -31,6 +32,7 @@ import alas_item_rules as ITEM_RULES  # noqa: E402
 import merge_w3obj as M  # noqa: E402
 import port_wings as P  # noqa: E402
 import port_lua_campaign_systems as LUA_PORT  # noqa: E402
+import wild_equipment_drops as WILD_DROPS  # noqa: E402
 import war3mpq as W  # noqa: E402
 from doctor.data import objects as OBJ  # noqa: E402
 from doctor.data import w3i as W3I  # noqa: E402
@@ -69,7 +71,7 @@ SOURCE_WEAPON_ABILITY_IDS = {
     "A105", "A106", "A107", "A108", "A109",
     "A110", "A111", "A113", "A116", "A170",
 }
-WEAPON_ABILITY_IDS = SOURCE_WEAPON_ABILITY_IDS | {"A117", "A118"}
+WEAPON_ABILITY_IDS = SOURCE_WEAPON_ABILITY_IDS | {"A117", "A118", "A171"}
 ITEM_NAMES = {
     "I103": "阿克蒙德之手",
     "I105": "霜之哀伤",
@@ -156,6 +158,7 @@ WARGLAIVE_CHARGE_DESCRIPTION = (
 FROSTMOURNE_ACTIVE_ICON = (
     r"ReplaceableTextures\CommandButtons\BTNBreathOfFrost.blp"
 )
+FROSTMOURNE_SLOW_ABILITY = "A171"
 FROSTMOURNE_ITEM_TOOLTIP = (
     "|cffff8c00神器|r|n|n"
     "+30 攻击力|n"
@@ -177,8 +180,11 @@ FROSTMOURNE_ITEM_DESCRIPTION = (
 )
 FROSTMOURNE_ACTIVE_TOOLTIP = (
     "消耗当前生命 20%（不会致死）。|n"
-    "对 550 范围内地面与空中敌人造成 100 + 4×力量 的伤害。|n"
-    "普通单位冰冻 5 秒，英雄冰冻 3 秒。|n"
+    "对 750 范围内敌人造成 100 + 4×力量 的伤害，越靠近中心效果越强。|n"
+    "核心 0～300：冰冻 6 秒，同时附加冰缓 60%，共持续 9 秒，伤害 100%。|n"
+    "中环 300～550：冰冻 4 秒，同时附加冰缓 40%，共持续 6 秒，伤害 70%。|n"
+    "外环 550～750：冰冻 2 秒，同时附加冰缓 20%，共持续 3 秒，伤害 40%。|n"
+    "建筑只承受冰冻。空中单位不冰冻，但仍受伤害和减速。|n"
     "魔法免疫单位会被冻结，但不会受到伤害。"
 )
 
@@ -785,33 +791,49 @@ def build_tables(
 
     archive = W.MPQArchive(str(campaign))
     try:
-        chapter_names = sorted(
-            name for name in archive.listfile
-            if name.lower().endswith((".w3x", ".w3m"))
-        )
-        for chapter_name in chapter_names:
-            data = archive.read_file(chapter_name)
-            if not data:
-                raise SystemExit("cannot read campaign chapter " + chapter_name)
-            fd, temp_name = tempfile.mkstemp(suffix=".w3x")
-            os.close(fd)
-            temp = Path(temp_name)
-            try:
-                temp.write_bytes(data)
-                chapter = W.MPQArchive(str(temp))
-                try:
-                    chapter_items = target_custom_names(chapter, "w3t")
-                    custom_items.update(chapter_items)
-                    custom_item_aliases.update(
-                        (ident, clean_name(name))
-                        for ident, name in chapter_items.items()
-                        if name
+        if campaign.suffix.lower() in (".w3x", ".w3m"):
+            chapter_items = target_custom_names(archive, "w3t")
+            custom_items.update(chapter_items)
+            custom_item_aliases.update(
+                (ident, clean_name(name))
+                for ident, name in chapter_items.items()
+                if name
+            )
+            custom_skills.update(target_custom_names(archive, "w3a"))
+        else:
+            chapter_names = sorted(
+                name for name in archive.listfile
+                if name.lower().endswith((".w3x", ".w3m"))
+            )
+            for chapter_name in chapter_names:
+                data = archive.read_file(chapter_name)
+                if not data:
+                    raise SystemExit(
+                        "cannot read campaign chapter " + chapter_name
                     )
-                    custom_skills.update(target_custom_names(chapter, "w3a"))
+                fd, temp_name = tempfile.mkstemp(
+                    suffix=Path(chapter_name).suffix
+                )
+                os.close(fd)
+                temp = Path(temp_name)
+                try:
+                    temp.write_bytes(data)
+                    chapter = W.MPQArchive(str(temp))
+                    try:
+                        chapter_items = target_custom_names(chapter, "w3t")
+                        custom_items.update(chapter_items)
+                        custom_item_aliases.update(
+                            (ident, clean_name(name))
+                            for ident, name in chapter_items.items()
+                            if name
+                        )
+                        custom_skills.update(
+                            target_custom_names(chapter, "w3a")
+                        )
+                    finally:
+                        chapter.close()
                 finally:
-                    chapter.close()
-            finally:
-                temp.unlink(missing_ok=True)
+                    temp.unlink(missing_ok=True)
     finally:
         archive.close()
 
@@ -1450,6 +1472,53 @@ def patch_frostmourne_source(sources: dict[str, Path]) -> None:
             ability_mod("aubx", 0, 1),
         ],
     )
+    add_custom_ability(
+        sources["w3a"],
+        FROSTMOURNE_SLOW_ABILITY,
+        "Aslo",
+        [
+            ability_mod("anam", 3, "霜之哀伤·冰缓"),
+            ability_mod("aart", 3, ""),
+            ability_mod("arar", 3, ""),
+            ability_mod("atp1", 3, "冰缓", level=1),
+            ability_mod("aub1", 3, "移动速度降低。", level=1),
+            ability_mod("alev", 0, 3),
+            ability_mod("aite", 0, 0),
+            ability_mod("aher", 0, 0),
+            ability_mod("abuf", 3, "Bfro", level=1),
+            ability_mod("abuf", 3, "Bfro", level=2),
+            ability_mod("abuf", 3, "Bfro", level=3),
+            ability_mod("atar", 3, "air,ground,enemy,neutral", level=1),
+            ability_mod("atar", 3, "air,ground,enemy,neutral", level=2),
+            ability_mod("atar", 3, "air,ground,enemy,neutral", level=3),
+            ability_mod("aare", 2, 0.0, level=1),
+            ability_mod("aare", 2, 0.0, level=2),
+            ability_mod("aare", 2, 0.0, level=3),
+            ability_mod("acdn", 2, 0.0, level=1),
+            ability_mod("acdn", 2, 0.0, level=2),
+            ability_mod("acdn", 2, 0.0, level=3),
+            ability_mod("amcs", 0, 0, level=1),
+            ability_mod("amcs", 0, 0, level=2),
+            ability_mod("amcs", 0, 0, level=3),
+            ability_mod("acas", 2, 0.0, level=1),
+            ability_mod("acas", 2, 0.0, level=2),
+            ability_mod("acas", 2, 0.0, level=3),
+            ability_mod("aani", 3, "stand"),
+            ability_mod("acat", 3, ""),
+            ability_mod("Slo1", 2, 0.8, level=1, column=1),
+            ability_mod("Slo1", 2, 0.6, level=2, column=1),
+            ability_mod("Slo1", 2, 0.4, level=3, column=1),
+            ability_mod("Slo2", 2, 0.0, level=1, column=2),
+            ability_mod("Slo2", 2, 0.0, level=2, column=2),
+            ability_mod("Slo2", 2, 0.0, level=3, column=2),
+            ability_mod("adur", 2, 3.0, level=1),
+            ability_mod("adur", 2, 6.0, level=2),
+            ability_mod("adur", 2, 9.0, level=3),
+            ability_mod("ahdu", 2, 3.0, level=1),
+            ability_mod("ahdu", 2, 6.0, level=2),
+            ability_mod("ahdu", 2, 9.0, level=3),
+        ],
+    )
 
 
 def strip_mdx_chunks(data: bytes, removed_tags: set[bytes]) -> bytes:
@@ -1619,7 +1688,12 @@ endfunction
 
 
 def build_lua_module(
-    work: Path, browser_dir: Path, item_active: bool
+    work: Path,
+    browser_dir: Path,
+    item_active: bool,
+    campaign_loot: WILD_DROPS.CampaignDropProfile | None = None,
+    output_suffix: str = "",
+    extra_script: Path | None = None,
 ) -> bytes:
     wing_globals = (WING_DIR / "g.j").read_text(encoding="utf-8")
     wing_functions = (WING_DIR / "f.j").read_text(encoding="utf-8")
@@ -1631,6 +1705,24 @@ def build_lua_module(
     browser_functions = (browser_dir / "f.j").read_text(
         encoding="utf-8", errors="surrogateescape"
     )
+    loot_globals = ""
+    loot_functions = ""
+    if campaign_loot is not None:
+        loot_globals = (
+            campaign_loot.script_dir / "g.j"
+        ).read_text(encoding="utf-8")
+        loot_functions = (
+            campaign_loot.script_dir / "f.j"
+        ).read_text(encoding="utf-8")
+    extra_globals = ""
+    extra_functions = ""
+    if extra_script is not None:
+        extra_globals = (extra_script / "g.j").read_text(
+            encoding="utf-8"
+        )
+        extra_functions = (extra_script / "f.j").read_text(
+            encoding="utf-8"
+        )
     wing_globals = wing_globals.replace(
         "boolean WG_ITEM_ACTIVE = false",
         "boolean WG_ITEM_ACTIVE = " + ("true" if item_active else "false"),
@@ -1653,11 +1745,15 @@ def build_lua_module(
         + fr_globals + "\n"
         + wgl_globals + "\n"
         + browser_globals + "\n"
+        + loot_globals + "\n"
+        + extra_globals + "\n"
         + "endglobals\n"
         + wing_functions + "\n"
         + fr_functions + "\n"
         + WGL.WGL_V3_FUNCTIONS + "\n"
         + browser_functions + "\n"
+        + loot_functions + "\n"
+        + extra_functions + "\n"
         + ALAS_LOAD_SYNC + "\n"
     )
     lua = LUA_PORT.transpile(source, "forsaken-301-item-skill")
@@ -1701,6 +1797,7 @@ TimerStart(__alasInitTimer, 0.20, false, function()
   __alasRunInit("FR", FR_Init)
   __alasRunInit("WGL", WGL_Init)
   __alasRunInit("LOAD", ALAS_InitLoadSync)
+  __alasRunInit("TALENT", TT_Init)
   local __alasQtTrigger = CreateTrigger()
   for __alasQtPlayer = 0, 11 do
     TriggerRegisterPlayerChatEvent(__alasQtTrigger, Player(__alasQtPlayer), "qt", true)
@@ -1712,6 +1809,21 @@ TimerStart(__alasInitTimer, 0.20, false, function()
 end)
 end
 """
+    if campaign_loot is not None:
+        anchor = '  __alasRunInit("LOAD", ALAS_InitLoadSync)\n'
+        if anchor not in tail:
+            raise SystemExit("campaign loot init anchor missing")
+        tail = tail.replace(
+            anchor,
+            anchor + '  __alasRunInit("WED", WED_Init)\n',
+            1,
+        )
+    if extra_script is None:
+        tail = tail.replace(
+            '  __alasRunInit("TALENT", TT_Init)\n',
+            "",
+            1,
+        )
     runtime = LUA_PORT.RUNTIME_HEAD.replace(
         "if bj_lastCreatedGroup == nil then bj_lastCreatedGroup = CreateGroup() end\n",
         "",
@@ -1722,6 +1834,8 @@ end
     module = (runtime + "\n" + lua + "\n" + tail).encode("utf-8")
     lua_ast.parse(module.decode("utf-8"))
     suffix = "item" if item_active else "command"
+    if output_suffix:
+        suffix += "-" + output_suffix
     (work / ("item-skill-wings-301-" + suffix + ".lua")).write_bytes(module)
     return MARKER + module
 
@@ -1936,6 +2050,7 @@ def validate_chapter(
     chapter: Path,
     expected_objects: dict[str, set[str]],
     item_active: bool,
+    campaign_loot: bool = False,
 ) -> None:
     archive = W.MPQArchive(str(chapter))
     try:
@@ -1978,6 +2093,18 @@ def validate_chapter(
         if b'__alasRunInit("LOAD", ALAS_InitLoadSync)' not in script:
             raise SystemExit("%s: equipment load recovery is missing" %
                              chapter.name)
+        if campaign_loot:
+            for token in (
+                b"function WED_Init()",
+                b'__alasRunInit("WED", WED_Init)',
+                b"WED_CAMPAIGN_MODE = true",
+                b"function WED_IsEnemyHeroTarget",
+            ):
+                if token not in script:
+                    raise SystemExit(
+                        "%s: campaign loot marker missing %r"
+                        % (chapter.name, token)
+                    )
         mode_value = b"true" if item_active else b"false"
         for mode_name in (
             b"WG_ITEM_ACTIVE", b"FR_ITEM_ACTIVE", b"WGL_ITEM_ACTIVE"
@@ -2077,6 +2204,9 @@ def main() -> int:
                         default=DEFAULT_OBJECT_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--config", default=WING_CONFIG)
+    parser.add_argument("--campaign-loot-manifest", type=Path)
+    parser.add_argument("--extra-object", action="append", default=[])
+    parser.add_argument("--extra-lua-script-manifest", type=Path)
     parser.add_argument("--no-deploy", action="store_true")
     args = parser.parse_args()
 
@@ -2097,6 +2227,15 @@ def main() -> int:
     weapon_sources = extract_object_sources(work)
     patch_frostmourne_source(weapon_sources)
     patch_warglaive_sources(weapon_sources)
+    extra_objects: dict[str, list[Path]] = {}
+    for spec in args.extra_object:
+        extension, separator, source_text = spec.partition("=")
+        if not separator or extension not in ("w3a", "w3t"):
+            raise SystemExit("--extra-object must be w3a=PATH or w3t=PATH")
+        path = Path(source_text).resolve()
+        if not path.is_file():
+            raise SystemExit("extra object file missing: " + str(path))
+        extra_objects.setdefault(extension, []).append(path)
     sources = {
         "w3a": [
             wing_sources["hand_w3a"],
@@ -2111,6 +2250,8 @@ def main() -> int:
         "w3u": [wing_sources["w3u"]],
         "w3h": [wing_sources["w3h"]],
     }
+    for extension, paths in extra_objects.items():
+        sources[extension].extend(paths)
     expected_objects = {
         ext: set().union(*(object_ids(path, ext) for path in paths))
         for ext, paths in sources.items()
@@ -2119,8 +2260,39 @@ def main() -> int:
     print("tables: %d items, %d skills" % (item_count, skill_count))
     browser_dir = prepare_browser(work, expected_objects["w3a"])
     assets = make_assets(work)
-    module_command = build_lua_module(work, browser_dir, False)
-    module_item = build_lua_module(work, browser_dir, True)
+    campaign_loot = None
+    if args.campaign_loot_manifest:
+        campaign_loot = WILD_DROPS.load_campaign_manifest(
+            args.campaign_loot_manifest.resolve()
+        )
+    extra_scripts: dict[str, Path] = {}
+    if args.extra_lua_script_manifest:
+        manifest_path = args.extra_lua_script_manifest.resolve()
+        raw_manifest = json.loads(
+            manifest_path.read_text(encoding="utf-8")
+        )
+        if not isinstance(raw_manifest, dict):
+            raise SystemExit("extra Lua script manifest must be an object")
+        for key, value in raw_manifest.items():
+            script_dir = Path(str(value)).resolve()
+            if not (script_dir / "g.j").is_file() or not (
+                script_dir / "f.j"
+            ).is_file():
+                raise SystemExit(
+                    "extra Lua script directory is incomplete: "
+                    + str(script_dir)
+                )
+            extra_scripts[str(key)] = script_dir
+    module_command = (
+        None
+        if campaign_loot is not None
+        else build_lua_module(work, browser_dir, False)
+    )
+    module_item = (
+        None
+        if campaign_loot is not None
+        else build_lua_module(work, browser_dir, True)
+    )
     asset_names = [internal for _path, internal in assets]
 
     chapters = sorted(
@@ -2129,6 +2301,28 @@ def main() -> int:
     )
     if not chapters:
         raise SystemExit("no chapters found in " + str(base))
+    if campaign_loot is not None:
+        missing_profiles = (
+            {chapter.name for chapter in chapters}
+            - {profile.chapter for profile in campaign_loot.profiles}
+        )
+        if missing_profiles:
+            raise SystemExit(
+                "campaign loot profiles missing chapters: "
+                + ", ".join(sorted(missing_profiles))
+            )
+    if extra_scripts:
+        missing_scripts = (
+            {chapter.name for chapter in chapters}
+            - set(extra_scripts)
+        )
+        if "*" in extra_scripts:
+            missing_scripts = set()
+        if missing_scripts:
+            raise SystemExit(
+                "extra Lua script manifest is missing chapters: "
+                + ", ".join(sorted(missing_scripts))
+            )
 
     staged_dir = work / "_staged_item_skill_301"
     if staged_dir.exists():
@@ -2152,9 +2346,49 @@ def main() -> int:
             chapter, object_dir, sources, asset_names, item_active
         )
         target = staged_dir / chapter.name
-        module = module_item if item_active else module_command
+        loot_profile = (
+            campaign_loot.profile_for(chapter.name)
+            if campaign_loot is not None
+            else None
+        )
+        if loot_profile is None and campaign_loot is not None:
+            raise SystemExit(
+                "campaign loot profile missing: " + chapter.name
+            )
+        extra_script = extra_scripts.get(
+            chapter.name,
+            extra_scripts.get("*"),
+        )
+        module = (
+            build_lua_module(
+                work,
+                browser_dir,
+                item_active,
+                campaign_loot=loot_profile,
+                output_suffix=chapter.stem,
+                extra_script=extra_script,
+            )
+            if campaign_loot is not None or extra_script is not None
+            else (module_item if item_active else module_command)
+        )
+        if extra_script is not None:
+            if b"function TT_Init()" not in module:
+                raise SystemExit(
+                    "%s: universal talent Lua init is missing"
+                    % chapter.name
+                )
+            if b'__alasRunInit("TALENT", TT_Init)' not in module:
+                raise SystemExit(
+                    "%s: universal talent Lua init is not guarded"
+                    % chapter.name
+                )
         inject_chapter(chapter, target, module, merged, assets)
-        validate_chapter(target, expected_objects, item_active)
+        validate_chapter(
+            target,
+            expected_objects,
+            item_active,
+            campaign_loot=loot_profile is not None,
+        )
         staged.append((chapter.name, target))
 
     pack_campaign(source, output, staged)

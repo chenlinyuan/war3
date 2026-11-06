@@ -46,7 +46,8 @@ ABIL = {
     # 主动技能（放在物品 iabi 的第一位，物品图标才会显示冷却转圈）
     "act_invul": "W022",        # 暗影庇护：6 秒无敌
     "act_tele": "W023",         # 群体传送
-    "act_blink": "W024",        # 闪烁
+    # Compatibility key name: W024 is now the Demon Wings Avatar active.
+    "act_blink": "W024",
     # 「试穿」专用（只挂模型 + 移速，没有光环/被动/主动）
     "wing_model_awing": "W030",
     "wing_model_angel": "W031",
@@ -403,8 +404,30 @@ COMMON = dict(
     act_invul_dur=6.0,          # 暗影庇护：无敌时长（adur/ahdu）
     act_invul_cd=50.0,          # 暗影庇护：冷却
     act_tele_cd=15.0,           # 群体传送：冷却
-    act_blink_cd=12.0,          # 闪烁：冷却
-    act_blink_range=1300.0,     # 闪烁：最远距离
+    # Demon Wings active: Avatar + scripted Divine defense type.
+    act_avatar_duration=45.0,
+    act_avatar_cd=150.0,
+    act_avatar_mana=100,
+    act_avatar_defense_bonus=0.0,
+    act_avatar_hp_bonus=0.0,
+    act_avatar_damage_bonus=0.0,
+    act_avatar_magic_reduction=0.0,
+    act_avatar_life_cost_pct=0.50,
+    act_avatar_attack_speed_pct=1.00,
+    act_avatar_move_speed_pct=1.00,
+    act_avatar_model_scale_mult=3.0,
+    act_avatar_attack_range=500.0,
+    act_avatar_projectile_speed=1200.0,
+    act_avatar_acquisition_range=800.0,
+    act_avatar_air_target_flag=2,
+    act_avatar_splash_full=50.0,
+    act_avatar_splash_medium=150.0,
+    act_avatar_splash_small=250.0,
+    act_avatar_splash_medium_factor=0.5,
+    act_avatar_splash_small_factor=0.25,
+    act_avatar_missile=(
+        r"Abilities\Weapons\DemonHunterMissile\DemonHunterMissile.mdx"
+    ),
     # 星魂之力（第 4 件翅膀）：2026-10-15 玩家改需求 —— 原来的 +1000 生命 /
     #   +20 全属性 / +500 魔法 全部去掉，改成"移动速度顶满"。
     #   （引擎的速度上限是 522，所以写 522 就等于"全满"，多少基础速度都到顶。）
@@ -462,12 +485,12 @@ COMMON = dict(
     plunder_hero_rand=5,       # 英雄：随机(1..等级) 的系数
     plunder_div=3,             # 最后除以这个数（照抄原图的 /3）
     # --- 阿克蒙德之手的「重击」（概率触发额外伤害 + 眩晕）---
-    #   照抄燃烧之怒里现成的物品版重击（`A6AE`「重击600 8%」，基对象 AHbh = 山丘之王-重击）：
+    #   基对象 AHbh = 山丘之王-重击；当前概率由玩家指定为 20%。
     #   alev=1 / aher=0 / Hbh1 = 概率(%) / Hbh3 = 额外伤害。
     #   眩晕时长用原生值（非英雄 2 秒、英雄 1 秒）。
     #   hand_bash_chance = 0 时不生成这条技能、也不写进物品的技能列表。
-    hand_bash_chance=8,        # 触发概率（%）；0 = 关闭
-    hand_bash_damage=600,      # 额外伤害（照抄"重击600 8%"那档）
+    hand_bash_chance=20,       # 触发概率（%）；0 = 关闭
+    hand_bash_damage=600,      # 额外伤害（保持"重击600"档）
     # --- 夺魂：死亡之指击杀英雄或高分强敌时永久增加智力 ---
     hand_soul_gain=1,          # 1 = 开启；0 = 关闭
     hand_soul_hero_chance=100, # 英雄击杀触发概率（%）

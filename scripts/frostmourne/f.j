@@ -402,6 +402,16 @@ function FR_DestroyFreezeFx takes integer unitKey returns nothing
     set fx = null
 endfunction
 
+function FR_IsAliveTarget takes unit u returns boolean
+    if u == null or GetUnitTypeId(u) == 0 then
+        return false
+    endif
+    if GetWidgetLife(u) <= 0.405 then
+        return false
+    endif
+    return not IsUnitType(u, UNIT_TYPE_DEAD)
+endfunction
+
 function FR_IsInvulnerable takes unit u returns boolean
     if u == null then
         return false
@@ -410,6 +420,29 @@ function FR_IsInvulnerable takes unit u returns boolean
         return true
     endif
     return GetUnitAbilityLevel(u, 'Avul') > 0
+endfunction
+
+function FR_ApplySlow takes player owner, unit target, integer level returns nothing
+    local unit dummy
+    local real x
+    local real y
+    if owner == null or not FR_IsAliveTarget(target) then
+        return
+    endif
+    if IsUnitType(target, UNIT_TYPE_STRUCTURE) then
+        return
+    endif
+    set x = GetUnitX(target)
+    set y = GetUnitY(target)
+    set dummy = CreateUnit(owner, FR_NOVA_DUMMY, x, y, 0.0)
+    call UnitAddAbility(dummy, 'Aloc')
+    call SetUnitScale(dummy, 0.01, 0.01, 0.01)
+    call SetUnitVertexColor(dummy, 255, 255, 255, 0)
+    call UnitAddAbility(dummy, FR_SLOW_ABILITY)
+    call SetUnitAbilityLevel(dummy, FR_SLOW_ABILITY, level)
+    call IssueTargetOrder(dummy, "slow", target)
+    call UnitApplyTimedLife(dummy, FR_NOVA_LIFE, 1.0)
+    set dummy = null
 endfunction
 
 function FR_Unfreeze takes nothing returns nothing
@@ -433,7 +466,10 @@ function FR_FreezeUnit takes unit u, real duration returns nothing
     local integer unitKey
     local integer timerKey
     local timer t
-    if u == null or FR_IsInvulnerable(u) then
+    if not FR_IsAliveTarget(u) or FR_IsInvulnerable(u) then
+        return
+    endif
+    if IsUnitType(u, UNIT_TYPE_FLYING) then
         return
     endif
     set unitKey = GetHandleId(u)
@@ -453,9 +489,34 @@ function FR_FreezeUnit takes unit u, real duration returns nothing
     set t = null
 endfunction
 
+function FR_OnFrozenDeath takes nothing returns nothing
+    local unit u = GetDyingUnit()
+    local integer unitKey
+    local timer t
+    if u == null then
+        return
+    endif
+    set unitKey = GetHandleId(u)
+    if not HaveSavedHandle(fr_freeze_table, unitKey, 0) then
+        set u = null
+        return
+    endif
+    set t = LoadTimerHandle(fr_freeze_table, unitKey, 0)
+    call PauseUnit(u, false)
+    call SetUnitTimeScale(u, 1.0)
+    call FR_DestroyFreezeFx(unitKey)
+    if t != null then
+        call FlushChildHashtable(fr_freeze_timer_table, GetHandleId(t))
+        call DestroyTimer(t)
+    endif
+    call FlushChildHashtable(fr_freeze_table, unitKey)
+    set t = null
+    set u = null
+endfunction
+
 function FR_CanAffect takes unit caster, unit target returns boolean
     local integer ownerId
-    if caster == null or target == null then
+    if caster == null or not FR_IsAliveTarget(target) then
         return false
     endif
     if FR_IsInvulnerable(target) then
@@ -513,7 +574,12 @@ function FR_CastStomp takes unit caster returns nothing
     local real x
     local real y
     local real bonus
+    local real dx
+    local real dy
+    local real distance
+    local real damageFactor
     local real freeze_duration
+    local integer slowLevel
     if caster == null or not FR_HasItem(caster) then
         set caster = null
         return
@@ -535,14 +601,32 @@ function FR_CastStomp takes unit caster returns nothing
         set target = FirstOfGroup(g)
         exitwhen target == null
         if target != caster and IsUnitAliveBJ(target) and FR_CanAffect(caster, target) then
-            if IsUnitType(target, UNIT_TYPE_HERO) then
-                set freeze_duration = 3.0
+            set dx = GetUnitX(target) - x
+            set dy = GetUnitY(target) - y
+            set distance = SquareRoot(dx * dx + dy * dy)
+            if distance <= FR_RING_CORE_RADIUS then
+                set freeze_duration = FR_FREEZE_CORE
+                set slowLevel = 3
+                set damageFactor = FR_DAMAGE_CORE_MULT
+            elseif distance <= FR_RING_MID_RADIUS then
+                set freeze_duration = FR_FREEZE_MID
+                set slowLevel = 2
+                set damageFactor = FR_DAMAGE_MID_MULT
             else
-                set freeze_duration = 5.0
+                set freeze_duration = FR_FREEZE_OUTER
+                set slowLevel = 1
+                set damageFactor = FR_DAMAGE_OUTER_MULT
             endif
-            call FR_FreezeUnit(target, freeze_duration)
+            if IsUnitType(target, UNIT_TYPE_FLYING) then
+                call FR_ApplySlow(GetOwningPlayer(caster), target, slowLevel)
+            else
+                if not IsUnitType(target, UNIT_TYPE_STRUCTURE) then
+                    call FR_ApplySlow(GetOwningPlayer(caster), target, slowLevel)
+                endif
+                call FR_FreezeUnit(target, freeze_duration)
+            endif
             if not IsUnitType(target, UNIT_TYPE_MAGIC_IMMUNE) then
-                call UnitDamageTarget(caster, target, bonus, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_MAGIC, WEAPON_TYPE_WHOKNOWS)
+                call UnitDamageTarget(caster, target, bonus * damageFactor, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_MAGIC, WEAPON_TYPE_WHOKNOWS)
             endif
         endif
         call GroupRemoveUnit(g, target)
@@ -614,7 +698,17 @@ function FR_Init takes nothing returns nothing
     call TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_EFFECT)
     call TriggerAddAction(fr_spell_trigger, function FR_OnStompCast)
 
+    set fr_freeze_death_trigger = CreateTrigger()
+    set i = 0
+    loop
+        exitwhen i >= 16
+        call TriggerRegisterPlayerUnitEvent(fr_freeze_death_trigger, Player(i), EVENT_PLAYER_UNIT_DEATH, null)
+        set i = i + 1
+    endloop
+    call TriggerAddAction(fr_freeze_death_trigger, function FR_OnFrozenDeath)
+
     set fr_soul_trigger = CreateTrigger()
+    set i = 0
     loop
         exitwhen i >= 12
         call TriggerRegisterPlayerUnitEvent(fr_soul_trigger, Player(i), EVENT_PLAYER_UNIT_DEATH, null)

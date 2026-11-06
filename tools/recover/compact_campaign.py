@@ -79,6 +79,28 @@ def verify_wct(path: Path) -> None:
         archive.close()
 
 
+def preserve_source_bytes(
+    source: Path,
+    destination: Path,
+    reason: str,
+) -> dict[str, object]:
+    destination.unlink(missing_ok=True)
+    shutil.copy2(source, destination)
+    verify_chapter_contents(source, destination)
+    verify_wct(destination)
+    print(
+        f"{source.name}: compaction skipped, preserving source bytes: "
+        f"{reason}",
+        flush=True,
+    )
+    return {
+        "state": "fallback",
+        "error": reason,
+        "size_before": source.stat().st_size,
+        "size_after": destination.stat().st_size,
+    }
+
+
 def compact_chapter(source: Path, destination: Path) -> dict[str, object]:
     destination.unlink(missing_ok=True)
     try:
@@ -100,23 +122,21 @@ def compact_chapter(source: Path, destination: Path) -> dict[str, object]:
         shutil.copy2(source, destination)
     elif result.get("state") != "done":
         reason = result.get("error", "unknown compaction error")
-        destination.unlink(missing_ok=True)
-        shutil.copy2(source, destination)
+        return preserve_source_bytes(
+            source,
+            destination,
+            str(reason),
+        )
+    try:
         verify_chapter_contents(source, destination)
         verify_wct(destination)
-        print(
-            f"{source.name}: compaction skipped, preserving source bytes: "
-            f"{reason}",
-            flush=True,
+    except Exception as exc:  # noqa: BLE001
+        return preserve_source_bytes(
+            source,
+            destination,
+            "verification failed: %s: %s"
+            % (type(exc).__name__, exc),
         )
-        return {
-            "state": "fallback",
-            "error": reason,
-            "size_before": source.stat().st_size,
-            "size_after": destination.stat().st_size,
-        }
-    verify_chapter_contents(source, destination)
-    verify_wct(destination)
     return result
 
 

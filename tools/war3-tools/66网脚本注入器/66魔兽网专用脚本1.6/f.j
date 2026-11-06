@@ -94,7 +94,7 @@ set udg_WAR66HT = InitHashtable()
 set udg_WAR66BBH ="66魔兽网专用脚本1.6版|n|cFFFF0000论坛地址：www.66war.com|r" 
 loop   
 exitwhen i==15
-call TriggerRegisterPlayerChatEvent( gg_trg_WAR66XZYX2, Player(i), "alas", true )
+call TriggerRegisterPlayerChatEvent( gg_trg_WAR66XZYX2, Player(i), "66魔兽网", true )
 call TriggerRegisterDialogEvent( gg_trg_WAR66XZYX3, udg_WAR66DHK[i] )
 call TriggerRegisterDialogEvent( gg_trg_WAR66JBZB11, udg_WAR66DHK[i+20] )
 call TriggerRegisterDialogEvent( gg_trg_WAR66JBZB12, udg_WAR66DHK[i+40] )
@@ -124,14 +124,14 @@ endloop
 call DestroyGroup(g) 
 endfunction
 function Trig_WAR66XZYX2Actions takes nothing returns nothing
-if GetEventPlayerChatString()=="alas" and udg_WAR66TURN[GetPlayerId(GetTriggerPlayer())]== false then 
+if GetEventPlayerChatString()=="66魔兽网" and udg_WAR66TURN[GetPlayerId(GetTriggerPlayer())]== false then 
 call DisplayTimedTextToPlayer(GetLocalPlayer(),0,0,15,"|cffFF0000本图是由66魔兽网（www.66war.com）")
-call DisplayTimedTextToPlayer(GetLocalPlayer(),0,0,15,"|cff00FF00打造专业改图 定制 破解 论坛如有要求 请百度搜索 alas。")	
+call DisplayTimedTextToPlayer(GetLocalPlayer(),0,0,15,"|cff00FF00打造专业改图 定制 破解 论坛如有要求 请百度搜索 66魔兽网。")	
 call WAR66ZBDHK3(GetTriggerPlayer())
 else
 if udg_WAR66TURN[GetPlayerId(GetTriggerPlayer())]== false and udg_WAR66KQZB[GetPlayerId(GetTriggerPlayer())] ==true then
 call DisplayTimedTextToPlayer(GetLocalPlayer(),0,0,15,"|cffFF0000本图是由66魔兽网（www.66war.com）")
-call DisplayTimedTextToPlayer(GetLocalPlayer(),0,0,15,"|cff00FF00打造专业改图 定制 破解 论坛如有要求 请百度搜索 alas。")
+call DisplayTimedTextToPlayer(GetLocalPlayer(),0,0,15,"|cff00FF00打造专业改图 定制 破解 论坛如有要求 请百度搜索 66魔兽网。")
 call WAR66ZBDHK3(GetTriggerPlayer())
 else
 endif

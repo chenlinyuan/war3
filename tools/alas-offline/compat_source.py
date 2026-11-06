@@ -64,6 +64,9 @@ def prepare(source: Path, work: Path, output: Path, report_path: Path) -> Path:
             script_internal = next(
                 (
                     internal for internal in (
+                        "war3map.lua",
+                        "scripts\\war3map.lua",
+                        "Scripts\\war3map.lua",
                         "war3map.j",
                         "scripts\\war3map.j",
                         "Scripts\\war3map.j",
@@ -76,8 +79,15 @@ def prepare(source: Path, work: Path, output: Path, report_path: Path) -> Path:
         finally:
             archive.close()
         if not script:
-            raise RuntimeError("map has no war3map.j: " + str(source))
-        updated, removed, skipped = remove_unused_legacy_functions(script)
+            raise RuntimeError(
+                "map has no war3map.j or war3map.lua: " + str(source)
+            )
+        if script_internal.lower().endswith(".lua"):
+            updated, removed, skipped = script, [], []
+        else:
+            updated, removed, skipped = remove_unused_legacy_functions(
+                script
+            )
         chosen = source
         if removed:
             MPQ.patch(

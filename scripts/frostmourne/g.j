@@ -3,10 +3,12 @@ boolean FR_ITEM_ACTIVE = false
 integer FR_ITEM_ID = 'I105'
 integer FR_SPELL_ID = 'A105'
 integer FR_NOVA_ABILITY = 'A170'
+integer FR_SLOW_ABILITY = 'A171'
 integer FR_NOVA_DUMMY = 'hfoo'
 integer FR_NOVA_LIFE = 'BTLF'
 
 trigger fr_spell_trigger = null
+trigger fr_freeze_death_trigger = null
 trigger fr_attack_trigger = null
 trigger fr_pickup_trigger = null
 trigger fr_drop_trigger = null
@@ -32,7 +34,18 @@ timer fr_clock = null
 
 boolean fr_inited = false
 
-real FR_SPELL_RADIUS = 550.0
+real FR_SPELL_RADIUS = 750.0
+real FR_RING_CORE_RADIUS = 300.0
+real FR_RING_MID_RADIUS = 550.0
+real FR_FREEZE_CORE = 6.0
+real FR_FREEZE_MID = 4.0
+real FR_FREEZE_OUTER = 2.0
+real FR_SLOW_CORE = 3.0
+real FR_SLOW_MID = 2.0
+real FR_SLOW_OUTER = 1.0
+real FR_DAMAGE_CORE_MULT = 1.0
+real FR_DAMAGE_MID_MULT = 0.7
+real FR_DAMAGE_OUTER_MULT = 0.4
 real FR_SPELL_STAT_MULT = 4.0
 real FR_NOVA_CHANCE = 0.30
 real FR_ACTIVE_LIFE_COST = 0.20

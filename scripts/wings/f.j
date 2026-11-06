@@ -908,6 +908,7 @@ function WG_ReportWings takes player p returns nothing
     local integer found = 0
     local string s
     local unit u
+    local timer avatarTimer
     call GroupEnumUnitsOfPlayer(bj_lastCreatedGroup, p, null)
     loop
         set u = FirstOfGroup(bj_lastCreatedGroup)
@@ -942,6 +943,28 @@ function WG_ReportWings takes player p returns nothing
             call WG_MountMessage(p, s)
             // 逐个技能实测: 魔法书只把技能"装"进去, 到底哪些真的挂到单位身上,
             //   用 GetUnitAbilityLevel 一看就知道(每本魔法书实测只挂前 3 个)。
+            set s = "DefenseType=" + I2S(BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE))
+            set s = s + " AvatarLevel=" + I2S(GetUnitAbilityLevel(u, WG_AVATAR_ABILITY))
+            set s = s + " Type=" + WG_IdStr(GetUnitTypeId(u))
+            set s = s + " AttackType1=" + I2S(BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0))
+            set s = s + " AttackType2=" + I2S(BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 1))
+            set s = s + " Range1=" + R2S(BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 0))
+            set s = s + " Range2=" + R2S(BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 1))
+            set s = s + " Cooldown1=" + R2S(BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN, 0))
+            set s = s + " Cooldown2=" + R2S(BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN, 1))
+            set s = s + " Attack1On=" + WG_BoolStr(BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0))
+            set s = s + " Attack2On=" + WG_BoolStr(BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 1))
+            set s = s + " Attack1Show=" + WG_BoolStr(BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACK_SHOW_UI, 0))
+            set s = s + " Attack2Show=" + WG_BoolStr(BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACK_SHOW_UI, 1))
+            if wg_avatarTable != null then
+                set avatarTimer = LoadTimerHandle(wg_avatarTable, GetHandleId(u), 0)
+                set s = s + " AvatarActive=" + WG_BoolStr(avatarTimer != null)
+                set avatarTimer = null
+            else
+                set s = s + " AvatarActive=false"
+            endif
+            set s = s + " Ranged=" + WG_BoolStr(IsUnitType(u, UNIT_TYPE_RANGED_ATTACKER))
+            call WG_MountMessage(p, s)
             // >>> GENERATED:BEGIN wing_debug (wings_config.py) >>>
             set s = "技能 堕落[邪恶" + I2S(GetUnitAbilityLevel(u, 'W070'))
             set s = s + " 闪避" + I2S(GetUnitAbilityLevel(u, 'W072')) + "]"
@@ -2070,6 +2093,682 @@ function WG_WingSync takes nothing returns nothing
     set u = null
 endfunction
 
+//============================================================================
+// Demon Wings: Avatar grants temporary Divine defense and ranged chaos attacks.
+//============================================================================
+function WG_AvatarItem takes unit u returns item
+    if u == null or GetUnitTypeId(u) == 0 then
+        return null
+    endif
+    return GetItemOfTypeFromUnitBJ(u, WG_AVATAR_ITEM)
+endfunction
+
+function WG_AvatarActive takes unit u returns boolean
+    if u == null or GetUnitTypeId(u) == 0 or wg_avatarTable == null then
+        return false
+    endif
+    return LoadTimerHandle(wg_avatarTable, GetHandleId(u), 0) != null
+endfunction
+
+function WG_AvatarSimpleExpires takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer key = GetHandleId(t)
+    local unit u = LoadUnitHandle(wg_avatarTable, key, 0)
+    local item it = LoadItemHandle(wg_avatarTable, key, 10)
+    local integer unitKey
+    local real originalScale
+    local real originalSpeed
+    if u != null and GetUnitTypeId(u) != 0 then
+        call BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, LoadInteger(wg_avatarTable, key, 1))
+        call BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, LoadInteger(wg_avatarTable, key, 2))
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN, 0, LoadReal(wg_avatarTable, key, 3))
+        set originalScale = LoadReal(wg_avatarTable, key, 50)
+        if originalScale > 0.0 then
+            call SetUnitScale(u, originalScale, originalScale, originalScale)
+        endif
+        set originalSpeed = LoadReal(wg_avatarTable, key, 51)
+        if originalSpeed > 0.0 then
+            call SetUnitMoveSpeed(u, originalSpeed)
+        endif
+        if LoadInteger(wg_avatarTable, key, 13) > 0 and it != null and WG_UnitCarriesItem(u, it) then
+            call UnitAddAbility(u, WG_AVATAR_WING_MODEL_ABILITY)
+            call UnitMakeAbilityPermanent(u, true, WG_AVATAR_WING_MODEL_ABILITY)
+            call BlzUnitDisableAbility(u, WG_AVATAR_WING_MODEL_ABILITY, false, false)
+        endif
+        set unitKey = GetHandleId(u)
+        if LoadTimerHandle(wg_avatarTable, unitKey, 0) == t then
+            call FlushChildHashtable(wg_avatarTable, unitKey)
+        endif
+    endif
+    if it != null then
+        call SetItemDroppable(it, true)
+    endif
+    call FlushChildHashtable(wg_avatarTable, key)
+    call DestroyTimer(t)
+    set t = null
+    set u = null
+    set it = null
+endfunction
+
+function WG_OnAvatarSimple takes nothing returns nothing
+    local unit u = GetTriggerUnit()
+    local item it
+    local timer t
+    local integer key
+    local real life
+    local real cost
+    local real baseCooldown
+    local real attackCooldown
+    local real originalScale
+    local real originalSpeed
+    local real targetScale
+    if GetSpellAbilityId() != WG_AVATAR_ABILITY or u == null or GetUnitTypeId(u) == 0 then
+        set u = null
+        return
+    endif
+    if wg_avatarTable == null then
+        set wg_avatarTable = InitHashtable()
+    endif
+    if WG_AvatarActive(u) then
+        set u = null
+        return
+    endif
+    set it = WG_AvatarItem(u)
+    if it == null then
+        set u = null
+        return
+    endif
+    set t = CreateTimer()
+    set key = GetHandleId(t)
+    call SaveUnitHandle(wg_avatarTable, key, 0, u)
+    call SaveItemHandle(wg_avatarTable, key, 10, it)
+    call SaveInteger(wg_avatarTable, key, 1, BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE))
+    call SaveInteger(wg_avatarTable, key, 2, BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0))
+    set baseCooldown = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN, 0)
+    call SaveReal(wg_avatarTable, key, 3, baseCooldown)
+    set originalScale = BlzGetUnitRealField(u, UNIT_RF_SCALING_VALUE)
+    if originalScale <= 0.0 then
+        set originalScale = 1.0
+    endif
+    call SaveReal(wg_avatarTable, key, 50, originalScale)
+    set originalSpeed = GetUnitMoveSpeed(u)
+    call SaveReal(wg_avatarTable, key, 51, originalSpeed)
+    if GetUnitAbilityLevel(u, WG_AVATAR_WING_MODEL_ABILITY) > 0 then
+        call SaveInteger(wg_avatarTable, key, 13, 1)
+        call UnitRemoveAbility(u, WG_AVATAR_WING_MODEL_ABILITY)
+    else
+        call SaveInteger(wg_avatarTable, key, 13, 0)
+    endif
+    call SaveTimerHandle(wg_avatarTable, GetHandleId(u), 0, t)
+    call BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, WG_AVATAR_DIVINE_DEFENSE)
+    call BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, WG_AVATAR_CHAOS_ATTACK)
+    if baseCooldown > 0.0 then
+        set attackCooldown = baseCooldown / (1.0 + WG_AVATAR_ATTACK_SPEED_PCT)
+        if attackCooldown < 0.1 then
+            set attackCooldown = 0.1
+        endif
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN, 0, attackCooldown)
+    endif
+    set targetScale = originalScale * WG_AVATAR_MODEL_SCALE_MULT
+    call SetUnitScale(u, targetScale, targetScale, targetScale)
+    if originalSpeed > 0.0 then
+        call SetUnitMoveSpeed(u, originalSpeed * (1.0 + WG_AVATAR_MOVE_SPEED_PCT))
+    endif
+    call SetItemDroppable(it, false)
+    set life = GetUnitState(u, UNIT_STATE_LIFE)
+    set cost = life * WG_AVATAR_LIFE_COST_PCT
+    if cost >= life then
+        set cost = life - 1.0
+    endif
+    if cost > 0.0 then
+        call SetUnitState(u, UNIT_STATE_LIFE, life - cost)
+    endif
+    call WG_Message(GetOwningPlayer(u), "天神下凡：3 倍体型 / 攻速与移动速度 +100%")
+    call TimerStart(t, WG_AVATAR_DURATION, false, function WG_AvatarSimpleExpires)
+    set t = null
+    set u = null
+    set it = null
+endfunction
+
+function WG_AvatarSetRange takes unit u, real target returns nothing
+    local real currentRange
+    local real rangeBonus
+    set currentRange = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 0)
+    set rangeBonus = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 1)
+    if currentRange > 0.0 then
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 1, target - currentRange + rangeBonus)
+    else
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 1, target)
+    endif
+endfunction
+
+function WG_AvatarRestore takes unit u, integer key returns nothing
+    local item it = LoadItemHandle(wg_avatarTable, key, 10)
+    if u != null and GetUnitTypeId(u) != 0 then
+        if GetUnitAbilityLevel(u, WG_AVATAR_MAGIC_IMMUNITY) > 0 and LoadInteger(wg_avatarTable, key, 14) == 0 then
+            call UnitRemoveAbility(u, WG_AVATAR_MAGIC_IMMUNITY)
+        endif
+        call BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, LoadInteger(wg_avatarTable, key, 1))
+        call BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, LoadInteger(wg_avatarTable, key, 2))
+        call WG_AvatarSetRange(u, LoadReal(wg_avatarTable, key, 3))
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_PROJECTILE_SPEED, 0, LoadReal(wg_avatarTable, key, 4))
+        call BlzSetUnitWeaponStringField(u, UNIT_WEAPON_SF_ATTACK_PROJECTILE_ART, 0, LoadStr(wg_avatarTable, key, 5))
+        call BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_TARGETS_ALLOWED, 0, LoadInteger(wg_avatarTable, key, 6))
+        call BlzSetUnitWeaponStringField(u, ConvertUnitWeaponStringField('ua1w'), 0, LoadStr(wg_avatarTable, key, 23))
+        call BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_AREA_OF_EFFECT_TARGETS, 0, LoadInteger(wg_avatarTable, key, 24))
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_FULL_DAMAGE, 0, LoadReal(wg_avatarTable, key, 25))
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_MEDIUM_DAMAGE, 0, LoadReal(wg_avatarTable, key, 26))
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_SMALL_DAMAGE, 0, LoadReal(wg_avatarTable, key, 27))
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_DAMAGE_FACTOR_MEDIUM, 0, LoadReal(wg_avatarTable, key, 28))
+        call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_DAMAGE_FACTOR_SMALL, 0, LoadReal(wg_avatarTable, key, 29))
+        call BlzSetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, LoadInteger(wg_avatarTable, key, 15) > 0)
+        call SetUnitAcquireRange(u, LoadReal(wg_avatarTable, key, 7))
+        if LoadInteger(wg_avatarTable, key, 8) == 0 then
+            call UnitRemoveType(u, UNIT_TYPE_RANGED_ATTACKER)
+        else
+            call UnitAddType(u, UNIT_TYPE_RANGED_ATTACKER)
+        endif
+        if LoadInteger(wg_avatarTable, key, 9) == 0 then
+            call UnitRemoveType(u, UNIT_TYPE_MELEE_ATTACKER)
+        else
+            call UnitAddType(u, UNIT_TYPE_MELEE_ATTACKER)
+        endif
+        if LoadInteger(wg_avatarTable, key, 13) > 0 and it != null and WG_UnitCarriesItem(u, it) then
+            call UnitAddAbility(u, WG_AVATAR_WING_MODEL_ABILITY)
+            call UnitMakeAbilityPermanent(u, true, WG_AVATAR_WING_MODEL_ABILITY)
+            call BlzUnitDisableAbility(u, WG_AVATAR_WING_MODEL_ABILITY, false, false)
+        endif
+    endif
+    if it != null then
+        call SetItemDroppable(it, true)
+    endif
+    set it = null
+endfunction
+
+function WG_AvatarExpires takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer key = GetHandleId(t)
+    local unit u = LoadUnitHandle(wg_avatarTable, key, 0)
+    local integer unitKey
+    call WG_AvatarRestore(u, key)
+    if u != null then
+        set unitKey = GetHandleId(u)
+        if LoadTimerHandle(wg_avatarTable, unitKey, 0) == t then
+            call FlushChildHashtable(wg_avatarTable, unitKey)
+        endif
+    endif
+    call FlushChildHashtable(wg_avatarTable, key)
+    call DestroyTimer(t)
+    set t = null
+    set u = null
+endfunction
+
+function WG_AvatarApply takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer key = GetHandleId(t)
+    local unit u = LoadUnitHandle(wg_avatarTable, key, 0)
+    local item it = LoadItemHandle(wg_avatarTable, key, 10)
+    local integer unitKey
+    if u == null or GetUnitTypeId(u) == 0 then
+        call WG_AvatarRestore(u, key)
+        call FlushChildHashtable(wg_avatarTable, key)
+        call DestroyTimer(t)
+        set t = null
+        set u = null
+        set it = null
+        return
+    endif
+    call BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, WG_AVATAR_DIVINE_DEFENSE)
+    if GetUnitAbilityLevel(u, WG_AVATAR_MAGIC_IMMUNITY) == 0 then
+        call UnitAddAbility(u, WG_AVATAR_MAGIC_IMMUNITY)
+        call UnitMakeAbilityPermanent(u, true, WG_AVATAR_MAGIC_IMMUNITY)
+    endif
+    // Keep the original weapon slot, attack command and UI panel. Only the
+    // existing weapon is temporarily converted to a ranged chaos attack.
+    call BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, WG_AVATAR_CHAOS_ATTACK)
+    call BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_TARGETS_ALLOWED, 0, BlzBitOr(LoadInteger(wg_avatarTable, key, 6), WG_AVATAR_AIR_TARGET_FLAG))
+    call BlzSetUnitWeaponStringField(u, ConvertUnitWeaponStringField('ua1w'), 0, "missile")
+    call BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_PROJECTILE_SPEED, 0, WG_AVATAR_PROJECTILE_SPEED)
+    call BlzSetUnitWeaponStringField(u, UNIT_WEAPON_SF_ATTACK_PROJECTILE_ART, 0, WG_AVATAR_MISSILE)
+    call WG_AvatarSetRange(u, WG_AVATAR_RANGE)
+    call BlzSetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
+    call SetUnitAcquireRange(u, WG_AVATAR_ACQUIRE_RANGE)
+    if LoadInteger(wg_avatarTable, key, 13) > 0 then
+        call UnitRemoveAbility(u, WG_AVATAR_WING_MODEL_ABILITY)
+        call BlzUnitDisableAbility(u, WG_AVATAR_WING_MODEL_ABILITY, true, true)
+    endif
+    if it != null then
+        call SetItemDroppable(it, false)
+    endif
+    set unitKey = GetHandleId(u)
+    if LoadTimerHandle(wg_avatarTable, unitKey, 0) == t then
+        call TimerStart(t, WG_AVATAR_DURATION, false, function WG_AvatarExpires)
+    else
+        call FlushChildHashtable(wg_avatarTable, key)
+        call DestroyTimer(t)
+    endif
+    set t = null
+    set u = null
+    set it = null
+endfunction
+
+function WG_AvatarWingBookReady takes unit u returns boolean
+    return GetUnitAbilityLevel(u, WG_AVATAR_WING_BOOK) > 0 and GetUnitAbilityLevel(u, WG_AVATAR_WING_COMMAND) > 0 and GetUnitAbilityLevel(u, WG_AVATAR_WING_ENDURANCE) > 0 and GetUnitAbilityLevel(u, WG_AVATAR_WING_CRIT) > 0
+endfunction
+
+function WG_EnsureAvatarWingBook takes unit u returns nothing
+    if u == null or GetUnitTypeId(u) == 0 or not UnitHasItemOfTypeBJ(u, WG_AVATAR_ITEM) then
+        return
+    endif
+    if GetUnitAbilityLevel(u, WG_AVATAR_SPEED_ABILITY) == 0 then
+        call UnitAddAbility(u, WG_AVATAR_SPEED_ABILITY)
+        call UnitMakeAbilityPermanent(u, true, WG_AVATAR_SPEED_ABILITY)
+        call BlzUnitHideAbility(u, WG_AVATAR_SPEED_ABILITY, true)
+    endif
+    if WG_AvatarWingBookReady(u) then
+        call SetPlayerAbilityAvailable(GetOwningPlayer(u), WG_AVATAR_WING_BOOK, false)
+        return
+    endif
+    if GetUnitAbilityLevel(u, WG_AVATAR_WING_BOOK) > 0 then
+        call UnitRemoveAbility(u, WG_AVATAR_WING_BOOK)
+    endif
+    call UnitAddAbility(u, WG_AVATAR_WING_BOOK)
+    call UnitMakeAbilityPermanent(u, true, WG_AVATAR_WING_BOOK)
+    call SetPlayerAbilityAvailable(GetOwningPlayer(u), WG_AVATAR_WING_BOOK, false)
+    if GetUnitAbilityLevel(u, WG_AVATAR_WING_COMMAND) == 0 then
+        call UnitAddAbility(u, WG_AVATAR_WING_COMMAND)
+        call UnitMakeAbilityPermanent(u, true, WG_AVATAR_WING_COMMAND)
+        call BlzUnitHideAbility(u, WG_AVATAR_WING_COMMAND, true)
+    endif
+    if GetUnitAbilityLevel(u, WG_AVATAR_WING_ENDURANCE) == 0 then
+        call UnitAddAbility(u, WG_AVATAR_WING_ENDURANCE)
+        call UnitMakeAbilityPermanent(u, true, WG_AVATAR_WING_ENDURANCE)
+        call BlzUnitHideAbility(u, WG_AVATAR_WING_ENDURANCE, true)
+    endif
+    if GetUnitAbilityLevel(u, WG_AVATAR_WING_CRIT) == 0 then
+        call UnitAddAbility(u, WG_AVATAR_WING_CRIT)
+        call UnitMakeAbilityPermanent(u, true, WG_AVATAR_WING_CRIT)
+        call BlzUnitHideAbility(u, WG_AVATAR_WING_CRIT, true)
+    endif
+endfunction
+
+function WG_AvatarBookSyncTick takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer key = GetHandleId(t)
+    local unit u = LoadUnitHandle(wg_avatarBookTable, key, 0)
+    local integer ticks = LoadInteger(wg_avatarBookTable, key, 1) + 1
+    if u != null and GetUnitTypeId(u) != 0 then
+        call WG_EnsureAvatarWingBook(u)
+    endif
+    if u == null or GetUnitTypeId(u) == 0 or ticks >= 70 then
+        call FlushChildHashtable(wg_avatarBookTable, key)
+        call DestroyTimer(t)
+        set t = null
+        set u = null
+        return
+    endif
+    call SaveInteger(wg_avatarBookTable, key, 1, ticks)
+    call TimerStart(t, 0.5, false, function WG_AvatarBookSyncTick)
+    set t = null
+    set u = null
+endfunction
+
+function WG_StartAvatarBookSync takes unit u returns nothing
+    local timer t
+    local integer key
+    if u == null or GetUnitTypeId(u) == 0 then
+        return
+    endif
+    if wg_avatarBookTable == null then
+        set wg_avatarBookTable = InitHashtable()
+    endif
+    set t = CreateTimer()
+    set key = GetHandleId(t)
+    call SaveUnitHandle(wg_avatarBookTable, key, 0, u)
+    call SaveInteger(wg_avatarBookTable, key, 1, 0)
+    call TimerStart(t, 0.10, false, function WG_AvatarBookSyncTick)
+    set t = null
+endfunction
+
+function WG_AvatarNativeExpires takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer key = GetHandleId(t)
+    local unit u = LoadUnitHandle(wg_avatarTable, key, 0)
+    local item it = LoadItemHandle(wg_avatarTable, key, 10)
+    local integer unitKey
+    if u != null and GetUnitTypeId(u) != 0 then
+        if GetUnitAbilityLevel(u, WG_AVATAR_MAGIC_IMMUNITY) > 0 and LoadInteger(wg_avatarTable, key, 14) == 0 then
+            call UnitRemoveAbility(u, WG_AVATAR_MAGIC_IMMUNITY)
+        endif
+        if LoadInteger(wg_avatarTable, key, 13) > 0 and it != null and WG_UnitCarriesItem(u, it) then
+            call UnitAddAbility(u, WG_AVATAR_WING_MODEL_ABILITY)
+            call UnitMakeAbilityPermanent(u, true, WG_AVATAR_WING_MODEL_ABILITY)
+            call BlzUnitDisableAbility(u, WG_AVATAR_WING_MODEL_ABILITY, false, false)
+        endif
+        call WG_EnsureAvatarWingBook(u)
+        set unitKey = GetHandleId(u)
+        if LoadTimerHandle(wg_avatarTable, unitKey, 0) == t then
+            call FlushChildHashtable(wg_avatarTable, unitKey)
+        endif
+    endif
+    if it != null then
+        call SetItemDroppable(it, true)
+    endif
+    call FlushChildHashtable(wg_avatarTable, key)
+    call DestroyTimer(t)
+    set t = null
+    set u = null
+    set it = null
+endfunction
+
+function WG_OnAvatarLegacy takes nothing returns nothing
+    local unit u = GetTriggerUnit()
+    local timer t
+    local item it
+    local integer key
+    local integer oldDefense
+    local integer oldAttackType
+    local integer oldAttackType2
+    local integer oldTargets
+    local integer oldTargets2
+    local integer oldSplashTargets
+    local integer oldSplashTargets2
+    local boolean oldAttack1Enabled
+    local boolean oldAttack2Enabled
+    local boolean oldAttack1ShowUi
+    local boolean oldAttack2ShowUi
+    local real oldRange
+    local real oldRange2
+    local real oldCooldown1
+    local real oldCooldown2
+    local real oldProjectileSpeed
+    local real oldProjectileSpeed2
+    local real oldSplashFull
+    local real oldSplashMedium
+    local real oldSplashSmall
+    local real oldSplashMediumFactor
+    local real oldSplashSmallFactor
+    local real oldSplashFull2
+    local real oldSplashMedium2
+    local real oldSplashSmall2
+    local real oldSplashMediumFactor2
+    local real oldSplashSmallFactor2
+    local real oldAcquireRange
+    local real life
+    local real cost
+    local string oldProjectileArt
+    local string oldProjectileArt2
+    local string oldWeaponType1
+    local string oldWeaponType2
+    if GetSpellAbilityId() != WG_AVATAR_ABILITY or u == null or GetUnitTypeId(u) == 0 then
+        set u = null
+        return
+    endif
+    if wg_avatarTable == null then
+        set wg_avatarTable = InitHashtable()
+    endif
+    if WG_AvatarActive(u) then
+        set u = null
+        return
+    endif
+    set oldDefense = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+    set oldAttackType = BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0)
+    set oldAttackType2 = BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 1)
+    set oldRange = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 0)
+    set oldRange2 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 1)
+    set oldCooldown1 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN, 0)
+    set oldCooldown2 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN, 1)
+    set oldProjectileSpeed = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_PROJECTILE_SPEED, 0)
+    set oldProjectileSpeed2 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_PROJECTILE_SPEED, 1)
+    set oldProjectileArt = BlzGetUnitWeaponStringField(u, UNIT_WEAPON_SF_ATTACK_PROJECTILE_ART, 0)
+    set oldProjectileArt2 = BlzGetUnitWeaponStringField(u, UNIT_WEAPON_SF_ATTACK_PROJECTILE_ART, 1)
+    set oldTargets = BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_TARGETS_ALLOWED, 0)
+    set oldTargets2 = BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_TARGETS_ALLOWED, 1)
+    set oldSplashTargets = BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_AREA_OF_EFFECT_TARGETS, 0)
+    set oldSplashTargets2 = BlzGetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_AREA_OF_EFFECT_TARGETS, 1)
+    set oldAttack1Enabled = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0)
+    set oldAttack2Enabled = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 1)
+    set oldAttack1ShowUi = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACK_SHOW_UI, 0)
+    set oldAttack2ShowUi = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACK_SHOW_UI, 1)
+    set oldSplashFull = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_FULL_DAMAGE, 0)
+    set oldSplashMedium = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_MEDIUM_DAMAGE, 0)
+    set oldSplashSmall = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_SMALL_DAMAGE, 0)
+    set oldSplashMediumFactor = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_DAMAGE_FACTOR_MEDIUM, 0)
+    set oldSplashSmallFactor = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_DAMAGE_FACTOR_SMALL, 0)
+    set oldSplashFull2 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_FULL_DAMAGE, 1)
+    set oldSplashMedium2 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_MEDIUM_DAMAGE, 1)
+    set oldSplashSmall2 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_AREA_OF_EFFECT_SMALL_DAMAGE, 1)
+    set oldSplashMediumFactor2 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_DAMAGE_FACTOR_MEDIUM, 1)
+    set oldSplashSmallFactor2 = BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_DAMAGE_FACTOR_SMALL, 1)
+    set oldWeaponType1 = BlzGetUnitWeaponStringField(u, ConvertUnitWeaponStringField('ua1w'), 0)
+    set oldWeaponType2 = BlzGetUnitWeaponStringField(u, ConvertUnitWeaponStringField('ua2w'), 1)
+    set oldAcquireRange = GetUnitAcquireRange(u)
+    set t = CreateTimer()
+    set key = GetHandleId(t)
+    call SaveUnitHandle(wg_avatarTable, key, 0, u)
+    call SaveInteger(wg_avatarTable, key, 1, oldDefense)
+    if GetUnitAbilityLevel(u, WG_AVATAR_MAGIC_IMMUNITY) > 0 then
+        call SaveInteger(wg_avatarTable, key, 14, 1)
+    else
+        call SaveInteger(wg_avatarTable, key, 14, 0)
+    endif
+    call SaveInteger(wg_avatarTable, key, 2, oldAttackType)
+    call SaveInteger(wg_avatarTable, key, 16, oldAttackType2)
+    call SaveReal(wg_avatarTable, key, 3, oldRange)
+    call SaveReal(wg_avatarTable, key, 38, oldRange2)
+    call SaveReal(wg_avatarTable, key, 39, oldCooldown1)
+    call SaveReal(wg_avatarTable, key, 40, oldCooldown2)
+    call SaveReal(wg_avatarTable, key, 4, oldProjectileSpeed)
+    call SaveReal(wg_avatarTable, key, 17, oldProjectileSpeed2)
+    call SaveStr(wg_avatarTable, key, 5, oldProjectileArt)
+    call SaveStr(wg_avatarTable, key, 18, oldProjectileArt2)
+    call SaveInteger(wg_avatarTable, key, 6, oldTargets)
+    call SaveInteger(wg_avatarTable, key, 19, oldTargets2)
+    call SaveInteger(wg_avatarTable, key, 24, oldSplashTargets)
+    call SaveInteger(wg_avatarTable, key, 32, oldSplashTargets2)
+    call SaveReal(wg_avatarTable, key, 25, oldSplashFull)
+    call SaveReal(wg_avatarTable, key, 26, oldSplashMedium)
+    call SaveReal(wg_avatarTable, key, 27, oldSplashSmall)
+    call SaveReal(wg_avatarTable, key, 28, oldSplashMediumFactor)
+    call SaveReal(wg_avatarTable, key, 29, oldSplashSmallFactor)
+    call SaveReal(wg_avatarTable, key, 33, oldSplashFull2)
+    call SaveReal(wg_avatarTable, key, 34, oldSplashMedium2)
+    call SaveReal(wg_avatarTable, key, 35, oldSplashSmall2)
+    call SaveReal(wg_avatarTable, key, 36, oldSplashMediumFactor2)
+    call SaveReal(wg_avatarTable, key, 37, oldSplashSmallFactor2)
+    call SaveStr(wg_avatarTable, key, 23, oldWeaponType1)
+    call SaveStr(wg_avatarTable, key, 31, oldWeaponType2)
+    if oldAttack1Enabled then
+        call SaveInteger(wg_avatarTable, key, 15, 1)
+    else
+        call SaveInteger(wg_avatarTable, key, 15, 0)
+    endif
+    if oldAttack2Enabled then
+        call SaveInteger(wg_avatarTable, key, 21, 1)
+    else
+        call SaveInteger(wg_avatarTable, key, 21, 0)
+    endif
+    if oldAttack1ShowUi then
+        call SaveInteger(wg_avatarTable, key, 41, 1)
+    else
+        call SaveInteger(wg_avatarTable, key, 41, 0)
+    endif
+    if oldAttack2ShowUi then
+        call SaveInteger(wg_avatarTable, key, 42, 1)
+    else
+        call SaveInteger(wg_avatarTable, key, 42, 0)
+    endif
+    call SaveReal(wg_avatarTable, key, 7, oldAcquireRange)
+    set it = WG_AvatarItem(u)
+    if it != null then
+        call SaveItemHandle(wg_avatarTable, key, 10, it)
+    endif
+    if GetUnitTypeId(u) == 'Edem' or GetUnitTypeId(u) == 'H0D2' then
+        if GetUnitAbilityLevel(u, WG_AVATAR_MAGIC_IMMUNITY) > 0 then
+            call SaveInteger(wg_avatarTable, key, 14, 1)
+        else
+            call SaveInteger(wg_avatarTable, key, 14, 0)
+        endif
+        if GetUnitAbilityLevel(u, WG_AVATAR_WING_MODEL_ABILITY) > 0 then
+            call SaveInteger(wg_avatarTable, key, 13, 1)
+            call UnitRemoveAbility(u, WG_AVATAR_WING_MODEL_ABILITY)
+        else
+            call SaveInteger(wg_avatarTable, key, 13, 0)
+        endif
+        if GetUnitAbilityLevel(u, WG_AVATAR_MAGIC_IMMUNITY) == 0 then
+            call UnitAddAbility(u, WG_AVATAR_MAGIC_IMMUNITY)
+            call UnitMakeAbilityPermanent(u, true, WG_AVATAR_MAGIC_IMMUNITY)
+        endif
+        set life = GetUnitState(u, UNIT_STATE_LIFE)
+        set cost = life * WG_AVATAR_LIFE_COST_PCT
+        if cost >= life then
+            set cost = life - 1.0
+        endif
+        if cost > 0.0 then
+            call SetUnitState(u, UNIT_STATE_LIFE, life - cost)
+        endif
+        if it != null then
+            call SetItemDroppable(it, false)
+        endif
+        call WG_Message(GetOwningPlayer(u), "天神下凡：原生变身 / 神圣护甲 / 混乱溅射")
+        call TimerStart(t, WG_AVATAR_DURATION, false, function WG_AvatarNativeExpires)
+        call WG_StartAvatarBookSync(u)
+        set t = null
+        set it = null
+        set u = null
+        return
+    endif
+    if IsUnitType(u, UNIT_TYPE_RANGED_ATTACKER) then
+        call SaveInteger(wg_avatarTable, key, 8, 1)
+    else
+        call SaveInteger(wg_avatarTable, key, 8, 0)
+    endif
+    if IsUnitType(u, UNIT_TYPE_MELEE_ATTACKER) then
+        call SaveInteger(wg_avatarTable, key, 9, 1)
+    else
+        call SaveInteger(wg_avatarTable, key, 9, 0)
+    endif
+    if GetUnitAbilityLevel(u, WG_AVATAR_WING_MODEL_ABILITY) > 0 then
+        call SaveInteger(wg_avatarTable, key, 13, 1)
+    else
+        call SaveInteger(wg_avatarTable, key, 13, 0)
+    endif
+    call SaveTimerHandle(wg_avatarTable, GetHandleId(u), 0, t)
+    set life = GetUnitState(u, UNIT_STATE_LIFE)
+    set cost = life * WG_AVATAR_LIFE_COST_PCT
+    if cost >= life then
+        set cost = life - 1.0
+    endif
+    if cost > 0.0 then
+        call SetUnitState(u, UNIT_STATE_LIFE, life - cost)
+    endif
+    call WG_Message(GetOwningPlayer(u), "天神下凡：混乱攻击 / 远程 500 / 50-150-250 溅射")
+    if it != null then
+        call SetItemDroppable(it, false)
+    endif
+    call TimerStart(t, 0.05, false, function WG_AvatarApply)
+    set t = null
+    set it = null
+    set u = null
+endfunction
+
+function WG_OnAvatarSplash takes nothing returns nothing
+    local unit attacker = GetEventDamageSource()
+    local unit victim = BlzGetEventDamageTarget()
+    local unit target
+    local player owner
+    local group targets
+    local real dmg = GetEventDamage()
+    local real victimX
+    local real victimY
+    local real dx
+    local real dy
+    local real distance
+    local real factor
+    if attacker == null or GetUnitTypeId(attacker) == 0 then
+        set attacker = null
+        set victim = null
+        return
+    endif
+    if victim == null then
+        set victim = GetTriggerUnit()
+    endif
+    if victim == null or dmg <= 0.0 or not BlzGetEventIsAttack() then
+        set attacker = null
+        set victim = null
+        return
+    endif
+    if not WG_AvatarActive(attacker) or not IsUnitEnemy(victim, GetOwningPlayer(attacker)) then
+        set attacker = null
+        set victim = null
+        return
+    endif
+    if wg_avatarSplashBusy then
+        set attacker = null
+        set victim = null
+        return
+    endif
+    set wg_avatarSplashBusy = true
+    set owner = GetOwningPlayer(attacker)
+    set victimX = GetUnitX(victim)
+    set victimY = GetUnitY(victim)
+    set targets = CreateGroup()
+    call GroupEnumUnitsInRange(targets, victimX, victimY, WG_AVATAR_SPLASH_SMALL, null)
+    loop
+        set target = FirstOfGroup(targets)
+        exitwhen target == null
+        call GroupRemoveUnit(targets, target)
+        if target == victim or target == attacker or GetUnitTypeId(target) == 0 or GetWidgetLife(target) <= 0.405 then
+            set target = null
+        else
+            set dx = GetUnitX(target) - victimX
+            set dy = GetUnitY(target) - victimY
+            set distance = SquareRoot(dx * dx + dy * dy)
+            set factor = 0.0
+            if distance <= WG_AVATAR_SPLASH_FULL then
+                set factor = 1.0
+            elseif distance <= WG_AVATAR_SPLASH_MEDIUM then
+                set factor = WG_AVATAR_SPLASH_MEDIUM_FACTOR
+            elseif distance <= WG_AVATAR_SPLASH_SMALL then
+                set factor = WG_AVATAR_SPLASH_SMALL_FACTOR
+            endif
+            if factor > 0.0 and IsUnitEnemy(target, owner) and not BlzIsUnitInvulnerable(target) then
+                call UnitDamageTarget(attacker, target, dmg * factor, true, false, ATTACK_TYPE_CHAOS, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS)
+            endif
+            set target = null
+        endif
+    endloop
+    call DestroyGroup(targets)
+    set wg_avatarSplashBusy = false
+    set targets = null
+    set attacker = null
+    set victim = null
+    set owner = null
+endfunction
+
+function WG_OnAvatarDropItem takes nothing returns nothing
+    local unit u = GetTriggerUnit()
+    local item it = GetManipulatedItem()
+    if u == null or it == null or GetItemTypeId(it) != WG_AVATAR_ITEM then
+        set u = null
+        set it = null
+        return
+    endif
+    if not WG_AvatarActive(u) then
+        set u = null
+        set it = null
+        return
+    endif
+    if not WG_UnitCarriesItem(u, it) then
+        if UnitAddItem(u, it) == null then
+            call WG_Message(GetOwningPlayer(u), "天神下凡尚未结束，恶魔之翼无法离身")
+        endif
+    endif
+    call SetItemDroppable(it, false)
+    set u = null
+    set it = null
+endfunction
+
 function WG_NoOp takes nothing returns nothing
 endfunction
 
@@ -2195,6 +2894,15 @@ function WG_RegisterTriggers takes nothing returns nothing
     set t = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_UNIT_SPELL_EFFECT)
     call TriggerAddAction(t, function WG_OnAshFall)
+    set t = null
+    // Demon Wings: Avatar grants temporary Divine defense and ranged chaos attacks.
+    set t = CreateTrigger()
+    call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_UNIT_SPELL_EFFECT)
+    call TriggerAddAction(t, function WG_OnAvatarSimple)
+    set t = null
+    set t = CreateTrigger()
+    call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_UNIT_DROP_ITEM)
+    call TriggerAddAction(t, function WG_OnAvatarDropItem)
     set t = null
     // 死亡之指（阿克蒙德之手的主动）：伤害在脚本里按智力算
     set t = CreateTrigger()

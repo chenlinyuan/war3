@@ -1,1 +1,0 @@
-﻿trigger t=null

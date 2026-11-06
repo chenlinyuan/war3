@@ -41,6 +41,8 @@ HKE 只在两种情况下需要：图里有本工具不认识的压缩方式，�
 
 | 文件 | 用途 |
 | --- | --- |
+| `apply_reforged_migration.py` | **实验性 Reforged 数据迁移**：逐章把 `map-info v25-v30` 升级到 `v31+`，设置 Reforged 数据 `2/2`，战役章节保持原样存储，并逐章回读校验 |
+| `campaign_singleplayer.py` | **KK/KKWE 战役单机修复入口**：批量提取章节、还原 JASS、拆平台门禁、修已知卡关/清场/掉落问题、清内层 MPQ platform 位、pjass + Map Doctor + Storm 校验，并输出可供 ALAS 离线工具继续加工的 `.w3n` |
 | `inject_native.py` | **原生写入（推荐）**：不开 HKE，几秒完成脚本 + 文件替换；写入后自动读回校验。`--store <内部名>` = 原样存储（战役 .w3n 的章节**必须**这样写，否则游戏打不开章节）|
 | `mpq_patch.py` | 原生 MPQ 写入器（保留全部老条目 + 重写哈希/块表）|
 | `jass_gate.py` | 构建期门禁：pjass 对比注入前后，出现**新的错误类型**就拒绝写出 |
@@ -100,6 +102,63 @@ HKE 只在两种情况下需要：图里有本工具不认识的压缩方式，�
 | `verify_map.py` / `verify_inject.py` / `verify_w3obj.py` | 各自的读回校验 |
 
 踩坑记录见 `docs/06-工具链/地图载入校验.md`（"找不到地图或者损毁"排查手册）。
+
+## Reforged 数据迁移
+
+仅用于需要 Reforged `map-info v31+` 功能、但源地图仍是 `v25-v30`
+的兼容性测试。迁移只修改工作副本中的 `war3map.w3i`，不会升级脚本或资源，
+也不能证明 Reforged 基础数据下的剧情、单位和章节切换仍然正常。
+
+```powershell
+python tools\war3map-injector\apply_reforged_migration.py `
+  "C:\path\legacy.w3n" `
+  --output "C:\path\legacy-migrated.w3n" `
+  --work "C:\path\legacy-migration-work"
+```
+
+低于 `map-info v25`、缺少 `war3map.w3i` 或无法解析的章节会被拒绝。
+
+## KK/KKWE 战役单机化 + 已知卡关修复
+
+`campaign_singleplayer.py` 是本仓库面向 KK/KKWE 平台战役的统一入口。它只做
+单机兼容和已知作者陷阱修复，不添加物品、翅膀、英雄或其他 ALAS 内容；生成的
+`.w3n` 应作为 ALAS 离线工具的干净输入。
+
+```powershell
+# 处理一个目录里的全部 .w3n
+python tools\war3map-injector\campaign_singleplayer.py "H:\Games\War3\Campaigns\dz"
+
+# 或只处理一部战役
+python tools\war3map-injector\campaign_singleplayer.py "H:\Games\War3\Campaigns\dz\194213.w3n"
+
+# 只提取并修复章节，不重新打包 .w3n
+python tools\war3map-injector\campaign_singleplayer.py "H:\Games\War3\Campaigns\dz" --extract-only
+```
+
+默认输出：
+
+```text
+<源目录>\singleplayer\             最终 .w3n
+<源目录>\_singleplayer_work\       原始章节、修复章节、脚本、报告
+```
+
+每一步都从原始 `.w3n` 重新提取，不会在已经注入过的成品上二次施工。主要处理：
+
+- KKWE `kkmap.jc` 还原为 JASS；
+- `DzAPI_*`、`EX*`、`RequestExtra*`、`LBK*`、`Blz*`、`JAPI*` 平台 native 就地存根；
+- 拆 `DzAPI_Map_IsMapTest` 防盗版/反破解失败陷阱；
+- 按触发器走法区分试玩/付费门禁与正常剧情结束，只中和平台相关结束点；
+- 修复商城福利清场、宠物领取删主角、任意英雄（含宠物）死亡误判负；
+- 修复跨章节存档污染、错误进度分支、关键机关/预置 BOSS 删除、遗漏掉落；
+- 修复黑屏过场和单人入口缺少任务句柄保护；
+- 清零每章 MPQ 哈希表的 `wPlatform`，章节在外层战役中原样存储；
+- 每章执行 pjass、Map Doctor 1.27/Reforged 检查，并对整个成品执行 Storm
+  外层读取和逐章 `open-as-archive` 校验。
+
+这里不会自动执行章节结束用的 `GO` 聊天命令。原作者用平台的“过关”按钮发送
+`GO`，单机版仍保留聊天触发器；若某章任务完成但未自动切章，在聊天框输入
+`GO`。自动定时触发曾被证实会因任务对象尚未创建而误触发结局，因此没有把它
+作为默认修复。
 
 ## 环境要求
 

@@ -957,6 +957,7 @@ def verify(output: Path) -> None:
         b"event=INCINERATE_EXPLODE",
         b"event=INCINERATE_EXPLODE_HIT",
         b"event=TALENT_STATS",
+        b"event=TALENT_DAMAGE_EVENT",
         b"call TT_SyncAttributeTalents(u)",
         b"if GetUnitAbilityLevel(u, 'T100') > 0 then",
         b"if GetUnitAbilityLevel(u, 'T101') > 0 then",

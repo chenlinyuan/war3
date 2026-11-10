@@ -512,7 +512,6 @@ def _verify_archive(
                 expected = ",".join(
                     TALENT.node_id(tier, choice)
                     for choice in range(TALENT.CHOICES_PER_TIER)
-                    if not (tier == 2 and choice == 1 and not ranged)
                 )
                 if master.get(("aabi", tier + 1)) != expected:
                     raise ValueError(

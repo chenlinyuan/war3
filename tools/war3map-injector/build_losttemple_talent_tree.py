@@ -340,14 +340,9 @@ def talent_entry(ident: str, ranged: bool = False) -> dict[str, object]:
         mod("abpy", -11),
     ]
     for tier in range(TIER_COUNT):
-        choices = [
-            node_id(tier, choice)
-            for choice in range(3)
-            if not (tier == 2 and choice == 1 and not ranged)
-        ]
         mods.append(mod(
             "aabi",
-            ",".join(choices),
+            ",".join(node_id(tier, choice) for choice in range(3)),
             level=tier + 1,
         ))
     return {"old": OPENER_ID, "new": ident, "mods": mods}
@@ -750,7 +745,6 @@ def verify(output: Path) -> None:
                 expected = ",".join(
                     node_id(tier, choice)
                     for choice in range(3)
-                    if not (tier == 2 and choice == 1 and not ranged)
                 )
                 if master_fields.get(("aabi", tier + 1)) != expected:
                     raise SystemExit(

@@ -307,6 +307,7 @@ def _verify_script(
     for marker in (
         "TT_SavedBackpackIndex",
         "TT_IsTalentHero",
+        "TT_IsRangedHero",
         "function TT_EnsureBackpack",
         "TT_GrantEarnedPoints",
         "TT_ClearTalentMilestones",
@@ -340,12 +341,13 @@ def _verify_script(
         "set TT_FX_TABLE = InitHashtable()",
         '"talentstats"',
         "event=TALENT_ATTACK",
+        "function TT_BarrageGroupFor takes string art, integer speed returns integer",
+        "function TT_BarrageAbilityFor takes integer artGroup, integer targets returns integer",
         "function TT_SyncNativeBarrage takes unit u returns nothing",
         "call UnitAddAbility(u, desired)",
         "event=BARRAGE_NATIVE_SYNC",
-        "function TT_SyncBarrageMissileArt takes unit u, integer abilityId, boolean shouldLog",
-        "ABILITY_SLF_MISSILE_ART",
-        "event=BARRAGE_MISSILE_SYNC",
+        "event=BARRAGE_ART_GROUP",
+        "event=BARRAGE_ART_UNMATCHED",
         "event=BARRAGE_NATIVE_HIT",
         "event=INCINERATE_HIT",
         "event=INCINERATE_EXPLODE",
@@ -493,33 +495,36 @@ def _verify_archive(
                 display_name + " is missing artifact " + ident
             )
     for index in range(TALENT.HERO_POOL_SIZE):
-        talent = TALENT.talent_pool_id(index)
-        backpack = TALENT.backpack_pool_id(index)
-        if talent not in abilities or backpack not in items:
-            raise ValueError(
-                display_name + " is missing talent pair " + talent
-            )
-        master = _field_map(abilities[talent][1])
-        if master.get("alev") != TALENT.TIER_COUNT:
-            raise ValueError(
-                display_name + ": " + talent + " has the wrong tier count"
-            )
-        for tier in range(TALENT.TIER_COUNT):
-            expected = ",".join(
-                TALENT.node_id(tier, choice)
-                for choice in range(TALENT.CHOICES_PER_TIER)
-            )
-            if master.get(("aabi", tier + 1)) != expected:
+        for ranged in (False, True):
+            talent = TALENT.talent_pool_id(index, ranged)
+            backpack = TALENT.backpack_pool_id(index, ranged)
+            if talent not in abilities or backpack not in items:
+                raise ValueError(
+                    display_name + " is missing talent pair " + talent
+                )
+            master = _field_map(abilities[talent][1])
+            if master.get("alev") != TALENT.TIER_COUNT:
                 raise ValueError(
                     display_name + ": " + talent
-                    + " has an invalid tier mapping"
+                    + " has the wrong tier count"
                 )
-        bag = _field_map(items[backpack][1])
-        if bag.get("iabi") != "AIni,AEqu,ASde," + talent:
-            raise ValueError(
-                display_name + ": " + backpack
-                + " is linked to the wrong talent tree"
-            )
+            for tier in range(TALENT.TIER_COUNT):
+                expected = ",".join(
+                    TALENT.node_id(tier, choice)
+                    for choice in range(TALENT.CHOICES_PER_TIER)
+                    if not (tier == 2 and choice == 1 and not ranged)
+                )
+                if master.get(("aabi", tier + 1)) != expected:
+                    raise ValueError(
+                        display_name + ": " + talent
+                        + " has an invalid tier mapping"
+                    )
+            bag = _field_map(items[backpack][1])
+            if bag.get("iabi") != "AIni,AEqu,ASde," + talent:
+                raise ValueError(
+                    display_name + ": " + backpack
+                    + " is linked to the wrong talent tree"
+                )
     _verify_script(script, level_cap, display_name, script_type)
 
 

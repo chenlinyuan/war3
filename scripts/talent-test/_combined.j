@@ -698,10 +698,6 @@ endfunction
 
 function TT_ClearBreakthroughBuffs takes unit u returns nothing
     call UnitRemoveAbility(u, 'B64D')
-    call UnitRemoveAbility(u, 'B64E')
-    call UnitRemoveAbility(u, 'B64F')
-    call UnitRemoveAbility(u, 'B64G')
-    call UnitRemoveAbility(u, 'B64H')
 endfunction
 
 function TT_SetBreakthroughStacks takes unit u, integer heroIndex, integer stacks returns nothing

@@ -31,6 +31,10 @@ def read_w3f_title(archive: W.MPQArchive) -> str:
     return data[12:end].decode("utf-8")
 
 
+def chapter_skip_key(value: str | Path) -> str:
+    return str(value).replace("\\", "/").strip("/").casefold()
+
+
 def verify_chapter_contents(source: Path, compact: Path) -> None:
     old_names_archive = W.MPQArchive(str(source))
     new_names_archive = W.MPQArchive(str(compact))
@@ -145,6 +149,12 @@ def main() -> int:
     parser.add_argument("--campaign", required=True, type=Path)
     parser.add_argument("--work", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--skip-chapter",
+        action="append",
+        default=[],
+        help="preserve this chapter byte-for-byte during compaction",
+    )
     args = parser.parse_args()
 
     source = args.campaign.resolve()
@@ -174,15 +184,29 @@ def main() -> int:
         outer.close()
     if not chapters:
         raise SystemExit("campaign has no chapter maps")
+    skipped_chapters = {
+        chapter_skip_key(item) for item in args.skip_chapter
+    }
 
     compacted: list[tuple[str, Path, dict[str, object]]] = []
     total_before = 0
     total_after = 0
     for name in chapters:
-        source_chapter = compact_dir / ("source-" + name)
+        source_chapter = compact_dir / "source" / name
+        source_chapter.parent.mkdir(parents=True, exist_ok=True)
         source_chapter.write_bytes(source_data[name])
-        compact_chapter_path = compact_dir / name
-        report = compact_chapter(source_chapter, compact_chapter_path)
+        compact_chapter_path = compact_dir / "compacted" / name
+        compact_chapter_path.parent.mkdir(parents=True, exist_ok=True)
+        if chapter_skip_key(name) in skipped_chapters:
+            shutil.copy2(source_chapter, compact_chapter_path)
+            report = {
+                "state": "preserved",
+                "size_before": source_chapter.stat().st_size,
+                "size_after": compact_chapter_path.stat().st_size,
+            }
+            print(f"{name}: preserved source bytes", flush=True)
+        else:
+            report = compact_chapter(source_chapter, compact_chapter_path)
         before = int(report["size_before"])
         after = int(report["size_after"])
         total_before += before
@@ -228,7 +252,12 @@ def main() -> int:
         if output_names != set(chapters):
             raise RuntimeError("campaign chapter list changed")
         for name, path, _report in compacted:
-            if check.read_file(name) != path.read_bytes():
+            expected = (
+                source_data[name]
+                if chapter_skip_key(name) in skipped_chapters
+                else path.read_bytes()
+            )
+            if check.read_file(name) != expected:
                 raise RuntimeError(f"{name}: outer read-back mismatch")
         nonchapter = [
             name for name in check.listfile

@@ -49,6 +49,7 @@ sys.path.insert(0, str(DOCTOR))
 
 import fix_alas_campaign_names as NAMES  # noqa: E402
 import alas_item_rules as ITEM_RULES  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 import port_alas_jass_campaign as JASS_CAMPAIGN  # noqa: E402
 import universal_talents as TALENT_BUNDLE  # noqa: E402
 import wild_equipment_drops as WILD_DROPS  # noqa: E402
@@ -201,6 +202,8 @@ class CampaignInfo:
     reforged_migration_supported: bool
     reforged_migration_reason: str
     chapters: list[str]
+    injectable_chapters: list[str]
+    cinematic_chapters: dict[str, str]
     source_sha256: str
     source_bytes: int
     already_injected: bool
@@ -222,8 +225,11 @@ class BuildResult:
     wild_equipment_drops: bool
     campaign_equipment_drops: bool
     follow_game_graphics: bool
+    include_cinematic_chapters: bool
     script_type: str
     chapters: int
+    injected_chapters: int
+    skipped_cinematic_chapters: int
     output_bytes: int
     output_sha256: str
     doctor_blockers: int
@@ -249,12 +255,52 @@ class SaveRepairResult:
     message: str
 
 
+@dataclass
+class CacheClearResult:
+    targets: int
+    files: int
+    bytes_removed: int
+    errors: list[str]
+    message: str
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest().upper()
+
+
+def running_war3_processes() -> list[str]:
+    """Return running War3 editor/game executables without touching the GUI."""
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    wanted = {
+        "warcraft iii.exe",
+        "warcraft iii launcher.exe",
+        "war3.exe",
+        "worldedit.exe",
+        "world editor.exe",
+    }
+    found = []
+    for line in result.stdout.splitlines():
+        if not line.startswith('"'):
+            continue
+        end = line.find('"', 1)
+        name = line[1:end] if end > 1 else ""
+        if name.casefold() in wanted:
+            found.append(name)
+    return sorted(set(found))
 
 
 def default_campaign_dir() -> Path:
@@ -278,6 +324,132 @@ def default_output_dir(source: Path) -> Path:
 def default_cache_dir() -> Path:
     local = Path(os.environ.get("LOCALAPPDATA", profile_cache_fallback()))
     return local / "ALASOffline"
+
+
+def _path_size(path: Path) -> tuple[int, int]:
+    if not path.exists() and not path.is_symlink():
+        return 0, 0
+    if path.is_file() or path.is_symlink():
+        try:
+            return 1, path.stat().st_size
+        except OSError:
+            return 0, 0
+    files = 0
+    size = 0
+    for item in path.rglob("*"):
+        if not item.is_file():
+            continue
+        files += 1
+        try:
+            size += item.stat().st_size
+        except OSError:
+            pass
+    return files, size
+
+
+def _deduplicate_paths(paths: list[Path]) -> list[Path]:
+    found: dict[str, Path] = {}
+    for path in paths:
+        resolved = path.resolve()
+        found[os.path.normcase(str(resolved))] = resolved
+    return sorted(
+        found.values(),
+        key=lambda path: (len(path.parts), str(path).casefold()),
+        reverse=True,
+    )
+
+
+def clear_tool_cache(
+    *,
+    cache_root: Path | None = None,
+    injector: Path | None = None,
+    doctor: Path | None = None,
+    workspace_root: Path | None = None,
+) -> CacheClearResult:
+    """Remove tool-generated cache and backup data, never source/archive files."""
+    cache_root = (cache_root or default_cache_dir()).resolve()
+    injector = (injector or INJECTOR).resolve()
+    doctor = (doctor or DOCTOR).resolve()
+    workspace_root = (workspace_root or ROOT).resolve()
+
+    targets: list[Path] = []
+    if cache_root.is_dir():
+        targets.extend(cache_root.iterdir())
+
+    for exact in (
+        injector / "_rep",
+        injector / "__pycache__",
+        doctor / "doctor" / "cache",
+    ):
+        if exact.exists() or exact.is_symlink():
+            targets.append(exact)
+
+    if injector.is_dir():
+        for pattern in (
+            "wings_config_offline_*",
+            "_tmp*",
+            "_verify*",
+            "_diag*",
+        ):
+            for target in injector.glob(pattern):
+                if target.name == "wings_config_offline_template.py":
+                    continue
+                targets.append(target)
+
+    recover = workspace_root / "maps" / "recover"
+    if recover.is_dir():
+        targets.extend(recover.glob("alas_campaign_names_*"))
+
+    allowed_roots = (
+        cache_root,
+        injector,
+        doctor,
+        workspace_root / "maps" / "recover",
+    )
+    safe_targets = []
+    for target in _deduplicate_paths(targets):
+        try:
+            if target == Path(target.anchor):
+                continue
+            if not any(
+                target == root
+                or root in target.parents
+                for root in allowed_roots
+            ):
+                continue
+        except (OSError, ValueError):
+            continue
+        safe_targets.append(target)
+
+    files = 0
+    bytes_removed = 0
+    errors: list[str] = []
+    for target in safe_targets:
+        count, size = _path_size(target)
+        try:
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target)
+            else:
+                target.unlink(missing_ok=True)
+        except OSError as exc:
+            errors.append("%s：%s" % (target, exc))
+            continue
+        files += count
+        bytes_removed += size
+
+    message = (
+        "已清理 %d 项缓存，共 %d 个文件，释放 %.1f MB。"
+        % (len(safe_targets) - len(errors), files, bytes_removed / 1048576)
+    )
+    if errors:
+        message += "\n%d 项未能删除。" % len(errors)
+    return CacheClearResult(
+        targets=len(safe_targets),
+        files=files,
+        bytes_removed=bytes_removed,
+        errors=errors,
+        message=message,
+    )
 
 
 def profile_cache_fallback() -> Path:
@@ -478,7 +650,20 @@ def analyze_source(path: Path) -> CampaignInfo:
         )
         if not chapters:
             raise OfflineToolError("战役中没有列出章节地图，可能是未命名保护块。")
+        chapter_titles = CAMP.campaign_chapter_titles(path)
+        injectable_chapters: list[str] = []
+        cinematic_chapters: dict[str, str] = {}
         for name in chapters:
+            key = CAMP.normalize_chapter_name(name)
+            folded = key.casefold()
+            title = chapter_titles.get(folded) or chapter_titles.get(
+                folded.rsplit("/", 1)[-1], ""
+            )
+            reason = CAMP.cinematic_chapter_reason(key, title)
+            if reason:
+                cinematic_chapters[key] = reason
+                continue
+            injectable_chapters.append(key)
             data = outer.read_file(name)
             if not data:
                 raise OfflineToolError("章节无法读取：" + name)
@@ -510,6 +695,12 @@ def analyze_source(path: Path) -> CampaignInfo:
     finally:
         outer.close()
 
+    if not injectable_chapters:
+        raise OfflineToolError(
+            "\u8be5\u6218\u5f79\u53ea\u5305\u542b\u8fc7\u573a\u7ae0"
+            "\u8282\uff0c\u6ca1\u6709\u53ef\u6ce8\u5165\u7684\u5267\u60c5"
+            "\u6d41\u7a0b\u3002"
+        )
     if len(script_types) != 1:
         raise OfflineToolError(
             "战役混用了 JASS/Lua 章节，v1 无法安全地自动选择管线："
@@ -551,6 +742,8 @@ def analyze_source(path: Path) -> CampaignInfo:
         reforged_migration_supported=reforged_migration_supported,
         reforged_migration_reason=reforged_migration_reason,
         chapters=chapters,
+        injectable_chapters=injectable_chapters,
+        cinematic_chapters=cinematic_chapters,
         source_sha256=sha256_file(path),
         source_bytes=path.stat().st_size,
         already_injected=already_injected,
@@ -628,6 +821,8 @@ def analyze_map(path: Path) -> CampaignInfo:
         reforged_migration_supported=reforged_migration_supported,
         reforged_migration_reason=reforged_migration_reason,
         chapters=[],
+        injectable_chapters=[],
+        cinematic_chapters={},
         source_sha256=sha256_file(path),
         source_bytes=path.stat().st_size,
         already_injected=False,
@@ -654,6 +849,7 @@ class OfflineBuilder:
         wild_equipment_drops: bool = False,
         campaign_equipment_drops: bool = False,
         follow_game_graphics: bool = False,
+        include_cinematic_chapters: bool = False,
         repair_saves: bool = True,
         repair_save_dir: Path | None = None,
     ) -> None:
@@ -674,6 +870,9 @@ class OfflineBuilder:
         self.wild_equipment_drops = bool(wild_equipment_drops)
         self.campaign_equipment_drops = bool(
             campaign_equipment_drops
+        )
+        self.include_cinematic_chapters = bool(
+            include_cinematic_chapters
         )
         self.new_backpack = bool(new_backpack)
         if self.universal_talents and not self.new_backpack:
@@ -868,7 +1067,11 @@ class OfflineBuilder:
             raise OfflineToolError("旧任务问题修复失败，退出码 %d。" % code)
 
     def _compact_campaign_release(
-        self, output: Path, work: Path, expected_chapters: list[str]
+        self,
+        output: Path,
+        work: Path,
+        expected_chapters: list[str],
+        skipped_cinematics: dict[str, str],
     ) -> None:
         compactor = RECOVER / "compact_campaign.py"
         if not compactor.is_file():
@@ -882,7 +1085,7 @@ class OfflineBuilder:
             compact_work = work / "release-compaction"
             compact_work.mkdir(parents=True, exist_ok=True)
             self.log("逐章无损重压缩并紧凑重建战役归档")
-            code = self.run([
+            compact_args: list[object] = [
                 self.python_executable,
                 compactor,
                 "--campaign",
@@ -891,7 +1094,10 @@ class OfflineBuilder:
                 compact_work,
                 "--output",
                 target,
-            ])
+            ]
+            for name in sorted(skipped_cinematics):
+                compact_args.extend(["--skip-chapter", name])
+            code = self.run(compact_args)
             if code:
                 self.log(
                     "战役无损缩容失败，退出码 %d；保留已通过逐文件校验的"
@@ -963,7 +1169,11 @@ class OfflineBuilder:
                 self.log("单图已足够紧凑，无需替换成品")
 
     def _audit_lua_release(
-        self, output: Path, expected_chapters: list[str], config_name: str
+        self,
+        output: Path,
+        expected_chapters: list[str],
+        config_name: str,
+        skipped_cinematics: dict[str, str],
     ) -> None:
         config = importlib.import_module(config_name)
         avatar_id = config.ABIL["act_blink"]
@@ -1001,6 +1211,23 @@ class OfflineBuilder:
                     chapter = W.MPQArchive(str(temp))
                     try:
                         script = chapter.read_file("war3map.lua") or b""
+                        if name in skipped_cinematics:
+                            for marker in (
+                                b"function WG_Init",
+                                b"function IB_Init",
+                                b"function FR_Init",
+                                b"function WGL_Init",
+                                b"__alasRunInit",
+                            ):
+                                if marker in script:
+                                    raise OfflineToolError(
+                                        "%s: skipped cinematic chapter contains %s"
+                                        % (
+                                            name,
+                                            marker.decode("ascii"),
+                                        )
+                                    )
+                            continue
                         if FORSAKEN_CHAPTERS.issubset(set(chapters)):
                             text_data = chapter.read_file("war3map.wct") or b""
                             trigger_data = chapter.read_file("war3map.wtg") or b""
@@ -1852,7 +2079,11 @@ class OfflineBuilder:
         )
 
     def _audit_graphics_mode(
-        self, output: Path, source_kind: str, chapters: list[str]
+        self,
+        output: Path,
+        source_kind: str,
+        chapters: list[str],
+        skipped_cinematics: dict[str, str],
     ) -> None:
         if not self.follow_game_graphics:
             return
@@ -1901,13 +2132,16 @@ class OfflineBuilder:
             "%d 个旧版地图无需该字段。"
             % (checked, skipped)
         )
-        code = self.run([
+        audit_args: list[object] = [
             self.python_executable,
             INJECTOR / "apply_graphics_mode.py",
             "--audit",
             "--input",
             output,
-        ])
+        ]
+        for name in sorted(skipped_cinematics):
+            audit_args.extend(["--skip-chapter", name])
+        code = self.run(audit_args)
         if code:
             raise OfflineToolError("Reforged hero graphics audit failed.")
 
@@ -1945,7 +2179,7 @@ class OfflineBuilder:
                     script_type,
                 )
             else:
-                WILD_DROPS.verify_bundle(output)
+                WILD_DROPS.verify_bundle(output, script_type)
         except Exception as exc:
             raise OfflineToolError(
                 "wild equipment drop audit failed: " + str(exc)
@@ -1966,8 +2200,9 @@ class OfflineBuilder:
         output: Path,
         source_kind: str,
         chapters: list[str],
+        script_type: str,
     ) -> None:
-        if not self.new_backpack or self.universal_talents:
+        if not self.new_backpack:
             return
         expected = ",".join(
             {
@@ -2035,31 +2270,6 @@ class OfflineBuilder:
                     raise OfflineToolError(
                         "新背包对象数据有尾随字节：" + name
                     )
-                item = next(
-                    (
-                        mods
-                        for _table, _old, new, mods in entries
-                        if new.replace("\0", "") == "B30B"
-                    ),
-                    None,
-                )
-                if item is None:
-                    raise OfflineToolError(
-                        "新背包缺少 B30B：" + name
-                    )
-                fields = {
-                    mod[0]: (
-                        mod[4].decode("utf-8", "replace")
-                        if isinstance(mod[4], bytes)
-                        else mod[4]
-                    )
-                    for mod in item
-                }
-                if fields.get("iabi") != expected:
-                    raise OfflineToolError(
-                        "%s 的新背包页签不正确：%r"
-                        % (name, fields.get("iabi"))
-                    )
                 info = W3I.parse_or_tolerant(info_data)
                 if (
                     info.get("game_data_set"),
@@ -2068,13 +2278,80 @@ class OfflineBuilder:
                     raise OfflineToolError(
                         name + " 未设置 Reforged 2/2 数据版本"
                     )
-                if (
-                    b"ALAS_B30B_Init" not in script
-                    and b"local function ensureHero" not in script
-                ):
-                    raise OfflineToolError(
-                        name + " 缺少新背包英雄发放脚本"
+                if self.universal_talents:
+                    talent_backpacks = []
+                    for _table, _old, new, mods in entries:
+                        ident = new.replace("\0", "")
+                        if not ident.startswith("Z"):
+                            continue
+                        fields = {
+                            mod[0]: (
+                                mod[4].decode("utf-8", "replace")
+                                if isinstance(mod[4], bytes)
+                                else mod[4]
+                            )
+                            for mod in mods
+                        }
+                        iabi = fields.get("iabi")
+                        if (
+                            isinstance(iabi, str)
+                            and iabi.startswith("AIni,AEqu,ASde,Q")
+                        ):
+                            talent_backpacks.append(ident)
+                    if not talent_backpacks:
+                        raise OfflineToolError(
+                            name + " 缺少通用天赋 Zxxx 背包物品"
+                        )
+                    ensure_marker = (
+                        b"function TT_EnsureBackpack("
+                        if script_type == "lua"
+                        else b"function TT_EnsureBackpack"
                     )
+                    grant_marker = (
+                        b"it = UnitAddItemByIdSwapped(desiredId, u)"
+                        if script_type == "lua"
+                        else b"set it = UnitAddItemByIdSwapped(desiredId, u)"
+                    )
+                    if (
+                        ensure_marker not in script
+                        or grant_marker not in script
+                    ):
+                        raise OfflineToolError(
+                            name + " 缺少通用天赋背包发放脚本"
+                        )
+                else:
+                    item = next(
+                        (
+                            mods
+                            for _table, _old, new, mods in entries
+                            if new.replace("\0", "") == "B30B"
+                        ),
+                        None,
+                    )
+                    if item is None:
+                        raise OfflineToolError(
+                            "新背包缺少 B30B：" + name
+                        )
+                    fields = {
+                        mod[0]: (
+                            mod[4].decode("utf-8", "replace")
+                            if isinstance(mod[4], bytes)
+                            else mod[4]
+                        )
+                        for mod in item
+                    }
+                    if fields.get("iabi") != expected:
+                        raise OfflineToolError(
+                            "%s 的新背包页签不正确：%r"
+                            % (name, fields.get("iabi"))
+                        )
+                    if (
+                        b"ALAS_B30B_Init" not in script
+                        and b"local function ensureHero" not in script
+                    ):
+                        raise OfflineToolError(
+                            name + " 缺少新背包英雄发放脚本"
+                        )
                 checked += 1
         finally:
             outer.close()
@@ -2090,9 +2367,15 @@ class OfflineBuilder:
         output: Path,
         script_type: str,
         chapters: list[str],
+        skipped_cinematics: dict[str, str],
         source_kind: str,
         config: str,
     ) -> None:
+        injected_chapters = [
+            chapter
+            for chapter in chapters
+            if chapter not in skipped_cinematics
+        ]
         self._audit_universal_talents(output)
         self._audit_wild_equipment_drops(
             output,
@@ -2100,7 +2383,7 @@ class OfflineBuilder:
             script_type,
         )
         self._audit_new_backpack(
-            output, source_kind, chapters
+            output, source_kind, injected_chapters, script_type
         )
         terms = ["阿克蒙德", "霜之哀伤", "埃辛诺斯战刃"]
         args: list[object] = [
@@ -2118,21 +2401,39 @@ class OfflineBuilder:
             else:
                 self._audit_map_release(output, config)
             self._audit_ft_data(output, source_kind, chapters)
-            self._audit_graphics_mode(output, source_kind, chapters)
+            self._audit_graphics_mode(
+                output,
+                source_kind,
+                chapters,
+                skipped_cinematics,
+            )
             return
-        self._audit_item_rules(output, chapters)
-        self._audit_ft_data(output, source_kind, chapters)
-        self._audit_graphics_mode(output, source_kind, chapters)
+        self._audit_item_rules(output, injected_chapters)
+        self._audit_ft_data(output, source_kind, injected_chapters)
+        self._audit_graphics_mode(
+            output,
+            source_kind,
+            injected_chapters,
+            skipped_cinematics,
+        )
         if script_type == "lua":
-            self._audit_lua_release(output, chapters, config)
+            self._audit_lua_release(
+                output,
+                chapters,
+                config,
+                skipped_cinematics,
+            )
             return
         if not LOCAL_AUDIT.is_file():
             raise OfflineToolError("缺少离线战役审计脚本。")
-        if self.run([
+        audit_args: list[object] = [
             self.python_executable, LOCAL_AUDIT, output,
             "--config", config,
             "--equipment-mode", self.equipment_mode,
-        ]):
+        ]
+        for name in sorted(skipped_cinematics):
+            audit_args.extend(["--skip-chapter", name])
+        if self.run(audit_args):
             raise OfflineToolError("ALAS 战役结构审计失败。")
 
     def _run_doctor(self, targets: list[Path]) -> list[dict[str, object]]:
@@ -2353,17 +2654,31 @@ class OfflineBuilder:
                 "无法迁移到 Reforged："
                 + info.reforged_migration_reason
             )
-        if self.wild_equipment_drops and (
-            info.source_kind != "map" or info.script_type != "jass"
-        ):
+        if self.wild_equipment_drops and info.source_kind != "map":
             raise OfflineToolError(
-                "wild equipment drops currently require a JASS single map"
+                "wild equipment drops currently require a single map"
             )
         if self.campaign_equipment_drops and (
             info.source_kind != "campaign"
         ):
             raise OfflineToolError(
                 "campaign equipment drops require a campaign source"
+            )
+        skipped_cinematics = (
+            {}
+            if self.include_cinematic_chapters
+            else dict(info.cinematic_chapters)
+        )
+        injected_chapters = (
+            list(info.chapters)
+            if self.include_cinematic_chapters
+            else list(info.injectable_chapters)
+        )
+        if info.source_kind == "campaign" and not injected_chapters:
+            raise OfflineToolError(
+                "\u672a\u627e\u5230\u53ef\u6ce8\u5165\u7684\u5267\u60c5"
+                "\u7ae0\u8282\uff1b\u8be5\u6218\u5f79\u4f3c\u4e4e\u53ea"
+                "\u5305\u542b\u8fc7\u573a\u52a8\u753b\u3002"
             )
         forsaken_lua = self._is_forsaken_lua_campaign(info)
         forsaken_fixes = False
@@ -2434,6 +2749,15 @@ class OfflineBuilder:
         )
         if info.source_kind == "campaign":
             self.log("章节数量: %d" % len(info.chapters))
+            self.log(
+                "ALAS injection chapters: %d, skipped cinematics: %d"
+                % (
+                    len(injected_chapters),
+                    len(skipped_cinematics),
+                )
+            )
+            for name, reason in sorted(skipped_cinematics.items()):
+                self.log("  skipped %s (%s)" % (name, reason))
             if output.suffix.lower() != ".w3n":
                 raise OfflineToolError("战役成品扩展名必须是 .w3n。")
         else:
@@ -2483,6 +2807,14 @@ class OfflineBuilder:
         self.log = tee_log
         build_work = work / "build"
         self.log("工作目录: " + str(work))
+        running = running_war3_processes()
+        if running:
+            self.log(
+                "警告: 检测到 "
+                + "、".join(running)
+                + " 正在运行。修改对象数据或脚本后，必须完全退出游戏/编辑器"
+                "再测试；仅重新开始当前地图可能继续使用旧缓存。"
+            )
         compat_report = work / "compat-report.json"
         compat_output = work / "compat" / ("compat-" + source.name)
         code = self.run([
@@ -2512,6 +2844,30 @@ class OfflineBuilder:
             if code:
                 raise OfflineToolError("Reforged 数据迁移失败。")
             build_source = migrated_source
+        elif self.new_backpack and self.universal_talents:
+            # Universal talents grant their own Zxxx backpack items rather than
+            # using apply_new_backpack.py. Those items still depend on the
+            # Reforged AIni/AEqu/ASde panel abilities, so the target chapters
+            # must use the 2/2 data baseline even when map-info is already v31.
+            reforged_data_source = work / "compat" / (
+                "reforged-data-" + build_source.name
+            )
+            code = self.run([
+                self.python_executable,
+                INJECTOR / "apply_reforged_migration.py",
+                str(build_source),
+                "--output", str(reforged_data_source),
+                "--work", str(work / "reforged-data-version"),
+            ])
+            if code:
+                raise OfflineToolError(
+                    "通用天赋背包的 Reforged 2/2 数据切换失败。"
+                )
+            self.log(
+                "通用天赋背包已启用 Reforged 2/2 数据版本: "
+                + str(reforged_data_source)
+            )
+            build_source = reforged_data_source
         if self.ft_data and info.source_kind == "map":
             ft_source = work / "compat" / ("ft-" + source.name)
             code = self.run([
@@ -2561,9 +2917,18 @@ class OfflineBuilder:
             talent_bundle = TALENT_BUNDLE.prepare_bundle(
                 build_source,
                 work / "universal-talents",
-                info.chapters,
+                injected_chapters,
             )
             self._talent_bundle = talent_bundle
+            self.log(
+                "通用天赋等级基准: "
+                + ", ".join(
+                    "%s=%d" % (name, level)
+                    for name, level in sorted(
+                        talent_bundle.chapter_levels.items()
+                    )
+                )
+            )
         talent_script_manifest = None
         if talent_bundle is not None and info.source_kind == "campaign":
             talent_script_manifest = (
@@ -2575,7 +2940,7 @@ class OfflineBuilder:
                         chapter: str(
                             talent_bundle.script_for(chapter)
                         )
-                        for chapter in info.chapters
+                        for chapter in injected_chapters
                     },
                     ensure_ascii=False,
                     indent=2,
@@ -2601,17 +2966,18 @@ class OfflineBuilder:
             campaign_drop_bundle = WILD_DROPS.prepare_campaign_bundle(
                 build_source,
                 work / "campaign-equipment-drops",
-                info.chapters,
+                injected_chapters,
             )
             self._campaign_drop_bundle = campaign_drop_bundle
             self.log(
                 "campaign drop profiles: "
                 + ", ".join(
-                    "%s(wild=%d,hero=%d,%d%%)"
+                    "%s(global=%d,native=%d/%d,%d%%)"
                     % (
                         profile.chapter,
                         profile.level_cap,
-                        profile.hero_level_cap,
+                        profile.chapter_level_cap,
+                        profile.chapter_hero_level_cap,
                         profile.chapter_progress,
                     )
                     for profile in campaign_drop_bundle.profiles
@@ -2649,7 +3015,10 @@ class OfflineBuilder:
                 "--work", build_work,
                 "--config", config,
                 "--output", output,
+                "--preserve-source", source,
             ]
+            if self.include_cinematic_chapters:
+                campaign_args.append("--include-cinematic-chapters")
             if campaign_drop_bundle is not None:
                 campaign_args.extend([
                     "--campaign-loot-manifest",
@@ -2691,7 +3060,10 @@ class OfflineBuilder:
                     "--config", config,
                     "--output", output,
                     "--no-deploy",
+                    "--preserve-source", source,
                 ]
+                if self.include_cinematic_chapters:
+                    lua_args.append("--include-cinematic-chapters")
                 if campaign_drop_bundle is not None:
                     lua_args.extend([
                         "--campaign-loot-manifest",
@@ -2719,16 +3091,33 @@ class OfflineBuilder:
         if self.compact_archive:
             if info.source_kind == "campaign":
                 self._compact_campaign_release(
-                    output, build_work, info.chapters
+                    output,
+                    build_work,
+                    info.chapters,
+                    skipped_cinematics,
                 )
                 chapter_compaction = True
             else:
                 self._compact_map_release(output, build_work)
             lossless_compaction = True
 
+        if info.source_kind == "campaign" and skipped_cinematics:
+            try:
+                CAMP.verify_campaign_chapters(
+                    source,
+                    output,
+                    set(skipped_cinematics),
+                )
+            except Exception as exc:
+                raise OfflineToolError(
+                    "\u538b\u7f29\u540e\u8fc7\u573a\u7ae0\u8282"
+                    "\u6821\u9a8c\u5931\u8d25\uff1a" + str(exc)
+                ) from exc
+
         self._run_audits(
             build_source, build_work, output,
             info.script_type, info.chapters,
+            skipped_cinematics,
             info.source_kind, config,
         )
         doctor_results: list[dict[str, object]] = []
@@ -2737,10 +3126,7 @@ class OfflineBuilder:
                 doctor_targets = [output]
             else:
                 base = build_work / "base"
-                doctor_targets = sorted(
-                    path for path in base.iterdir()
-                    if path.suffix.lower() in (".w3x", ".w3m")
-                )
+                doctor_targets = CAMP.chapter_paths(base)
             doctor_results = self._run_doctor(doctor_targets)
         if self.cancelled:
             raise OfflineToolError("用户取消。")
@@ -2768,8 +3154,17 @@ class OfflineBuilder:
             wild_equipment_drops=self.wild_equipment_drops,
             campaign_equipment_drops=self.campaign_equipment_drops,
             follow_game_graphics=self.follow_game_graphics,
+            include_cinematic_chapters=(
+                self.include_cinematic_chapters
+            ),
             script_type=info.script_type,
             chapters=1 if info.source_kind == "map" else len(info.chapters),
+            injected_chapters=(
+                1
+                if info.source_kind == "map"
+                else len(injected_chapters)
+            ),
+            skipped_cinematic_chapters=len(skipped_cinematics),
             output_bytes=output.stat().st_size,
             output_sha256=sha256_file(output),
             doctor_blockers=sum(

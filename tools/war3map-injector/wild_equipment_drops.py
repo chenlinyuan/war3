@@ -19,6 +19,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(DOCTOR))
 
 import war3mpq as W  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 from doctor.data import objects as DOBJ  # noqa: E402
 from doctor.fix import inflated_counts as INFLATED  # noqa: E402
 
@@ -52,6 +53,8 @@ class CampaignDropProfile:
     chapter_count: int
     level_cap: int
     hero_level_cap: int
+    chapter_level_cap: int
+    chapter_hero_level_cap: int
     chapter_progress: int
     counts: dict[str, int]
     script_dir: Path
@@ -61,14 +64,17 @@ class CampaignDropProfile:
 class CampaignDropBundle:
     root: Path
     manifest: Path
+    campaign_level_cap: int
     profiles: tuple[CampaignDropProfile, ...]
 
     def profile_for(self, chapter: str) -> CampaignDropProfile | None:
+        requested = CAMP.normalize_chapter_name(chapter)
         return next(
             (
                 profile
                 for profile in self.profiles
-                if profile.chapter == chapter
+                if CAMP.normalize_chapter_name(profile.chapter)
+                == requested
             ),
             None,
         )
@@ -714,6 +720,9 @@ def prepare_campaign_bundle(
     try:
         with tempfile.TemporaryDirectory() as temp_name:
             temp_root = Path(temp_name)
+            chapter_inputs: list[
+                tuple[int, str, dict[str, list[str]], int, int]
+            ] = []
             for index, chapter in enumerate(chapters):
                 data = archive.read_file(chapter)
                 if not data:
@@ -725,8 +734,27 @@ def prepare_campaign_bundle(
                 )
                 chapter_path.write_bytes(data)
                 pools = collect_pools(chapter_path)
-                level_cap = _neutral_level_cap(chapter_path)
-                hero_level_cap = _hero_level_cap(chapter_path)
+                native_level_cap = _neutral_level_cap(chapter_path)
+                native_hero_level_cap = _hero_level_cap(chapter_path)
+                chapter_inputs.append(
+                    (
+                        index,
+                        chapter,
+                        pools,
+                        native_level_cap,
+                        native_hero_level_cap,
+                    )
+                )
+            campaign_level_cap = max(
+                item[4] for item in chapter_inputs
+            )
+            for (
+                index,
+                chapter,
+                pools,
+                native_level_cap,
+                native_hero_level_cap,
+            ) in chapter_inputs:
                 progress = (
                     0
                     if len(chapters) == 1
@@ -747,14 +775,20 @@ def prepare_campaign_bundle(
                     chapter=chapter,
                     chapter_index=index + 1,
                     chapter_count=len(chapters),
-                    level_cap=level_cap,
-                    hero_level_cap=hero_level_cap,
+                    level_cap=campaign_level_cap,
+                    hero_level_cap=campaign_level_cap,
+                    chapter_level_cap=native_level_cap,
+                    chapter_hero_level_cap=native_hero_level_cap,
                     chapter_progress=progress,
                     counts=counts,
                     script_dir=script_dir,
                 )
                 (script_dir / "g.j").write_text(
-                    _pool_globals(counts, level_cap, profile),
+                    _pool_globals(
+                        counts,
+                        campaign_level_cap,
+                        profile,
+                    ),
                     encoding="utf-8",
                 )
                 (script_dir / "f.j").write_text(
@@ -773,6 +807,7 @@ def prepare_campaign_bundle(
         json.dumps(
             {
                 "source": str(source),
+                "campaign_level_cap": campaign_level_cap,
                 "chapters": [
                     {
                         "chapter": profile.chapter,
@@ -780,6 +815,10 @@ def prepare_campaign_bundle(
                         "chapter_count": profile.chapter_count,
                         "level_cap": profile.level_cap,
                         "hero_level_cap": profile.hero_level_cap,
+                        "chapter_level_cap": profile.chapter_level_cap,
+                        "chapter_hero_level_cap": (
+                            profile.chapter_hero_level_cap
+                        ),
                         "chapter_progress": profile.chapter_progress,
                         "counts": profile.counts,
                         "script_dir": str(profile.script_dir),
@@ -796,6 +835,7 @@ def prepare_campaign_bundle(
     return CampaignDropBundle(
         root=root,
         manifest=manifest,
+        campaign_level_cap=campaign_level_cap,
         profiles=tuple(profiles),
     )
 
@@ -809,6 +849,15 @@ def load_campaign_manifest(manifest: Path) -> CampaignDropBundle:
             chapter_count=int(item["chapter_count"]),
             level_cap=int(item["level_cap"]),
             hero_level_cap=int(item["hero_level_cap"]),
+            chapter_level_cap=int(
+                item.get("chapter_level_cap", item["level_cap"])
+            ),
+            chapter_hero_level_cap=int(
+                item.get(
+                    "chapter_hero_level_cap",
+                    item["hero_level_cap"],
+                )
+            ),
             chapter_progress=int(item["chapter_progress"]),
             counts={
                 str(name): int(count)
@@ -823,58 +872,110 @@ def load_campaign_manifest(manifest: Path) -> CampaignDropBundle:
     return CampaignDropBundle(
         root=manifest.resolve().parent,
         manifest=manifest.resolve(),
+        campaign_level_cap=int(
+            data.get(
+                "campaign_level_cap",
+                max(profile.level_cap for profile in profiles),
+            )
+        ),
         profiles=profiles,
     )
 
 
-def _script_from_output(output: Path) -> str:
+def _script_from_output(output: Path, script_type: str) -> str:
     archive = W.MPQArchive(str(output))
     try:
-        data = (
-            archive.read_file("war3map.j")
-            or archive.read_file(r"scripts\war3map.j")
-            or archive.read_file(r"Scripts\war3map.j")
-            or b""
-        )
+        if script_type == "lua":
+            data = (
+                archive.read_file("war3map.lua")
+                or archive.read_file(r"scripts\war3map.lua")
+                or archive.read_file(r"Scripts\war3map.lua")
+                or b""
+            )
+        else:
+            data = (
+                archive.read_file("war3map.j")
+                or archive.read_file(r"scripts\war3map.j")
+                or archive.read_file(r"Scripts\war3map.j")
+                or b""
+            )
     finally:
         archive.close()
     if not data:
-        raise ValueError("wild drops: output map has no JASS script")
+        raise ValueError(
+            "wild drops: output map has no %s script" % script_type
+        )
     return data.decode("utf-8", "replace")
 
 
-def verify_bundle(output: Path) -> None:
-    script = _script_from_output(output)
-    required = (
-        "function WED_Init takes",
-        "call TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, Player(PLAYER_NEUTRAL_AGGRESSIVE), EVENT_PLAYER_UNIT_DEATH, null)",
-        "GetOwningPlayer(victim) == Player(PLAYER_NEUTRAL_AGGRESSIVE)",
-        "GetPlayerController(owner) == MAP_CONTROL_USER",
-        "IsUnitType(victim, UNIT_TYPE_STRUCTURE)",
-        "IsUnitType(victim, UNIT_TYPE_SUMMONED)",
-        "IsUnitIllusion(victim)",
-        "set band = ((level - 1) * 5) / WED_LEVEL_CAP",
-        "function WED_OrangeChance takes integer level returns integer",
-    )
+def verify_bundle(output: Path, script_type: str) -> None:
+    script = _script_from_output(output, script_type)
+    if script_type == "lua":
+        required = (
+            "function WED_Init()",
+            "TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, "
+            "Player(PLAYER_NEUTRAL_AGGRESSIVE), "
+            "EVENT_PLAYER_UNIT_DEATH, nil)",
+            '__alasRunInit("WED", WED_Init)',
+            "GetOwningPlayer(victim) == "
+            "Player(PLAYER_NEUTRAL_AGGRESSIVE)",
+            "GetPlayerController(owner) == MAP_CONTROL_USER",
+            "IsUnitType(victim, UNIT_TYPE_STRUCTURE)",
+            "IsUnitType(victim, UNIT_TYPE_SUMMONED)",
+            "IsUnitIllusion(victim)",
+            "WED_LEVEL_CAP",
+            "function WED_OrangeChance(level)",
+        )
+    else:
+        required = (
+            "function WED_Init takes",
+            "call TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, "
+            "Player(PLAYER_NEUTRAL_AGGRESSIVE), "
+            "EVENT_PLAYER_UNIT_DEATH, null)",
+            "GetOwningPlayer(victim) == "
+            "Player(PLAYER_NEUTRAL_AGGRESSIVE)",
+            "GetPlayerController(owner) == MAP_CONTROL_USER",
+            "IsUnitType(victim, UNIT_TYPE_STRUCTURE)",
+            "IsUnitType(victim, UNIT_TYPE_SUMMONED)",
+            "IsUnitIllusion(victim)",
+            "set band = ((level - 1) * 5) / WED_LEVEL_CAP",
+            "function WED_OrangeChance takes integer level returns integer",
+        )
     for marker in required:
         if marker not in script:
             raise ValueError("wild drops: missing runtime marker " + marker)
-    if (
-        "call WED_Init()" not in script
-        and "function WED_Init)" not in script
-    ):
-        raise ValueError("wild drops: WED_Init is not entered")
-    neutral_registration = (
-        "TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, "
-        "Player(PLAYER_NEUTRAL_AGGRESSIVE), "
-        "EVENT_PLAYER_UNIT_DEATH, null)"
-    )
+    if script_type == "lua":
+        if '__alasRunInit("WED", WED_Init)' not in script:
+            raise ValueError("wild drops: WED_Init is not entered")
+        neutral_registration = (
+            "TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, "
+            "Player(PLAYER_NEUTRAL_AGGRESSIVE), "
+            "EVENT_PLAYER_UNIT_DEATH, nil)"
+        )
+    else:
+        if (
+            "call WED_Init()" not in script
+            and "function WED_Init)" not in script
+        ):
+            raise ValueError("wild drops: WED_Init is not entered")
+        neutral_registration = (
+            "TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, "
+            "Player(PLAYER_NEUTRAL_AGGRESSIVE), "
+            "EVENT_PLAYER_UNIT_DEATH, null)"
+        )
     if script.count(neutral_registration) != 1:
         raise ValueError(
             "wild drops: neutral death trigger must be registered exactly once"
         )
-    tier_start = script.find("function WED_Tier takes")
-    tier_end = script.find("endfunction", tier_start)
+    tier_start = script.find(
+        "function WED_Tier(victim)"
+        if script_type == "lua"
+        else "function WED_Tier takes"
+    )
+    tier_end = script.find(
+        "\nend" if script_type == "lua" else "endfunction",
+        tier_start,
+    )
     tier_body = (
         script[tier_start:tier_end]
         if tier_start >= 0 and tier_end >= 0
@@ -887,23 +988,37 @@ def verify_bundle(output: Path) -> None:
         raise ValueError(
             "wild drops: tier selection still uses non-level state"
         )
-    cap_match = re.search(r"integer WED_LEVEL_CAP = (\d+)", script)
+    cap_match = re.search(
+        r"(?:integer )?WED_LEVEL_CAP = (\d+)",
+        script,
+    )
     if cap_match is None or int(cap_match.group(1)) < 1:
         raise ValueError("wild drops: neutral level cap is missing or invalid")
-    arrays = {
-        name: re.findall(
-            r"set %s\[\d+\] = '([0-9A-Za-z]{4})'"
-            % re.escape(array_name),
-            script,
-        )
-        for name, (array_name, _minimum, _maximum) in POOL_NAMES.items()
-    }
+    if script_type == "lua":
+        arrays = {
+            name: re.findall(
+                r"%s\[\d+\] = (\d+)"
+                % re.escape(array_name),
+                script,
+            )
+            for name, (array_name, _minimum, _maximum) in POOL_NAMES.items()
+        }
+    else:
+        arrays = {
+            name: re.findall(
+                r"set %s\[\d+\] = '([0-9A-Za-z]{4})'"
+                % re.escape(array_name),
+                script,
+            )
+            for name, (array_name, _minimum, _maximum) in POOL_NAMES.items()
+        }
     for name, values in arrays.items():
         if not values:
             raise ValueError("wild drops: empty " + name + " pool")
         array_name = POOL_NAMES[name][0]
         count_match = re.search(
-            r"integer %s_COUNT = (\d+)" % re.escape(array_name),
+            r"(?:integer )?%s_COUNT = (\d+)"
+            % re.escape(array_name),
             script,
         )
         if count_match is None or int(count_match.group(1)) != len(values):
@@ -914,9 +1029,18 @@ def verify_bundle(output: Path) -> None:
         raise ValueError(
             "wild drops: expected exactly seven gameplay orange items"
         )
-    all_ids = {ident for values in arrays.values() for ident in values}
+    if script_type == "lua":
+        all_ids = {
+            int(value).to_bytes(4, "big").decode("latin-1")
+            for values in arrays.values()
+            for value in values
+        }
+    else:
+        all_ids = {ident for values in arrays.values() for ident in values}
     if all_ids & EXCLUDED_IDS or "eauc" in all_ids:
-        raise ValueError("wild drops: exclusive artifact or candle leaked")
+        raise ValueError(
+            "wild drops: exclusive artifact or candle leaked"
+        )
 
 
 def _campaign_script_from_chapter(

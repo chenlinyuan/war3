@@ -456,14 +456,19 @@ def verify(output: Path, title: str) -> None:
             b"call TimerStart(CreateTimer(), 0.0, false, function TT_Init)",
             1,
         ),
-        (b"set it = UnitAddItemById(u, 'ttal')", 1),
+        (
+            b"function TT_GrantOneTalentPoint takes unit u, integer amount returns boolean",
+            1,
+        ),
+        (b"call UnitUseItem(u, it)", 1),
         (b'"talentpoints"', 2),
         (b"if GetUnitAbilityLevel(u, 'T405') > 0 then", 1),
         (b"call TriggerAddAction(TT_SELL_TRIGGER", 1),
         (b"call UnitRemoveAbility(u, 'ATal')", 1),
         (b"call UnitAddAbility(u, 'T1AL')", 1),
-        (b"call UnitUseItem(u, it)", 1),
-        (b"call RemoveItem(it)", 1),
+        (b"event=POINT_ITEM_ISSUED", 1),
+        (b"event=POINT_GRANT_COMMITTED", 1),
+        (b"event=POINT_GRANT_BLOCKED", 1),
     )
     for marker, expected in markers:
         if script.count(marker) != expected:
@@ -481,7 +486,7 @@ def verify(output: Path, title: str) -> None:
 
     print(
         "verified: 7 tiers x 3 direct attribute choices, "
-        "one shared custom ATal tree, auto-consumed talent tomes, "
+        "one shared custom ATal tree, one-shot ttal point transactions, "
         "B30B.iabi=%s" % expected_iabi
     )
 

@@ -20,6 +20,7 @@ import build_losttemple_talent_tree as TALENT  # noqa: E402
 import war3mpq as W  # noqa: E402
 import wild_equipment_drops as WILD_DROPS  # noqa: E402
 from doctor.data import objects as DOBJ  # noqa: E402
+from doctor.data import w3i as W3I  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class TalentBundle:
     source_script_dir: Path
     chapter_levels: dict[str, int]
     scripts: dict[int, Path]
+    chapter_scripts: dict[str, Path]
 
     def level_for(self, chapter: str | None = None) -> int:
         if chapter is None:
@@ -36,6 +38,8 @@ class TalentBundle:
         return self.chapter_levels[chapter]
 
     def script_for(self, chapter: str | None = None) -> Path:
+        if chapter is not None and chapter in self.chapter_scripts:
+            return self.chapter_scripts[chapter]
         return self.scripts[self.level_for(chapter)]
 
 
@@ -160,6 +164,33 @@ def _render_script(work: Path, level_cap: int) -> Path:
     return target
 
 
+def _render_chapter_script(
+    work: Path,
+    level_cap: int,
+    chapter_index: int,
+) -> Path:
+    target = work / "scripts" / ("chapter-%02d" % chapter_index)
+    if target.is_dir():
+        return target
+    shutil.copytree(
+        _render_script(work, level_cap),
+        target,
+    )
+    globals_path = target / "g.j"
+    text = globals_path.read_text(encoding="utf-8")
+    updated, count = re.subn(
+        r"(?m)^integer TT_CAMPAIGN_CHAPTER = \d+$",
+        "integer TT_CAMPAIGN_CHAPTER = %d" % chapter_index,
+        text,
+    )
+    if count != 1:
+        raise ValueError(
+            "talent global TT_CAMPAIGN_CHAPTER anchor is not unique"
+        )
+    globals_path.write_text(updated, encoding="utf-8", newline="\n")
+    return target
+
+
 def prepare_bundle(
     source: Path,
     work: Path,
@@ -180,6 +211,11 @@ def prepare_bundle(
             )
         levels = {
             name: levels[name]
+            for name in expected_chapters
+        }
+        campaign_level_cap = max(levels.values())
+        levels = {
+            name: campaign_level_cap
             for name in expected_chapters
         }
     else:
@@ -205,12 +241,23 @@ def prepare_bundle(
         level_cap: _render_script(work, level_cap)
         for level_cap in unique_levels
     }
+    chapter_scripts: dict[str, Path] = {}
+    if source.suffix.lower() == ".w3n":
+        chapter_scripts = {
+            chapter: _render_chapter_script(
+                work,
+                levels[chapter],
+                index,
+            )
+            for index, chapter in enumerate(expected_chapters, 1)
+        }
     return TalentBundle(
         ability_object=ability_object,
         item_object=item_object,
         source_script_dir=TALENT.TALENT_SCRIPT,
         chapter_levels=levels,
         scripts=scripts,
+        chapter_scripts=chapter_scripts,
     )
 
 
@@ -243,7 +290,12 @@ def _field_map(mods: object) -> dict[object, object]:
     return fields
 
 
-def _verify_script(script: bytes, level_cap: int, label: str) -> None:
+def _verify_script(
+    script: bytes,
+    level_cap: int,
+    label: str,
+    script_type: str,
+) -> None:
     text = script.decode("utf-8", "replace")
     if not re.search(
         r"\bTT_MAX_LEVEL\s*=\s*%d\b" % level_cap,
@@ -254,17 +306,120 @@ def _verify_script(script: bytes, level_cap: int, label: str) -> None:
         )
     for marker in (
         "TT_SavedBackpackIndex",
+        "TT_IsTalentHero",
+        "function TT_EnsureBackpack",
         "TT_GrantEarnedPoints",
         "TT_ClearTalentMilestones",
         "TT_ResetTalents",
+        "TT_RegisterHeroCore",
+        "TT_IsCampaignRestoreQueued",
+        "TT_EnsureHeroNow",
+        "TT_EligiblePointCount",
+        "TT_TrimMilestonesToCount",
+        "TT_ValidateTalentPoints",
+        "TT_NotifyTalentDeficit",
+        "TT_NotifyTalentExcess",
+        "TT_HeroDisplayName",
+        " 获得 ",
+        "TT_CaptureTalentState",
+        "TT_ActualSelectionText",
+        "TT_RestoreTalentState",
+        "TT_EarnedTalentPoints",
+        "TT_TALENT_MASTER_LEVEL",
+        "TT_AWARDED_MASK",
+        "TT_CAMPAIGN_STATE_PENDING",
+        "TT_CAMPAIGN_VERIFY_PENDING",
+        "TT_RESTORE_TABLE",
+        "TT_ScheduleCampaignVerify",
+        "TT_OnCampaignVerifyTimer",
+        "CAMPAIGN_REAPPLY",
+        "TT_IsAwarded",
+        "TT_CampaignStore",
+        "TT_CampaignRestore",
+        "TT_TryCampaignCacheRestore",
+        "TT_QuickSaveCampaignState",
+        "TT_OpenCampaignCache",
+        "CAMPAIGN_CACHE_OPEN",
+        "CAMPAIGN_FALLBACK_RESTORE",
+        "CAMPAIGN_SAVE",
+        "CAMPAIGN_STORE_SAVED",
+        "TT_QueueCampaignRestore",
+        "TT_ConsumeCampaignRestore",
+        "TT_RegisteredHeroIndex",
+        "TT_MarkStartReady",
+        "TT_OnPointTimer",
+        "TT_CAMPAIGN_CHAPTER",
+        "CAMPAIGN_FRESH",
+        "HaveStoredInteger",
+        "CAMPAIGN_LEGACY_RECOVER",
+        "CAMPAIGN_RESTORE_DEFERRED",
+        "START_READY",
+        "POINT_ITEM_ISSUED",
+        "POINT_GRANT_COMMITTED",
+        "POINT_GRANT_BLOCKED",
+        "UnitUseItem(u, it)",
+        "HERO_WAIT_BACKPACK",
+        "POINT_RECONCILE_EXCESS",
+        "POINT_RECONCILE_DEFICIT",
+        "POINT_RECONCILE_OK",
+        "TALENT_INFER_AWARDED",
+        "PANEL_ABILITY",
+        "TT_LogFlush",
+        "PreloadGenEnd",
+        "TT_LOG_FILE",
+        "talentlog",
         "TT_Init",
         "BlzResetUnitTalents",
         "talentreset",
+        "EVENT_PLAYER_HERO_REVIVE_FINISH",
+        "EVENT_PLAYER_HERO_SKILL",
+        'TriggerRegisterPlayerChatEvent(chatTrigger, Player(i), "", false)',
     ):
         if marker not in text:
             raise ValueError(
                 "%s is missing universal talent marker %s"
                 % (label, marker)
+            )
+    for forbidden in (
+        "set highest = master",
+        "set target = master",
+    ):
+        if forbidden in text:
+            raise ValueError(
+                "%s still uses Q master level as a talent-point count"
+                % label
+            )
+    if script_type == "lua":
+        markers = (
+            "TT_RegisterHeroCore(u, false)",
+            "TT_RegisterHeroCore(u, true)",
+            "if (not TT_EnsureBackpack(u, heroIndex)) then",
+            "GetPlayerController(p) == MAP_CONTROL_USER",
+            "TT_IsCampaignRestoreQueued(u)",
+            "TT_EnsureHeroNow(u)",
+            "TT_StartPointTimer()",
+            "TT_ConsumeCampaignRestore(u, heroIndex)",
+            "UnitRemoveAbility(u, talentId)",
+            "GroupEnumUnitsSelected(g, p, nil)",
+        )
+    else:
+        markers = (
+            "return TT_RegisterHeroCore(u, false)",
+            "TT_RegisterHeroCore(u, true)",
+            "if not TT_EnsureBackpack(u, heroIndex) then",
+            "GetPlayerController(p) == MAP_CONTROL_USER",
+            "if TT_IsCampaignRestoreQueued(u) then",
+            "call TT_EnsureHeroNow(u)",
+            "call TT_StartPointTimer()",
+            "call TT_ConsumeCampaignRestore(u, heroIndex)",
+            "call UnitRemoveAbility(u, talentId)",
+            "call GroupEnumUnitsSelected(g, p, null)",
+        )
+    for marker in markers:
+        if marker not in text:
+            raise ValueError(
+                "%s is missing %s talent marker %s"
+                % (label, script_type.upper(), marker)
             )
 
 
@@ -277,18 +432,29 @@ def _verify_archive(
     try:
         ability_data = archive.read_file("war3map.w3a") or b""
         item_data = archive.read_file("war3map.w3t") or b""
-        script = (
-            archive.read_file("war3map.lua")
-            or archive.read_file("war3map.j")
+        info_data = archive.read_file("war3map.w3i") or b""
+        lua_script = archive.read_file("war3map.lua") or b""
+        jass_script = (
+            archive.read_file("war3map.j")
             or archive.read_file(r"scripts\war3map.j")
             or archive.read_file(r"Scripts\war3map.j")
             or b""
         )
+        script = lua_script or jass_script
+        script_type = "lua" if lua_script else "jass"
     finally:
         archive.close()
     if not ability_data or not item_data or not script:
         raise ValueError(
             display_name + " is missing talent objects or script"
+        )
+    info = W3I.parse_or_tolerant(info_data)
+    if (
+        info.get("game_data_set"),
+        info.get("game_data_version"),
+    ) != (2, 2):
+        raise ValueError(
+            display_name + " is not using Reforged 2/2 game data"
         )
     abilities = _entries(ability_data, True)
     items = _entries(item_data, False)
@@ -325,7 +491,7 @@ def _verify_archive(
                 display_name + ": " + backpack
                 + " is linked to the wrong talent tree"
             )
-    _verify_script(script, level_cap, display_name)
+    _verify_script(script, level_cap, display_name, script_type)
 
 
 def verify_bundle(output: Path, bundle: TalentBundle) -> None:

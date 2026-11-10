@@ -20,6 +20,7 @@ sys.stderr.reconfigure(errors="replace")
 
 import mpq_patch  # noqa: E402
 import war3mpq as W  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 from doctor.data import w3i as W3I  # noqa: E402
 
 
@@ -151,11 +152,7 @@ def extract_campaign(source: Path, work: Path) -> Path:
 
 
 def campaign_chapters(base: Path) -> list[Path]:
-    chapters = sorted(
-        path
-        for path in base.iterdir()
-        if path.suffix.lower() in (".w3x", ".w3m")
-    )
+    chapters = CAMP.chapter_paths(base)
     if not chapters:
         raise SystemExit("campaign has no chapter maps")
     return chapters

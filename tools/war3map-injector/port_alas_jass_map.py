@@ -238,12 +238,21 @@ def build_lua_map(
         extra_script=extra_script,
     )
     if extra_script is not None:
-        if b"function TT_Init()" not in module:
-            raise SystemExit("universal talent Lua init is missing")
-        if b'__alasRunInit("TALENT", TT_Init)' not in module:
-            raise SystemExit(
-                "universal talent Lua init is not guarded"
-            )
+        extra_functions = (
+            extra_script / "f.j"
+        ).read_text(encoding="utf-8")
+        if "function TT_Init takes" in extra_functions:
+            if b"function TT_Init()" not in module:
+                raise SystemExit("universal talent Lua init is missing")
+            if b'__alasRunInit("TALENT", TT_Init)' not in module:
+                raise SystemExit(
+                    "universal talent Lua init is not guarded"
+                )
+        if "function WED_Init takes" in extra_functions:
+            if b"function WED_Init()" not in module:
+                raise SystemExit("wild drop Lua init is missing")
+            if b'__alasRunInit("WED", WED_Init)' not in module:
+                raise SystemExit("wild drop Lua init is not guarded")
     ITEM.inject_chapter(source, output, module, merged, assets)
     ITEM.validate_chapter(
         output,

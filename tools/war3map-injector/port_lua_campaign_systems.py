@@ -18,6 +18,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, DOCTOR)
 
 import war3mpq as W  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 import port_wings as P  # noqa: E402
 from doctor.data import objects as OBJ  # noqa: E402
 from doctor.script import jass2lua, lua_ast  # noqa: E402
@@ -444,11 +445,10 @@ def main():
     base = work / "base"
     generated = work / "generated"
     frost = work / "frostmourne"
-    chapters = sorted(
-        p for p in base.iterdir()
-        if p.suffix.lower() in (".w3x", ".w3m")
-        and not p.name.endswith(".systems.w3x")
-    )
+    chapters = [
+        path for path in CAMP.chapter_paths(base)
+        if not path.name.endswith(".systems.w3x")
+    ]
 
     shutil.copy2(args.campaign, work / "_campaign_source.w3n")
     cfg = importlib.import_module(args.config)
@@ -474,6 +474,7 @@ def main():
 
     fixed = []
     for chapter in chapters:
+        chapter_key = CAMP.chapter_key(base, chapter)
         out = chapter.with_suffix(".systems.w3x")
         object_files = []
         for ext, (with_levels, source_names) in OBJ_FILES.items():
@@ -499,7 +500,7 @@ def main():
             print("   %s %s: +%d objects" % (chapter.name, ext, additions))
             object_files.append((target, "war3map." + ext))
         inject_chapter(chapter, out, module, object_files, assets)
-        fixed.append((chapter.name, out))
+        fixed.append((chapter_key, out))
 
     output = Path(args.output).resolve()
     shutil.copy2(args.campaign, output)

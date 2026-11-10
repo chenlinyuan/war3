@@ -15,6 +15,7 @@ from offline_core import (
     OfflineBuilder,
     OfflineToolError,
     analyze_source,
+    clear_tool_cache,
     default_output_dir,
     suggested_output_name,
 )
@@ -140,8 +141,27 @@ def run_cli(argv: list[str]) -> int:
         action="store_true",
         help="让地图同时允许 SD/HD，画面跟随游戏设置",
     )
+    parser.add_argument(
+        "--include-cinematic-chapters",
+        action="store_true",
+        help=(
+            "include chapters explicitly marked as interludes/cinematics; "
+            "they are skipped by default"
+        ),
+    )
+    parser.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="清除构建缓存、旧成品归档、临时配置和地图备份",
+    )
     parser.add_argument("--preflight", action="store_true")
     args = parser.parse_args(argv)
+    if args.clear_cache:
+        result = clear_tool_cache()
+        print(result.message)
+        for error in result.errors:
+            print("错误: " + error)
+        return 1 if result.errors else 0
     if not args.source:
         parser.error("--source is required in CLI mode")
     if args.preflight:
@@ -172,6 +192,9 @@ def run_cli(argv: list[str]) -> int:
             wild_equipment_drops=args.wild_equipment_drops,
             campaign_equipment_drops=args.campaign_equipment_drops,
             follow_game_graphics=args.follow_graphics,
+            include_cinematic_chapters=(
+                args.include_cinematic_chapters
+            ),
             repair_saves=not args.no_repair_saves,
             repair_save_dir=args.saves,
         ).build(
@@ -295,13 +318,16 @@ class OfflineApp:
         )
         self.wild_equipment_drops_var = tk.BooleanVar(value=False)
         self.wild_equipment_drops_hint_var = tk.StringVar(
-            value="野怪装备掉落：请先预检 JASS 单图。"
+            value="野怪装备掉落：请先预检 JASS/Lua 单图。"
         )
         self.campaign_equipment_drops_var = tk.BooleanVar(value=False)
         self.campaign_equipment_drops_hint_var = tk.StringVar(
             value="战役掉落：请先预检战役。"
         )
         self.follow_graphics_var = tk.BooleanVar(value=False)
+        self.include_cinematic_chapters_var = tk.BooleanVar(
+            value=False
+        )
         row1 = ttk.Frame(options)
         row1.pack(fill="x")
         row2 = ttk.Frame(options)
@@ -333,6 +359,14 @@ class OfflineApp:
             text="无损压缩（推荐）",
             variable=self.compact_var,
         ).pack(side="left")
+        ttk.Checkbutton(
+            row1,
+            text=(
+                "\u5305\u542b\u7eaf\u8fc7\u573a\u7ae0\u8282"
+                "\uff08\u9ed8\u8ba4\u8df3\u8fc7\uff09"
+            ),
+            variable=self.include_cinematic_chapters_var,
+        ).pack(side="left", padx=(20, 0))
         ttk.Checkbutton(
             row1,
             text="自动修复存档（默认）",
@@ -468,6 +502,10 @@ class OfflineApp:
             buttons, text="打开成品目录", command=self.open_output
         )
         self.open_button.pack(side="right")
+        self.clear_cache_button = ttk.Button(
+            buttons, text="清除全部缓存", command=self.clear_cache
+        )
+        self.clear_cache_button.pack(side="right", padx=(0, 8))
 
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(
@@ -772,7 +810,7 @@ class OfflineApp:
         source_supported = bool(
             info is not None
             and getattr(info, "source_kind", "") == "map"
-            and getattr(info, "script_type", "") == "jass"
+            and getattr(info, "script_type", "") in ("jass", "lua")
         )
         supported = source_supported and self.new_backpack_var.get()
         if not supported:
@@ -782,14 +820,14 @@ class OfflineApp:
         )
         if info is None:
             self.wild_equipment_drops_hint_var.set(
-                "野怪装备掉落：请先预检 JASS 单图。"
+                "野怪装备掉落：请先预检 JASS/Lua 单图。"
             )
             self.wild_equipment_drops_hint_label.configure(
                 foreground="#666666"
             )
         elif not source_supported:
             self.wild_equipment_drops_hint_var.set(
-                "暂仅支持 JASS 单图，战役和 Lua 单图不启用。"
+                "仅支持 JASS/Lua 单图；战役请使用下一项“战役装备掉落”。"
             )
             self.wild_equipment_drops_hint_label.configure(
                 foreground="#8a5a00"
@@ -857,6 +895,7 @@ class OfflineApp:
         state = "disabled" if busy else "normal"
         self.preflight_button.configure(state=state)
         self.build_button.configure(state=state)
+        self.clear_cache_button.configure(state=state)
         self.cancel_button.configure(state="normal" if busy else "disabled")
 
     def start_preflight(self) -> None:
@@ -946,6 +985,9 @@ class OfflineApp:
                     self.campaign_equipment_drops_var.get()
                 ),
                 follow_game_graphics=self.follow_graphics_var.get(),
+                include_cinematic_chapters=(
+                    self.include_cinematic_chapters_var.get()
+                ),
                 repair_saves=self.repair_saves_var.get(),
             )
             self.builder = builder
@@ -1038,7 +1080,44 @@ class OfflineApp:
                 self.set_busy(False)
                 self.append_log("错误: " + str(payload))
                 self.messagebox.showerror("构建失败", str(payload))
+            elif kind == "cache-cleared":
+                self.status_var.set("缓存已清理")
+                self.set_busy(False)
+                self.append_log(str(payload.message))
+                detail = str(payload.message)
+                if payload.errors:
+                    detail += "\n\n" + "\n".join(payload.errors)
+                self.messagebox.showinfo("清理完成", detail)
+            elif kind == "cache-clear-error":
+                self.status_var.set("缓存清理失败")
+                self.set_busy(False)
+                self.append_log("缓存清理失败: " + str(payload))
+                self.messagebox.showerror("缓存清理失败", str(payload))
         self.root.after(100, self.poll_events)
+
+    def clear_cache(self) -> None:
+        if self.worker and self.worker.is_alive():
+            return
+        if not self.messagebox.askyesno(
+            "清理缓存",
+            "将删除工具构建目录、旧成品归档、临时配置、"
+            "Map Doctor 缓存和地图标题备份。\n\n"
+            "不会删除源战役、地图、当前成品或用户存档。\n\n"
+            "继续清理？",
+        ):
+            return
+        self.set_busy(True)
+        self.status_var.set("正在清理缓存…")
+
+        def work() -> None:
+            try:
+                result = clear_tool_cache()
+                self.events.put(("cache-cleared", result))
+            except Exception as exc:  # noqa: BLE001
+                self.events.put(("cache-clear-error", str(exc)))
+
+        self.worker = threading.Thread(target=work, daemon=True)
+        self.worker.start()
 
     def open_output(self) -> None:
         target = None

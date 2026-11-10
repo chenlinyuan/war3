@@ -29,7 +29,9 @@ sys.path.insert(0, str(DOCTOR))
 
 import add_warglaive_lt30 as WGL  # noqa: E402
 import alas_item_rules as ITEM_RULES  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 import merge_w3obj as M  # noqa: E402
+import official_campaign_metadata as OFFICIAL  # noqa: E402
 import port_wings as P  # noqa: E402
 import port_lua_campaign_systems as LUA_PORT  # noqa: E402
 import wild_equipment_drops as WILD_DROPS  # noqa: E402
@@ -1809,21 +1811,25 @@ TimerStart(__alasInitTimer, 0.20, false, function()
 end)
 end
 """
-    if campaign_loot is not None:
-        anchor = '  __alasRunInit("LOAD", ALAS_InitLoadSync)\n'
-        if anchor not in tail:
-            raise SystemExit("campaign loot init anchor missing")
-        tail = tail.replace(
-            anchor,
-            anchor + '  __alasRunInit("WED", WED_Init)\n',
-            1,
+    init_calls = ""
+    if (
+        campaign_loot is not None
+        or (
+            extra_script is not None
+            and "function WED_Init takes" in extra_functions
         )
-    if extra_script is None:
-        tail = tail.replace(
-            '  __alasRunInit("TALENT", TT_Init)\n',
-            "",
-            1,
-        )
+    ):
+        init_calls += '  __alasRunInit("WED", WED_Init)\n'
+    if (
+        extra_script is not None
+        and "function TT_Init takes" in extra_functions
+    ):
+        init_calls += '  __alasRunInit("TALENT", TT_Init)\n'
+    tail = tail.replace(
+        '  __alasRunInit("TALENT", TT_Init)\n',
+        init_calls,
+        1,
+    )
     runtime = LUA_PORT.RUNTIME_HEAD.replace(
         "if bj_lastCreatedGroup == nil then bj_lastCreatedGroup = CreateGroup() end\n",
         "",
@@ -2161,21 +2167,33 @@ def validate_chapter(
 
 
 def pack_campaign(
-    source: Path, output: Path, staged: list[tuple[str, Path]]
+    source: Path,
+    output: Path,
+    staged: list[tuple[str, Path]],
+    preserved: dict[str, bytes],
 ) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, output)
-    args: list[object] = [
-        sys.executable, HERE / "inject_native.py", output,
-        "--no-backup",
-    ]
-    for name, path in staged:
-        args += ["--file", str(path) + "=" + name, "--store", name]
-    run(args)
+    with tempfile.TemporaryDirectory() as temp_name:
+        temp = Path(temp_name)
+        args: list[object] = [
+            sys.executable, HERE / "inject_native.py", output,
+            "--no-backup",
+        ]
+        for name, path in staged:
+            args += ["--file", str(path) + "=" + name, "--store", name]
+        for index, (name, data) in enumerate(preserved.items()):
+            path = temp / ("%03d-%s" % (index, Path(name).name))
+            path.write_bytes(data)
+            args += ["--file", str(path) + "=" + name, "--store", name]
+        run(args)
 
     original_archive = W.MPQArchive(str(source))
     output_archive = W.MPQArchive(str(output))
     replaced = {name for name, _path in staged}
+    preserved_expected = {
+        name: data for name, data in preserved.items()
+    }
     try:
         source_names = sorted(original_archive.listfile)
         output_names = sorted(output_archive.listfile)
@@ -2188,6 +2206,11 @@ def pack_campaign(
                 expected = dict(staged)[name].read_bytes()
                 if output_data != expected:
                     raise SystemExit("campaign read-back mismatch: " + name)
+            elif name in preserved_expected:
+                if output_data != preserved_expected[name]:
+                    raise SystemExit(
+                        "preserved cinematic chapter changed: " + name
+                    )
             elif output_data != source_data:
                 raise SystemExit("untouched campaign entry changed: " + name)
     finally:
@@ -2207,16 +2230,26 @@ def main() -> int:
     parser.add_argument("--campaign-loot-manifest", type=Path)
     parser.add_argument("--extra-object", action="append", default=[])
     parser.add_argument("--extra-lua-script-manifest", type=Path)
+    parser.add_argument("--preserve-source", type=Path)
+    parser.add_argument(
+        "--include-cinematic-chapters",
+        action="store_true",
+    )
     parser.add_argument("--no-deploy", action="store_true")
     args = parser.parse_args()
 
     DEFAULT_OBJECT_SOURCE = args.object_source.resolve()
     source = args.campaign.resolve()
+    preserve_source = (args.preserve_source or source).resolve()
     work = args.work.resolve()
     output = args.output.resolve()
     base = work / "base"
     if not source.is_file():
         raise SystemExit("campaign not found: " + str(source))
+    if not preserve_source.is_file():
+        raise SystemExit(
+            "preserve source not found: " + str(preserve_source)
+        )
     if not DEFAULT_OBJECT_SOURCE.is_file():
         raise SystemExit("object source not found: " + str(DEFAULT_OBJECT_SOURCE))
     if not base.is_dir():
@@ -2282,7 +2315,7 @@ def main() -> int:
                     "extra Lua script directory is incomplete: "
                     + str(script_dir)
                 )
-            extra_scripts[str(key)] = script_dir
+            extra_scripts[CAMP.normalize_chapter_name(str(key))] = script_dir
     module_command = (
         None
         if campaign_loot is not None
@@ -2295,16 +2328,28 @@ def main() -> int:
     )
     asset_names = [internal for _path, internal in assets]
 
-    chapters = sorted(
-        path for path in base.iterdir()
-        if path.suffix.lower() in (".w3x", ".w3m")
+    chapters, skipped_cinematics = CAMP.select_campaign_chapters(
+        base,
+        preserve_source,
+        include_cinematic=args.include_cinematic_chapters,
     )
+    chapter_keys = {
+        CAMP.chapter_key(base, chapter): chapter
+        for chapter in chapters
+    }
     if not chapters:
         raise SystemExit("no chapters found in " + str(base))
+    if skipped_cinematics:
+        print("skipped cinematic chapters:", flush=True)
+        for key, reason in skipped_cinematics.items():
+            print("  %s (%s)" % (key, reason), flush=True)
     if campaign_loot is not None:
         missing_profiles = (
-            {chapter.name for chapter in chapters}
-            - {profile.chapter for profile in campaign_loot.profiles}
+            set(chapter_keys)
+            - {
+                CAMP.normalize_chapter_name(profile.chapter)
+                for profile in campaign_loot.profiles
+            }
         )
         if missing_profiles:
             raise SystemExit(
@@ -2313,7 +2358,7 @@ def main() -> int:
             )
     if extra_scripts:
         missing_scripts = (
-            {chapter.name for chapter in chapters}
+            set(chapter_keys)
             - set(extra_scripts)
         )
         if "*" in extra_scripts:
@@ -2333,30 +2378,32 @@ def main() -> int:
     staged = []
     item_active_chapters = 0
     for chapter in chapters:
+        chapter_key = CAMP.chapter_key(base, chapter)
         item_active = chapter_uses_item_actives(chapter)
         if item_active:
             item_active_chapters += 1
         print(
             "chapter: %s (%s skills)"
-            % (chapter.name, "item-owned" if item_active else "command-card"),
+            % (chapter_key, "item-owned" if item_active else "command-card"),
             flush=True,
         )
         object_dir = work / "_obj_item_skill_301" / chapter.stem
         merged = merge_chapter_objects(
             chapter, object_dir, sources, asset_names, item_active
         )
-        target = staged_dir / chapter.name
+        target = staged_dir.joinpath(*chapter_key.split("/"))
+        target.parent.mkdir(parents=True, exist_ok=True)
         loot_profile = (
-            campaign_loot.profile_for(chapter.name)
+            campaign_loot.profile_for(chapter_key)
             if campaign_loot is not None
             else None
         )
         if loot_profile is None and campaign_loot is not None:
             raise SystemExit(
-                "campaign loot profile missing: " + chapter.name
+                "campaign loot profile missing: " + chapter_key
             )
         extra_script = extra_scripts.get(
-            chapter.name,
+            chapter_key,
             extra_scripts.get("*"),
         )
         module = (
@@ -2389,9 +2436,22 @@ def main() -> int:
             item_active,
             campaign_loot=loot_profile is not None,
         )
-        staged.append((chapter.name, target))
+        staged.append((chapter_key, target))
 
-    pack_campaign(source, output, staged)
+    preserved: dict[str, bytes] = {}
+    if skipped_cinematics:
+        preserve_archive = W.MPQArchive(str(preserve_source))
+        try:
+            for key in sorted(skipped_cinematics):
+                data = preserve_archive.read_file(key)
+                if not data:
+                    raise SystemExit(
+                        "preserved campaign chapter cannot be read: " + key
+                    )
+                preserved[key] = data
+        finally:
+            preserve_archive.close()
+    pack_campaign(source, output, staged, preserved)
     import fix_alas_campaign_names as NAMES
     archive = W.MPQArchive(str(output))
     try:
@@ -2399,12 +2459,28 @@ def main() -> int:
     finally:
         archive.close()
     display_name = NAMES.desired_title(output)
+    metadata = OFFICIAL.patch_w3f_bytes(
+        NAMES.make_w3f(old_w3f, display_name)
+    )
     NAMES.patch_with_mpq(
         output,
-        NAMES.make_w3f(old_w3f, display_name),
+        metadata,
         work / "recover" / "alas_campaign_names_20261030",
     )
+    CAMP.verify_campaign_chapters(
+        preserve_source,
+        output,
+        set(skipped_cinematics),
+    )
+    archive = W.MPQArchive(str(output))
+    try:
+        OFFICIAL.verify_w3f_bytes(
+            archive.read_file("war3campaign.w3f") or b""
+        )
+    finally:
+        archive.close()
     print("verified chapters:", len(staged))
+    print("skipped cinematic chapters:", len(skipped_cinematics))
     print(
         "equipment ownership: %d item-owned, %d command-card"
         % (item_active_chapters, len(staged) - item_active_chapters)

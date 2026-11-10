@@ -17,6 +17,7 @@ import hashlib
 import importlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -27,7 +28,9 @@ sys.path.insert(0, str(HERE))
 
 import fix_alas_campaign_names as NAMES  # noqa: E402
 import alas_item_rules as ITEM_RULES  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 import merge_w3obj as M  # noqa: E402
+import official_campaign_metadata as OFFICIAL  # noqa: E402
 import port_item_skill_campaign as ITEM  # noqa: E402
 import port_weapon_campaign as WPN  # noqa: E402
 import port_wings_campaign as PC  # noqa: E402
@@ -36,6 +39,8 @@ import war3mpq as W  # noqa: E402
 
 PY = sys.executable
 WING_DIR = ROOT / "scripts" / "wings"
+KNOWN_GARITHOS_SKIP_FIX = b"ALAS_GARITHOS_DWARF_SKIP_FIX"
+TALENT_CACHE_MARKER = b"ALAS_TALENT_CACHE_V1"
 
 
 def run(args: list[object], env: dict[str, str] | None = None) -> None:
@@ -79,6 +84,206 @@ def chapter_script(path: Path) -> tuple[str, bytes]:
     finally:
         archive.close()
     raise SystemExit(str(path) + " has no JASS script")
+
+
+def _find_jass_call(
+    line: bytes,
+    function_name: bytes,
+) -> tuple[list[bytes], bytes] | None:
+    pattern = re.compile(
+        rb"(?<![A-Za-z0-9_])" + re.escape(function_name) + rb"\s*\("
+    )
+    for match in pattern.finditer(line):
+        prefix = line[: match.start()]
+        quoted = False
+        comment = False
+        index = 0
+        while index < len(prefix):
+            char = prefix[index]
+            if char == 0x22:
+                quoted = not quoted
+            elif (
+                not quoted
+                and char == 0x2F
+                and index + 1 < len(prefix)
+                and prefix[index + 1] == 0x2F
+            ):
+                comment = True
+                break
+            index += 1
+        if quoted or comment:
+            continue
+        opening = line.find(b"(", match.start())
+        depth = 1
+        quoted = False
+        escaped = False
+        index = opening + 1
+        while index < len(line):
+            char = line[index]
+            if quoted:
+                if escaped:
+                    escaped = False
+                elif char == 0x5C:
+                    escaped = True
+                elif char == 0x22:
+                    quoted = False
+            elif char == 0x22:
+                quoted = True
+            elif char == 0x28:
+                depth += 1
+            elif char == 0x29:
+                depth -= 1
+                if depth == 0:
+                    args = _split_jass_args(line[opening + 1:index])
+                    return args, line[index + 1:]
+            index += 1
+        return None
+    return None
+
+
+def _split_jass_args(data: bytes) -> list[bytes]:
+    args = []
+    start = 0
+    depth = 0
+    quoted = False
+    escaped = False
+    for index, char in enumerate(data):
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == 0x5C:
+                escaped = True
+            elif char == 0x22:
+                quoted = False
+            continue
+        if char == 0x22:
+            quoted = True
+        elif char == 0x28:
+            depth += 1
+        elif char == 0x29:
+            depth -= 1
+        elif char == 0x2C and depth == 0:
+            args.append(data[start:index].strip())
+            start = index + 1
+    args.append(data[start:].strip())
+    return args
+
+
+def _append_talent_cache_call(
+    line: bytes,
+    call: bytes,
+) -> bytes:
+    if line.endswith(b"\r\n"):
+        body, ending = line[:-2], b"\r\n"
+    elif line.endswith((b"\n", b"\r")):
+        body, ending = line[:-1], line[-1:]
+    else:
+        body, ending = line, b"\r\n"
+    indent = re.match(rb"[ \t]*", body).group(0)
+    return body + ending + indent + call + ending
+
+
+def _is_call_suffix(suffix: bytes) -> bool:
+    remainder = suffix.strip()
+    return not remainder or remainder.startswith(b"//")
+
+
+def patch_campaign_talent_cache(
+    script: bytes,
+) -> tuple[bytes, dict[str, int]]:
+    """Mirror talent state into the campaign's unit game cache."""
+    if TALENT_CACHE_MARKER in script:
+        return script, {
+            "store": script.count(b"call TT_CampaignStore("),
+            "restore": script.count(b"call TT_CampaignRestore("),
+        }
+    output = []
+    counts = {"store": 0, "restore": 0}
+    restore_names = (
+        b"RestoreUnitLocFacingAngleBJ",
+        b"RestoreUnitLocFacingPointBJ",
+        b"RestoreUnitBJ",
+    )
+    for line in script.splitlines(keepends=True):
+        output.append(line)
+        store = _find_jass_call(line, b"StoreUnitBJ")
+        if store is not None:
+            args, suffix = store
+            if args and len(args) >= 4 and _is_call_suffix(suffix):
+                unit = args[0]
+                cache = args[3]
+                output[-1:] = [
+                    _append_talent_cache_call(
+                        line,
+                        b"call TT_CampaignStore("
+                        + unit
+                        + b", "
+                        + cache
+                        + b") // "
+                        + TALENT_CACHE_MARKER,
+                    )
+                ]
+                counts["store"] += 1
+                continue
+        for name in restore_names:
+            restore = _find_jass_call(line, name)
+            if restore is None:
+                continue
+            args, suffix = restore
+            if args and len(args) >= 3 and _is_call_suffix(suffix):
+                cache = args[2]
+                output[-1:] = [
+                    _append_talent_cache_call(
+                        line,
+                        b"call TT_CampaignRestore("
+                        b"GetLastRestoredUnitBJ(), "
+                        + cache
+                        + b") // "
+                        + TALENT_CACHE_MARKER,
+                    )
+                ]
+                counts["restore"] += 1
+            break
+    return b"".join(output), counts
+
+
+def has_campaign_talent_cache(script_dir: Path) -> bool:
+    for name in ("f.j", "g.j"):
+        path = script_dir / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if (
+            "function TT_CampaignStore takes unit u, gamecache cache"
+            in text
+            and "function TT_CampaignRestore takes unit u, gamecache cache"
+            in text
+        ):
+            return True
+    return False
+
+
+def patch_known_source_script(name: str, script: bytes) -> bytes:
+    """Repair source-map bugs that are safe to identify by exact script text."""
+    if name.lower() != "human02.w3m":
+        return script
+    if KNOWN_GARITHOS_SKIP_FIX in script:
+        return script
+    anchor = (
+        b"    call ForGroupBJ( GetUnitsInRectAll(GetPlayableMapRect()), "
+        b"function Trig_Dwarf_Sacrifice_Cinematic_Cancel_Func014002 )"
+    )
+    count = script.count(anchor)
+    if count != 1:
+        raise SystemExit(
+            "human02.w3m has %d Garithos dwarf-skip reset anchors"
+            % count
+        )
+    replacement = (
+        b"    // " + KNOWN_GARITHOS_SKIP_FIX + b": skipping this cinematic "
+        b"must leave units vulnerable."
+    )
+    return script.replace(anchor, replacement, 1)
 
 
 def validate_extra_script(path: Path, script_dir: Path | None) -> None:
@@ -159,10 +364,19 @@ def validate_chapter(
     assets: list[tuple[Path, str]],
     config,
     campaign_loot: bool = False,
+    talent_cache_counts: dict[str, int] | None = None,
 ) -> None:
     archive = W.MPQArchive(str(path))
     try:
         script = archive.read_file("war3map.j") or b""
+        if (
+            path.name.lower() == "human02.w3m"
+            and KNOWN_GARITHOS_SKIP_FIX not in script
+        ):
+            raise SystemExit(
+                "%s is missing the Garithos cinematic-skip fix"
+                % path.name
+            )
         for marker in (
             b"function IB_Init takes",
             b"function WG_Init takes",
@@ -177,6 +391,29 @@ def validate_chapter(
             raise SystemExit(
                 "%s missing campaign equipment drops" % path.name
             )
+        if talent_cache_counts is not None:
+            for marker in (
+                b"function TT_CampaignStore takes unit u, gamecache cache",
+                b"function TT_CampaignRestore takes unit u, gamecache cache",
+            ):
+                if marker not in script:
+                    raise SystemExit(
+                        "%s missing campaign talent state marker %r"
+                        % (path.name, marker)
+                    )
+            for marker, expected in (
+                (b"call TT_CampaignStore(", talent_cache_counts["store"]),
+                (
+                    b"call TT_CampaignRestore(",
+                    talent_cache_counts["restore"],
+                ),
+            ):
+                actual = script.count(marker)
+                if actual < expected:
+                    raise SystemExit(
+                        "%s has %d campaign talent cache calls; expected %d"
+                        % (path.name, actual, expected)
+                    )
         item_active = ITEM.selected_equipment_mode() == "item"
         mode_value = b"true" if item_active else b"false"
         for mode_name in (
@@ -226,18 +463,29 @@ def patch_title(path: Path, recover: Path) -> str:
     finally:
         archive.close()
     title = NAMES.desired_title(path)
-    NAMES.patch_with_mpq(path, NAMES.make_w3f(old_w3f, title), recover)
+    metadata = OFFICIAL.patch_w3f_bytes(
+        NAMES.make_w3f(old_w3f, title)
+    )
+    NAMES.patch_with_mpq(path, metadata, recover)
     NAMES.patch_hm3w(path, title)
     actual_w3f, actual_hm3w = NAMES.read_campaign_title(path)
     if actual_w3f != title or (
         actual_hm3w is not None and actual_hm3w != title
     ):
         raise SystemExit("campaign title verification failed")
+    archive = W.MPQArchive(str(path))
+    try:
+        OFFICIAL.verify_w3f_bytes(
+            archive.read_file("war3campaign.w3f") or b""
+        )
+    finally:
+        archive.close()
     return title
 
 
 def build(args: argparse.Namespace) -> int:
     source = args.campaign.resolve()
+    preserve_source = (args.preserve_source or source).resolve()
     work = args.work.resolve()
     output = args.output.resolve()
     config = args.config
@@ -279,10 +527,14 @@ def build(args: argparse.Namespace) -> int:
                     "extra JASS script directory is incomplete: "
                     + str(script_dir)
                 )
-            extra_scripts[str(key)] = script_dir
+            extra_scripts[CAMP.normalize_chapter_name(str(key))] = script_dir
 
     if not source.is_file():
         raise SystemExit("campaign not found: " + str(source))
+    if not preserve_source.is_file():
+        raise SystemExit(
+            "preserve source not found: " + str(preserve_source)
+        )
     config_path = HERE / (config + ".py")
     if not config_path.is_file():
         raise SystemExit("campaign wing config not found: " + str(config_path))
@@ -326,13 +578,26 @@ def build(args: argparse.Namespace) -> int:
         )
     ITEM_RULES.patch_object_tree(base)
 
-    chapters = sorted(
-        path for path in base.iterdir()
-        if path.suffix.lower() in (".w3x", ".w3m")
+    chapters, skipped_cinematics = CAMP.select_campaign_chapters(
+        base,
+        preserve_source,
+        include_cinematic=args.include_cinematic_chapters,
     )
+    chapter_keys = {
+        CAMP.chapter_key(base, chapter): chapter
+        for chapter in chapters
+    }
+    if not chapters:
+        raise SystemExit(
+            "no ALAS target chapters remain after cinematic filtering"
+        )
+    if skipped_cinematics:
+        print("skipped cinematic chapters:", flush=True)
+        for key, reason in skipped_cinematics.items():
+            print("  %s (%s)" % (key, reason), flush=True)
     if extra_scripts:
         missing_scripts = (
-            {chapter.name for chapter in chapters}
+            set(chapter_keys)
             - set(extra_scripts)
         )
         if "*" in extra_scripts:
@@ -342,6 +607,10 @@ def build(args: argparse.Namespace) -> int:
                 "extra JASS script manifest is missing chapters: "
                 + ", ".join(sorted(missing_scripts))
             )
+    campaign_talent_cache = any(
+        has_campaign_talent_cache(script_dir)
+        for script_dir in extra_scripts.values()
+    )
 
     run([PY, HERE / "port_wings_campaign.py", "ib",
          "--work", work, "--config", config, "--mounts", "none"], env)
@@ -397,8 +666,11 @@ def build(args: argparse.Namespace) -> int:
             args.campaign_loot_manifest.resolve()
         )
         missing_profiles = (
-            {chapter.name for chapter in chapters}
-            - {profile.chapter for profile in campaign_loot.profiles}
+            set(chapter_keys)
+            - {
+                CAMP.normalize_chapter_name(profile.chapter)
+                for profile in campaign_loot.profiles
+            }
         )
         if missing_profiles:
             raise SystemExit(
@@ -427,8 +699,9 @@ def build(args: argparse.Namespace) -> int:
         )
         combined_sources[extension] = combined
     for index, chapter in enumerate(chapters, 1):
+        chapter_key = CAMP.chapter_key(base, chapter)
         print("\n[%d/%d] one-pass ALAS injection: %s"
-              % (index, len(chapters), chapter.name), flush=True)
+              % (index, len(chapters), chapter_key), flush=True)
         object_payloads = merge_chapter_objects(
             chapter, work, combined_sources
         )
@@ -446,7 +719,7 @@ def build(args: argparse.Namespace) -> int:
             archive.close()
 
         chapter_loot = (
-            campaign_loot.profile_for(chapter.name)
+            campaign_loot.profile_for(chapter_key)
             if campaign_loot is not None
             else None
         )
@@ -455,39 +728,80 @@ def build(args: argparse.Namespace) -> int:
         if chapter_loot is not None:
             chapter_scripts.append(chapter_loot.script_dir)
         extra_script = extra_scripts.get(
-            chapter.name,
+            chapter_key,
             extra_scripts.get("*"),
         )
         if extra_script is not None:
             chapter_scripts.append(extra_script)
         for script_dir in chapter_scripts:
             inject += ["--script", script_dir]
+        script_internal, source_script = chapter_script(chapter)
+        base_script = patch_known_source_script(
+            chapter.name, source_script
+        )
+        talent_cache_counts = None
+        if campaign_talent_cache:
+            base_script, talent_cache_counts = (
+                patch_campaign_talent_cache(base_script)
+            )
+            expected_store = source_script.count(b"StoreUnitBJ")
+            expected_restore = sum(
+                source_script.count(name)
+                for name in (
+                    b"RestoreUnitLocFacingAngleBJ",
+                    b"RestoreUnitLocFacingPointBJ",
+                    b"RestoreUnitBJ",
+                )
+            )
+            if (
+                expected_store != talent_cache_counts["store"]
+                or expected_restore != talent_cache_counts["restore"]
+            ):
+                raise SystemExit(
+                    "%s campaign talent cache calls were not patched "
+                    "exactly: expected store/restore %d/%d, got %d/%d"
+                    % (
+                        chapter.name,
+                        expected_store,
+                        expected_restore,
+                        talent_cache_counts["store"],
+                        talent_cache_counts["restore"],
+                    )
+                )
+            if expected_store or expected_restore:
+                print(
+                    "talent campaign cache %s: store=%d restore=%d"
+                    % (
+                        chapter.name,
+                        talent_cache_counts["store"],
+                        talent_cache_counts["restore"],
+                    ),
+                    flush=True,
+                )
         if args.suppress_source_backpack_auto:
-            script_internal, source_script = chapter_script(chapter)
             source_call = (
                 b"call UnitAddItemByIdSwapped('B30B', u)"
             )
-            call_count = source_script.count(source_call)
+            call_count = base_script.count(source_call)
             if call_count > 1:
                 raise SystemExit(
                     "%s has %d source B30B autogrant calls"
                     % (chapter.name, call_count)
                 )
             if call_count == 1:
-                base_script = (
-                    work / "_base_no_source_backpack"
-                    / (chapter.stem + ".j")
-                )
-                base_script.parent.mkdir(parents=True, exist_ok=True)
-                base_script.write_bytes(
-                    source_script.replace(source_call, b"", 1)
-                )
-                inject += [
-                    "--base-script",
-                    str(base_script),
-                    "--script-internal",
-                    script_internal,
-                ]
+                base_script = base_script.replace(source_call, b"", 1)
+        if base_script != source_script:
+            base_script_path = (
+                work / "_base_patched" / (chapter.stem + ".j")
+            )
+            base_script_path.parent.mkdir(parents=True, exist_ok=True)
+            base_script_path.write_bytes(base_script)
+            inject += [
+                "--base-script",
+                str(base_script_path),
+                "--script-internal",
+                script_internal,
+            ]
         for local, internal in object_payloads:
             inject += ["--file", "%s=%s" % (local, internal)]
         for local, internal in assets:
@@ -503,14 +817,26 @@ def build(args: argparse.Namespace) -> int:
             assets,
             config_module,
             campaign_loot=chapter_loot is not None,
+            talent_cache_counts=talent_cache_counts,
         )
         validate_extra_script(chapter, extra_script)
 
+    CAMP.restore_campaign_chapters(
+        preserve_source,
+        base,
+        set(skipped_cinematics),
+    )
     run([PY, HERE / "port_wings_campaign.py", "pack", source,
          "--work", work, "--out", output])
     title = patch_title(output, work / "recover" / "alas_campaign_names")
+    CAMP.verify_campaign_chapters(
+        preserve_source,
+        output,
+        set(skipped_cinematics),
+    )
     digest = hashlib.sha256(output.read_bytes()).hexdigest().upper()
-    print("chapters:", len(chapters))
+    print("injected chapters:", len(chapters))
+    print("skipped cinematic chapters:", len(skipped_cinematics))
     print("display title:", title)
     print("output:", output)
     print("bytes:", output.stat().st_size)
@@ -533,6 +859,11 @@ def main() -> int:
     )
     parser.add_argument("--extra-object", action="append", default=[])
     parser.add_argument("--extra-script-manifest", type=Path)
+    parser.add_argument("--preserve-source", type=Path)
+    parser.add_argument(
+        "--include-cinematic-chapters",
+        action="store_true",
+    )
     parser.add_argument(
         "--suppress-source-backpack-auto",
         action="store_true",

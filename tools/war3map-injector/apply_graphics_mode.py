@@ -28,12 +28,25 @@ sys.path.insert(0, str(DOCTOR))
 
 import mpq_patch  # noqa: E402
 import war3mpq as W  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 from doctor.data import objects as OBJ  # noqa: E402
 from doctor.data import w3i as W3I  # noqa: E402
 
 
 SD_HD = 0x1 | 0x2
 MODEL_FIELDS = frozenset(("umdl", "upor"))
+
+
+def _chapter_key(value: str | Path) -> str:
+    return str(value).replace("\\", "/").strip("/").casefold()
+
+
+def _chapter_is_skipped(
+    chapter: str | Path,
+    skipped: set[str],
+) -> bool:
+    key = _chapter_key(chapter)
+    return key in skipped or key.rsplit("/", 1)[-1] in skipped
 
 # Standard hero IDs in Warcraft III 3.0.  Custom heroes can inherit from these
 # IDs without repeating Hero Abilities in object data.  Additional custom
@@ -420,7 +433,13 @@ def _audit_map_bytes(
     return failures
 
 
-def audit_path(path: Path) -> list[str]:
+def audit_path(
+    path: Path,
+    skipped_chapters: set[str] | None = None,
+) -> list[str]:
+    skipped = {
+        _chapter_key(item) for item in (skipped_chapters or set())
+    }
     failures: list[str] = []
     if path.is_dir():
         failures.extend(
@@ -434,11 +453,13 @@ def audit_path(path: Path) -> list[str]:
                 "war3campaign",
             )
         )
-        chapters = sorted(
-            item for item in path.iterdir()
-            if item.suffix.lower() in (".w3x", ".w3m")
-        )
+        chapters = CAMP.chapter_paths(path)
         for chapter in chapters:
+            if _chapter_is_skipped(
+                CAMP.chapter_key(path, chapter),
+                skipped,
+            ):
+                continue
             archive = W.MPQArchive(str(chapter))
             try:
                 failures.extend(
@@ -473,6 +494,8 @@ def audit_path(path: Path) -> list[str]:
     finally:
         archive.close()
     for name, data in chapter_payloads:
+        if _chapter_is_skipped(name, skipped):
+            continue
         if not data:
             failures.append("cannot read chapter: " + name)
             continue
@@ -505,10 +528,16 @@ def main() -> int:
         action="store_true",
         help="verify that no standard hero model locks remain",
     )
+    parser.add_argument(
+        "--skip-chapter",
+        action="append",
+        default=[],
+        help="chapter intentionally preserved outside the graphics patch",
+    )
     args = parser.parse_args()
     source = args.input.resolve()
     if args.audit:
-        failures = audit_path(source)
+        failures = audit_path(source, set(args.skip_chapter))
         if failures:
             raise SystemExit(
                 "hero graphics audit failed:\n  " + "\n  ".join(failures)
@@ -517,10 +546,7 @@ def main() -> int:
         return 0
     if source.is_dir():
         patch_campaign_directory(source)
-        chapters = sorted(
-            path for path in source.iterdir()
-            if path.suffix.lower() in (".w3x", ".w3m")
-        )
+        chapters = CAMP.chapter_paths(source)
         if not chapters:
             raise SystemExit("no chapter maps found in " + str(source))
         results = []

@@ -21,6 +21,7 @@ sys.path.insert(0, str(DOCTOR))
 
 import mpq_patch  # noqa: E402
 import war3mpq as W  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 from doctor.data import w3i as W3I  # noqa: E402
 
 
@@ -82,10 +83,7 @@ def main() -> int:
     args = parser.parse_args()
     source = args.input.resolve()
     if source.is_dir():
-        chapters = sorted(
-            path for path in source.iterdir()
-            if path.suffix.lower() in (".w3x", ".w3m")
-        )
+        chapters = CAMP.chapter_paths(source)
         if not chapters:
             raise SystemExit("no chapter maps found in " + str(source))
         results = []

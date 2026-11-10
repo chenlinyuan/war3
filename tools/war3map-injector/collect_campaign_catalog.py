@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 import port_item_skill_campaign as PORT
+import campaign_paths as CAMP
 
 
 def valid_rawcode(value: str) -> bool:
@@ -185,10 +186,7 @@ def main() -> int:
         campaign_abilities_files, campaign_strings, skill_names
     )
 
-    chapters = sorted(
-        path for path in base.iterdir()
-        if path.suffix.lower() in (".w3x", ".w3m")
-    )
+    chapters = CAMP.chapter_paths(base)
     chapter_items = []
     chapter_skills = []
     with tempfile.TemporaryDirectory(prefix="alas_catalog_") as temp_name:

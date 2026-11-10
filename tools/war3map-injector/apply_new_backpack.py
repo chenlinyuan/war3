@@ -21,6 +21,7 @@ sys.stderr.reconfigure(errors="replace")
 import merge_w3obj as M  # noqa: E402
 import objparse as O  # noqa: E402
 import war3mpq as W  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 from doctor.data import objects as OBJ  # noqa: E402
 from doctor.data import w3i as W3I  # noqa: E402
 from port_item_skill_campaign import set_object_mod_value  # noqa: E402
@@ -381,10 +382,7 @@ def process_campaign(source: Path, output: Path, work: Path, panels: tuple[str, 
     )
     generated_campaign_item = campaign_dir / "war3map.w3t"
     campaign_item.write_bytes(generated_campaign_item.read_bytes())
-    chapters = sorted(
-        path for path in base.iterdir()
-        if path.suffix.lower() in (".w3x", ".w3m")
-    )
+    chapters = CAMP.chapter_paths(base)
     if not chapters:
         raise SystemExit(
             "campaign has no readable chapter maps: " + str(source)
@@ -485,10 +483,7 @@ def main() -> int:
             temp_root = Path(temp_dir)
             extract_work = temp_root / "check"
             base = campaign_work(output, extract_work)
-            for chapter in sorted(
-                path for path in base.iterdir()
-                if path.suffix.lower() in (".w3x", ".w3m")
-            ):
+            for chapter in CAMP.chapter_paths(base):
                 verify_map(chapter, panels)
     else:
         shutil.copy2(source, output)

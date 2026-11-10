@@ -15,6 +15,7 @@ sys.path.insert(0, str(INJECTOR))
 
 import mpq_patch as MPQ  # noqa: E402
 import war3mpq as W  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 
 
 LEGACY_DECLARATIONS = (
@@ -160,9 +161,11 @@ def prepare(source: Path, work: Path, output: Path, report_path: Path) -> Path:
         details.append(detail)
         if not removed:
             continue
-        chapter_source = work / name
+        safe_name = CAMP.normalize_chapter_name(name).replace("/", "__")
+        chapter_source = work / "chapters" / safe_name
+        chapter_source.parent.mkdir(parents=True, exist_ok=True)
         chapter_source.write_bytes(data)
-        chapter_output = work / ("compat-" + name)
+        chapter_output = work / "chapters" / ("compat-" + safe_name)
         MPQ.patch(
             str(chapter_source),
             [("war3map.j", updated)],

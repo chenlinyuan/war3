@@ -45,6 +45,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, DOCTOR)
 import war3mpq as W  # noqa: E402
 from merge_w3obj import merge_files  # noqa: E402
+import campaign_paths as CAMP  # noqa: E402
 import port_wings as P  # noqa: E402  (复用 run / check_script_clash / WING_MODELS)
 
 CAMPAIGN_OBJ = [("war3campaign.w3a", "_wing_nohand.w3a"),
@@ -170,7 +171,7 @@ def cmd_extract(a):
             "--input",
             base,
         ])
-    chs = sorted(f for f in os.listdir(base) if f.lower().endswith((".w3x", ".w3m")))
+    chs = list(CAMP.chapter_map(base))
     print("章节地图 %d 个: %s" % (len(chs), ", ".join(chs)))
     return 0
 
@@ -389,11 +390,14 @@ def cmd_chapters(a):
     only = None
     if a.only:
         only = set(x.strip() for x in a.only.split(",") if x.strip())
-    chs = sorted(f for f in os.listdir(base)
-                 if f.lower().endswith((".w3x", ".w3m")) and (not only or f in only))
+    chapter_map = CAMP.chapter_map(base)
+    chs = [
+        name for name in chapter_map
+        if not only or name in only or os.path.basename(name) in only
+    ]
     injected = skipped = failed = 0
     for i, ch in enumerate(chs, 1):
-        p = os.path.join(base, ch)
+        p = str(chapter_map[ch])
         # 已经注入过就跳过（否则会插第二遍 -> 函数重定义，地图打不开）
         try:
             ar = W.MPQArchive(p)
@@ -511,13 +515,13 @@ def cmd_pack(a):
             p = os.path.join(base, internal)
             if os.path.exists(p):
                 files.append((p, internal))
-    chs = sorted(f for f in os.listdir(base) if f.lower().endswith((".w3x", ".w3m")))
-    for ch in chs:
-        files.append((os.path.join(base, ch), ch))
+    chapters = CAMP.chapter_map(base)
+    for ch, chapter_path in chapters.items():
+        files.append((str(chapter_path), ch))
     # ⚠ 章节地图必须**原样存储(不压缩)**：游戏是把它当"归档里的归档"打开的
     #   （SFileOpenFileAsArchive），压缩过的块打不开 -> "找不到地图或者损毁"。
     #   原版战役里章节也都是未压缩存储的；这里顺便照抄原战役每个文件的存储方式。
-    store = set(ch for ch in chs)
+    store = set(chapters)
     store.update(internal for _srcname, internal in P.WING_MODELS)
     try:
         src_ar = W.MPQArchive(src)
@@ -530,7 +534,7 @@ def cmd_pack(a):
             src_ar.close()
     except Exception as e:
         print("  ! 读原战役取存储方式失败（章节仍按未压缩写）:", e)
-    print("   原样存储的文件: %d 个（其中章节 %d 个）" % (len(store), len(chs)))
+    print("   原样存储的文件: %d 个（其中章节 %d 个）" % (len(store), len(chapters)))
     # 原生写成（不走 HKE）：一次会话、保留全部老条目、也不会重写 (listfile)
     args = [PY, os.path.join(HERE, "inject_native.py"), out, "--no-backup"]
     for p, internal in files:

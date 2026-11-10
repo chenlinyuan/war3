@@ -32,6 +32,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(DOCTOR_DIR))
 
 import war3mpq as W  # noqa: E402
+import official_campaign_metadata as OFFICIAL  # noqa: E402
 from doctor.data.casc_wc3 import CascWC3  # noqa: E402
 from doctor.data import campaign_info, w3i  # noqa: E402
 
@@ -197,9 +198,7 @@ def write_w3f(
         "name": group.title.encode("utf-8"),
         "difficulty": "普通".encode("utf-8"),
         "author": b"Blizzard Entertainment",
-        "description": (
-            "由 Warcraft III: Reforged 3.0.1.24371 官方 CASC 原始章节地图组装。"
-        ).encode("utf-8"),
+        "description": OFFICIAL.ALAS_DESCRIPTION.encode("utf-8"),
         "flags": 1,
         "background_number": 0,
         "background_path": b"",
@@ -308,6 +307,9 @@ def validate_campaign(
         parsed = campaign_info.parse(w3f_data)
         if parsed["name"] != group.title.encode("utf-8"):
             raise BuildError("campaign title round-trip failed")
+        OFFICIAL.verify_w3f_bytes(w3f_data)
+        if parsed["description"] != OFFICIAL.ALAS_DESCRIPTION.encode("utf-8"):
+            raise BuildError("campaign ALAS description round-trip failed")
         if len(parsed["buttons"]) != len(buttons):
             raise BuildError("campaign button count mismatch")
         if len(parsed["maps"]) != len(internal_maps):
@@ -423,7 +425,13 @@ def build(
             if internal is None:
                 continue
             source_path = map_by_internal[internal.lower()]
-            title = display_title(map_description(source_path), Path(internal).stem)
+            title = OFFICIAL.localized_chapter_title(
+                internal,
+                display_title(
+                    map_description(source_path),
+                    Path(internal).stem,
+                ),
+            )
             buttons.append(
                 {
                     "visible": 1,

@@ -286,7 +286,12 @@ def lua_runtime_failures(name: str, script: str) -> list[str]:
     return failures
 
 
-def audit(path: Path, config_name: str | None = None) -> int:
+def audit(
+    path: Path,
+    config_name: str | None = None,
+    skipped_chapters: set[str] | None = None,
+) -> int:
+    skipped_chapters = skipped_chapters or set()
     item_active = os.environ.get(
         "ALAS_EQUIPMENT_MODE", "command"
     ).strip().lower() == "item"
@@ -448,6 +453,20 @@ def audit(path: Path, config_name: str | None = None) -> int:
                     script = (lua_data or jass_data).decode(
                         "utf-8", "replace"
                     )
+                    if name in skipped_chapters:
+                        for marker in (
+                            "function WG_Init",
+                            "function IB_Init",
+                            "function FR_Init",
+                            "function WGL_Init",
+                            "__alasRunInit",
+                        ):
+                            if marker in script:
+                                failures.append(
+                                    f"{name}: skipped cinematic chapter "
+                                    f"contains {marker}"
+                                )
+                        continue
                     attributes = chapter.read_file("(attributes)")
                     if attributes and len(attributes) >= 8:
                         _version, flags = struct.unpack_from("<II", attributes)
@@ -1641,13 +1660,26 @@ def main() -> int:
         "--equipment-mode",
         choices=("command", "item"),
     )
+    parser.add_argument(
+        "--skip-chapter",
+        action="append",
+        default=[],
+        help="explicit cinematic chapter that must not contain ALAS",
+    )
     args = parser.parse_args()
     if args.equipment_mode:
         os.environ["ALAS_EQUIPMENT_MODE"] = args.equipment_mode
     path = args.campaign.resolve()
     if not path.is_file():
         raise SystemExit("campaign not found: " + str(path))
-    return audit(path, args.config)
+    return audit(
+        path,
+        args.config,
+        {
+            item.replace("\\", "/").strip("/")
+            for item in args.skip_chapter
+        },
+    )
 
 
 if __name__ == "__main__":

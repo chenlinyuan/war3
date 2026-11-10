@@ -103,6 +103,26 @@ WAR3_STANDARD_MAP_FILES = (
     "conversation.json",
 )
 
+WAR3_STANDARD_CAMPAIGN_FILES = (
+    "war3campaign.w3f",
+    "war3campaign.wts",
+    "war3campaign.w3u",
+    "war3campaign.w3t",
+    "war3campaign.w3a",
+    "war3campaign.w3h",
+    "war3campaign.w3b",
+    "war3campaign.w3d",
+    "war3campaign.w3q",
+    "war3campaign.w3s",
+    "war3campaign.imp",
+    "war3campaign.mmp",
+    "war3campaignSkin.txt",
+    "war3campaignSkin.w3u",
+    "war3campaignSkin.w3t",
+    "war3campaignSkin.w3a",
+    "war3campaignSkin.w3h",
+)
+
 
 # ---------------------------------------------------------------------------
 # 加密表
@@ -290,17 +310,62 @@ class MPQArchive:
         return candidates[0][1]
 
     def _read_listfile(self):
-        self.listfile = []
+        raw_names = []
         try:
             data = self.read_file("(listfile)")
             if data:
-                self.listfile = [
+                raw_names = [
                     line.strip()
                     for line in data.decode("utf-8", "replace").splitlines()
                     if line.strip()
                 ]
         except Exception:
-            self.listfile = []
+            raw_names = []
+
+        # Protected campaigns often leave (listfile) as encrypted garbage.
+        # Keep only names that actually match an entry in this archive, then
+        # recover campaign files, chapters, and imports from standard files.
+        names = []
+        seen = set()
+
+        def add(name):
+            if not name or name in seen:
+                return
+            if len(name) > 260 or ".." in name.replace("\\", "/").split("/"):
+                return
+            if any(ord(ch) < 0x20 for ch in name):
+                return
+            if self._find_file(name) is None:
+                return
+            seen.add(name)
+            names.append(name)
+
+        for name in raw_names:
+            add(name)
+        for name in WAR3_STANDARD_MAP_FILES + WAR3_STANDARD_CAMPAIGN_FILES:
+            add(name)
+
+        w3f = self.read_file("war3campaign.w3f")
+        if w3f:
+            for token in w3f.split(b"\x00"):
+                if token.lower().endswith((b".w3x", b".w3m")):
+                    add(token.decode("utf-8", "replace"))
+
+        imports = self.read_file("war3campaign.imp")
+        if imports and len(imports) >= 8:
+            version, count = struct.unpack_from("<II", imports, 0)
+            if version == 1 and 0 <= count <= 100000:
+                offset = 8
+                for _ in range(count):
+                    if offset >= len(imports):
+                        break
+                    offset += 1  # import type
+                    end = imports.find(b"\x00", offset)
+                    if end < 0:
+                        break
+                    add(imports[offset:end].decode("utf-8", "replace"))
+                    offset = end + 1
+        self.listfile = names
 
     def _find_file(self, name):
         """通过哈希表查找文件。"""

@@ -693,6 +693,41 @@ function TT_ClearNativeBarrage takes unit u returns nothing
     endif
 endfunction
 
+function TT_SyncBarrageMissileArt takes unit u, integer abilityId, boolean shouldLog returns nothing
+    local ability ab
+    local string art
+    local string resultText = "false"
+    local integer speed
+    local boolean artSet = false
+    if u == null or GetUnitTypeId(u) == 0 then
+        return
+    endif
+    set ab = BlzGetUnitAbility(u, abilityId)
+    if ab == null then
+        if shouldLog then
+            call TT_LogAppend("event=BARRAGE_MISSILE_SYNC_FAILED hero=" + GetUnitName(u) + " ability=" + I2S(abilityId) + " reason=NO_ABILITY")
+            call TT_LogFlush()
+        endif
+        return
+    endif
+    set art = BlzGetUnitWeaponStringField(u, UNIT_WEAPON_SF_ATTACK_PROJECTILE_ART, 0)
+    if art != "" then
+        set artSet = BlzSetAbilityStringLevelField(ab, ABILITY_SLF_MISSILE_ART, 0, art)
+        if artSet then
+            set resultText = "true"
+        endif
+    endif
+    set speed = R2I(BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_PROJECTILE_SPEED, 0))
+    if speed > 0 then
+        call BlzSetAbilityIntegerField(ab, ABILITY_IF_MISSILE_SPEED, speed)
+    endif
+    if shouldLog then
+        call TT_LogAppend("event=BARRAGE_MISSILE_SYNC hero=" + GetUnitName(u) + " ability=" + I2S(abilityId) + " art=" + art + " result=" + resultText + " speed=" + I2S(speed))
+        call TT_LogFlush()
+    endif
+    set ab = null
+endfunction
+
 function TT_SyncNativeBarrage takes unit u returns nothing
     local integer level
     local integer desired
@@ -726,6 +761,7 @@ function TT_SyncNativeBarrage takes unit u returns nothing
         call TT_LogFlush()
     endif
     if GetUnitAbilityLevel(u, desired) > 0 then
+        call TT_SyncBarrageMissileArt(u, desired, current != desired)
         call UnitMakeAbilityPermanent(u, true, desired)
         call BlzUnitHideAbility(u, desired, true)
     endif

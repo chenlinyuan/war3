@@ -618,6 +618,247 @@ function TT_SyncAttributeTalents takes unit u returns nothing
     call TT_SyncAttributeTalent(u, 'T108', TT_AttributeTalentLevel(GetHeroInt(u, true)))
 endfunction
 
+function TT_CleaveRadiusForLevel takes integer level returns real
+    return RMinBJ(500.0, 275.0 + I2R(level) * 25.0)
+endfunction
+
+function TT_BarrageTargetCount takes integer level returns integer
+    return 2 + (level - 1) / 3
+endfunction
+
+function TT_IsTalentAoeTarget takes unit caster, unit target returns boolean
+    if caster == null or target == null then
+        return false
+    endif
+    if target == caster or GetUnitTypeId(target) == 0 then
+        return false
+    endif
+    if GetWidgetLife(target) <= 0.405 or IsUnitType(target, UNIT_TYPE_DEAD) then
+        return false
+    endif
+    if IsUnitType(target, UNIT_TYPE_STRUCTURE) then
+        return false
+    endif
+    if not IsUnitEnemy(target, GetOwningPlayer(caster)) then
+        return false
+    endif
+    if BlzIsUnitInvulnerable(target) then
+        return false
+    endif
+    return true
+endfunction
+
+function TT_OnTalentEffectExpire takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local effect fx = LoadEffectHandle(TT_FX_TABLE, GetHandleId(t), 0)
+    if fx != null then
+        call DestroyEffect(fx)
+    endif
+    call FlushChildHashtable(TT_FX_TABLE, GetHandleId(t))
+    call DestroyTimer(t)
+    set fx = null
+    set t = null
+endfunction
+
+function TT_ShowTalentEffectAt takes string model, real x, real y returns nothing
+    local timer t
+    local effect fx
+    if model == "" or TT_FX_TABLE == null then
+        return
+    endif
+    set fx = AddSpecialEffect(model, x, y)
+    set t = CreateTimer()
+    call SaveEffectHandle(TT_FX_TABLE, GetHandleId(t), 0, fx)
+    call TimerStart(t, 0.45, false, function TT_OnTalentEffectExpire)
+    set t = null
+    set fx = null
+endfunction
+
+function TT_ShowTalentEffectTarget takes string model, unit target returns nothing
+    local timer t
+    local effect fx
+    if model == "" or target == null or TT_FX_TABLE == null then
+        return
+    endif
+    set fx = AddSpecialEffectTarget(model, target, "overhead")
+    set t = CreateTimer()
+    call SaveEffectHandle(TT_FX_TABLE, GetHandleId(t), 0, fx)
+    call TimerStart(t, 0.45, false, function TT_OnTalentEffectExpire)
+    set t = null
+    set fx = null
+endfunction
+
+function TT_ShowTalentText takes unit target, string text returns nothing
+    local texttag tt
+    if target == null then
+        return
+    endif
+    set tt = CreateTextTag()
+    call SetTextTagPosUnit(tt, target, 40.0)
+    call SetTextTagText(tt, text, 0.023)
+    call SetTextTagColor(tt, 255, 128, 0, 255)
+    call SetTextTagVelocity(tt, 0.0, 0.03)
+    call SetTextTagPermanent(tt, false)
+    call SetTextTagLifespan(tt, 1.0)
+    call SetTextTagFadepoint(tt, 0.8)
+    set tt = null
+endfunction
+
+function TT_ApplyCleaveTalent takes unit caster, unit victim, real attackDamage returns nothing
+    local group g
+    local unit target
+    local real x
+    local real y
+    local real radius
+    local integer level
+    if TT_AOE_BUSY or caster == null or victim == null then
+        return
+    endif
+    set level = TT_AttributeTalentLevel(GetHeroStr(caster, true))
+    set radius = TT_CleaveRadiusForLevel(level)
+    set x = GetUnitX(victim)
+    set y = GetUnitY(victim)
+    set g = CreateGroup()
+    set TT_AOE_BUSY = true
+    call GroupEnumUnitsInRange(g, x, y, radius, null)
+    loop
+        set target = FirstOfGroup(g)
+        exitwhen target == null
+        call GroupRemoveUnit(g, target)
+        if target != victim and TT_IsTalentAoeTarget(caster, target) then
+            call UnitDamageTarget(caster, target, attackDamage * 0.35, true, false, ATTACK_TYPE_HERO, DAMAGE_TYPE_NORMAL, WEAPON_TYPE_WHOKNOWS)
+            call TT_ShowTalentEffectAt("Abilities\\Spells\\Other\\Cleave\\CleaveDamageTarget.mdl", GetUnitX(target), GetUnitY(target))
+        endif
+    endloop
+    set TT_AOE_BUSY = false
+    call DestroyGroup(g)
+    set target = null
+    set g = null
+endfunction
+
+function TT_ApplyBarrageTalent takes unit caster, unit victim returns nothing
+    local group g
+    local unit target
+    local real x
+    local real y
+    local integer level
+    local integer remaining
+    if TT_AOE_BUSY or caster == null or victim == null then
+        return
+    endif
+    set level = TT_AttributeTalentLevel(GetHeroAgi(caster, true))
+    set remaining = TT_BarrageTargetCount(level) - 1
+    set x = GetUnitX(victim)
+    set y = GetUnitY(victim)
+    set g = CreateGroup()
+    set TT_AOE_BUSY = true
+    call GroupEnumUnitsInRange(g, x, y, 550.0, null)
+    loop
+        set target = FirstOfGroup(g)
+        exitwhen target == null or remaining <= 0
+        call GroupRemoveUnit(g, target)
+        if target != victim and TT_IsTalentAoeTarget(caster, target) then
+            call UnitDamageTarget(caster, target, 30.0, true, false, ATTACK_TYPE_HERO, DAMAGE_TYPE_NORMAL, WEAPON_TYPE_WHOKNOWS)
+            call TT_ShowTalentEffectTarget("Abilities\\Weapons\\FlamingArrow\\FlamingArrowMissile.mdx", target)
+            set remaining = remaining - 1
+        endif
+    endloop
+    set TT_AOE_BUSY = false
+    call DestroyGroup(g)
+    set target = null
+    set g = null
+endfunction
+
+function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing
+    local integer heroIndex
+    local integer level
+    local integer stacks
+    local real now
+    local real bonus
+    if TT_AOE_BUSY or caster == null or victim == null then
+        return
+    endif
+    set heroIndex = TT_RegisteredHeroIndex(caster)
+    if heroIndex < 0 then
+        return
+    endif
+    set level = TT_AttributeTalentLevel(GetHeroInt(caster, true))
+    set now = TimerGetElapsed(TT_LOG_CLOCK)
+    if TT_INCIN_TARGET[heroIndex] != victim or now > TT_INCIN_EXPIRE[heroIndex] then
+        set stacks = 1
+    else
+        set stacks = TT_INCIN_STACKS[heroIndex] + 1
+    endif
+    if stacks > 6 then
+        set stacks = 6
+    endif
+    set TT_INCIN_TARGET[heroIndex] = victim
+    set TT_INCIN_STACKS[heroIndex] = stacks
+    set TT_INCIN_LEVEL[heroIndex] = level
+    set TT_INCIN_EXPIRE[heroIndex] = now + 4.0
+    set bonus = I2R(stacks * (3 + level))
+    set TT_AOE_BUSY = true
+    call UnitDamageTarget(caster, victim, bonus, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_FIRE, WEAPON_TYPE_WHOKNOWS)
+    set TT_AOE_BUSY = false
+    call TT_ShowTalentText(victim, "+" + I2S(R2I(bonus)))
+    call TT_ShowTalentEffectTarget("Abilities\\Spells\\Other\\Incinerate\\IncinerateBuff.mdx", victim)
+endfunction
+
+function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer heroIndex returns nothing
+    local group g
+    local unit target
+    local real x
+    local real y
+    local real damage
+    local integer level = TT_INCIN_LEVEL[heroIndex]
+    local boolean wasBusy = TT_AOE_BUSY
+    if caster == null or victim == null then
+        return
+    endif
+    set x = GetUnitX(victim)
+    set y = GetUnitY(victim)
+    set damage = I2R(80 + level * 20)
+    set g = CreateGroup()
+    set TT_AOE_BUSY = true
+    call TT_ShowTalentEffectAt("Abilities\\Spells\\Other\\Incinerate\\FireLordDeathExplode.mdx", x, y)
+    call GroupEnumUnitsInRange(g, x, y, 250.0, null)
+    loop
+        set target = FirstOfGroup(g)
+        exitwhen target == null
+        call GroupRemoveUnit(g, target)
+        if target != victim and TT_IsTalentAoeTarget(caster, target) then
+            call UnitDamageTarget(caster, target, damage, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_FIRE, WEAPON_TYPE_WHOKNOWS)
+        endif
+    endloop
+    set TT_AOE_BUSY = wasBusy
+    call DestroyGroup(g)
+    set TT_INCIN_TARGET[heroIndex] = null
+    set TT_INCIN_STACKS[heroIndex] = 0
+    set TT_INCIN_LEVEL[heroIndex] = 0
+    set TT_INCIN_EXPIRE[heroIndex] = 0.0
+    set target = null
+    set g = null
+endfunction
+
+function TT_OnAnyUnitDeath takes nothing returns nothing
+    local unit victim = GetTriggerUnit()
+    local unit caster
+    local integer i = 0
+    if victim == null then
+        return
+    endif
+    loop
+        exitwhen i >= TT_HERO_COUNT
+        set caster = TT_HEROES[i]
+        if caster != null and TT_INCIN_TARGET[i] == victim and TimerGetElapsed(TT_LOG_CLOCK) <= TT_INCIN_EXPIRE[i] then
+            call TT_ExplodeIncinerateTalent(caster, victim, i)
+        endif
+        set i = i + 1
+    endloop
+    set caster = null
+    set victim = null
+endfunction
+
 function TT_ClearTalentArtifact takes unit u returns nothing
     local integer i = 0
     local item it
@@ -1177,6 +1418,10 @@ function TT_ResetTalents takes unit u returns nothing
     call TT_HideTalentBooks(u)
     set TT_EARNED_POINTS[heroIndex] = 0
     set TT_TALENT_MASTER_LEVEL[heroIndex] = GetUnitAbilityLevel(u, talentId)
+    set TT_INCIN_TARGET[heroIndex] = null
+    set TT_INCIN_STACKS[heroIndex] = 0
+    set TT_INCIN_LEVEL[heroIndex] = 0
+    set TT_INCIN_EXPIRE[heroIndex] = 0.0
     call TT_LogHeroState(u, heroIndex, "RESET_FINISHED")
     call TT_LogFlush()
 endfunction
@@ -1376,6 +1621,12 @@ function TT_OnHeroDeath takes nothing returns nothing
     if TT_IsTalentHero(u) then
         set heroIndex = TT_RegisterHero(u)
         call TT_CaptureTalentState(u)
+        if heroIndex >= 0 then
+            set TT_INCIN_TARGET[heroIndex] = null
+            set TT_INCIN_STACKS[heroIndex] = 0
+            set TT_INCIN_LEVEL[heroIndex] = 0
+            set TT_INCIN_EXPIRE[heroIndex] = 0.0
+        endif
         call TT_LogHeroState(u, heroIndex, "HERO_DEATH")
         call TT_LogFlush()
     endif
@@ -1496,10 +1747,24 @@ endfunction
 
 function TT_OnDamage takes nothing returns nothing
     local unit victim = BlzGetEventDamageTarget()
+    local unit attacker = GetEventDamageSource()
     local real damage = GetEventDamage()
     if victim != null and damage > 0.0 and IsUnitType(victim, UNIT_TYPE_HERO) and GetUnitAbilityLevel(victim, 'T112') > 0 then
         call BlzSetEventDamage(damage * 0.60)
+        set damage = GetEventDamage()
     endif
+    if victim != null and attacker != null and damage > 0.0 and not TT_AOE_BUSY and BlzGetEventIsAttack() then
+        if IsUnitEnemy(victim, GetOwningPlayer(attacker)) and not IsUnitType(victim, UNIT_TYPE_STRUCTURE) then
+            if GetUnitAbilityLevel(attacker, 'T106') > 0 then
+                call TT_ApplyCleaveTalent(attacker, victim, damage)
+            elseif GetUnitAbilityLevel(attacker, 'T107') > 0 then
+                call TT_ApplyBarrageTalent(attacker, victim)
+            elseif GetUnitAbilityLevel(attacker, 'T108') > 0 then
+                call TT_ApplyIncinerateTalent(attacker, victim)
+            endif
+        endif
+    endif
+    set attacker = null
     set victim = null
 endfunction
 
@@ -1547,12 +1812,40 @@ function TT_OnChat takes nothing returns nothing
     local unit u
     local string command = StringCase(GetEventPlayerChatString(), false)
     local integer affected = 0
+    local integer strValue
+    local integer agiValue
+    local integer intValue
+    local integer derivedLevel
+    local integer heroIndex
     if command == "talentlog" then
         call TT_LogAppend("event=MANUAL_FLUSH player=" + GetPlayerName(p))
         call TT_LogFlush()
         call DisplayTextToPlayer(p, 0, 0, "|cff32cd32[天赋日志]|r 已刷新 ALAS-TalentLog.txt。")
         call DestroyGroup(g)
         set g = null
+        return
+    endif
+    if command == "talentstats" then
+        call SyncSelections()
+        call GroupEnumUnitsSelected(g, p, null)
+        set u = FirstOfGroup(g)
+        if TT_IsLiveHero(u) then
+            set heroIndex = TT_RegisteredHeroIndex(u)
+            set strValue = GetHeroStr(u, true)
+            set agiValue = GetHeroAgi(u, true)
+            set intValue = GetHeroInt(u, true)
+            set derivedLevel = TT_AttributeTalentLevel(intValue)
+            call DisplayTextToPlayer(p, 0, 0, "|cff32cd32[天赋属性]|r 力量 " + I2S(strValue) + "，敏捷 " + I2S(agiValue) + "，智力 " + I2S(intValue) + "。")
+            call DisplayTextToPlayer(p, 0, 0, "分裂半径 " + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + "；弹幕目标 " + I2S(TT_BarrageTargetCount(TT_AttributeTalentLevel(agiValue))) + "；燃灰每层 " + I2S(3 + derivedLevel) + "，爆炸 " + I2S(80 + derivedLevel * 20) + "。")
+            if heroIndex >= 0 then
+                call DisplayTextToPlayer(p, 0, 0, "当前选择 " + TT_ActualSelectionText(u) + "；燃灰层数 " + I2S(TT_INCIN_STACKS[heroIndex]) + "。")
+            endif
+        else
+            call DisplayTextToPlayer(p, 0, 0, "|cffff4444[天赋属性]|r 请先选中一个英雄。")
+        endif
+        call DestroyGroup(g)
+        set g = null
+        set u = null
         return
     endif
     if command != "talentreset" then
@@ -1646,6 +1939,7 @@ function TT_Init takes nothing returns nothing
     call TriggerAddAction(TT_LEVEL_TRIGGER, function TT_OnLevel)
     set TT_REVIVE_TABLE = InitHashtable()
     set TT_RESTORE_TABLE = InitHashtable()
+    set TT_FX_TABLE = InitHashtable()
     set TT_SKILL_TRIGGER = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(TT_SKILL_TRIGGER, EVENT_PLAYER_HERO_SKILL)
     call TriggerAddAction(TT_SKILL_TRIGGER, function TT_OnHeroSkill)
@@ -1655,6 +1949,7 @@ function TT_Init takes nothing returns nothing
     set TT_DEATH_TRIGGER = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(TT_DEATH_TRIGGER, EVENT_PLAYER_UNIT_DEATH)
     call TriggerAddAction(TT_DEATH_TRIGGER, function TT_OnHeroDeath)
+    call TriggerAddAction(TT_DEATH_TRIGGER, function TT_OnAnyUnitDeath)
     set TT_REVIVE_TRIGGER = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(TT_REVIVE_TRIGGER, EVENT_PLAYER_HERO_REVIVE_FINISH)
     call TriggerAddAction(TT_REVIVE_TRIGGER, function TT_OnHeroRevive)

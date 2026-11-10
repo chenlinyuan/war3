@@ -10,12 +10,18 @@ trigger TT_SKILL_TRIGGER = null
 trigger TT_PANEL_TRIGGER = null
 trigger TT_DEATH_TRIGGER = null
 trigger TT_REVIVE_TRIGGER = null
+boolean TT_AOE_BUSY = false
 hashtable TT_REVIVE_TABLE = null
 hashtable TT_RESTORE_TABLE = null
+hashtable TT_FX_TABLE = null
 boolean TT_INITED = false
 boolean TT_START_READY = false
 integer TT_HERO_COUNT = 0
 unit array TT_HEROES
+unit array TT_INCIN_TARGET
+integer array TT_INCIN_STACKS
+integer array TT_INCIN_LEVEL
+real array TT_INCIN_EXPIRE
 boolean array TT_BACKPACK_ATTEMPTED
 integer array TT_LEVEL_MARKERS
 integer array TT_LEVEL_REQ

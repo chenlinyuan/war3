@@ -212,6 +212,26 @@ def stat_talent_entry(
     return {"old": old, "new": ident, "mods": mods}
 
 
+def marker_talent_entry(
+    ident: str,
+    name: str,
+    icon: str,
+    tips: list[str],
+) -> dict[str, object]:
+    return stat_talent_entry(
+        ident,
+        "AIst",
+        name,
+        icon,
+        tips,
+        lambda level: [
+            mod("Istr", 0, O.T_INT, level=level, column=3),
+            mod("Iagi", 0, O.T_INT, level=level, column=1),
+            mod("Iint", 0, O.T_INT, level=level, column=2),
+        ],
+    )
+
+
 def book_entry(
     ident: str,
     name: str,
@@ -338,9 +358,8 @@ def build_entries() -> list[dict[str, object]]:
             [child_id(8), child_id(9)],
             icon=ICON_MOVEMENT,
         ),
-        stat_talent_entry(
+        marker_talent_entry(
             node_id(2, 0),
-            "ANca",
             "力破千军",
             ICON_CLEAVE,
             [
@@ -348,19 +367,9 @@ def build_entries() -> list[dict[str, object]]:
                 "力量越高，分裂范围越大。" % int(cleave_radius(level))
                 for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
             ],
-            lambda level: [
-                mod("nca1", 0.35, O.T_UNREAL, level=level),
-                mod(
-                    "aare",
-                    cleave_radius(level),
-                    O.T_UNREAL,
-                    level=level,
-                ),
-            ],
         ),
-        stat_talent_entry(
+        marker_talent_entry(
             node_id(2, 1),
-            "Aroc",
             "万箭穿云",
             ICON_BARRAGE,
             [
@@ -369,38 +378,9 @@ def build_entries() -> list[dict[str, object]]:
                 % barrage_targets(level)
                 for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
             ],
-            lambda level: [
-                mod("Efk1", 30.0, O.T_UNREAL, level=level),
-                mod("Efk2", 9999.0, O.T_UNREAL, level=level),
-                mod(
-                    "Efk3",
-                    barrage_targets(level),
-                    O.T_INT,
-                    level=level,
-                ),
-                mod("aare", 550.0, O.T_UNREAL, level=level),
-                mod(
-                    "atar",
-                    "air,ground,enemy,neutral",
-                    O.T_STRING,
-                    level=level,
-                ),
-                *(
-                    [
-                        mod(
-                            "amat",
-                            r"Abilities\Weapons\FlamingArrow\FlamingArrowMissile.mdx",
-                        ),
-                        mod("amsp", 1400.0, O.T_UNREAL),
-                    ]
-                    if level == 1
-                    else []
-                ),
-            ],
         ),
-        stat_talent_entry(
+        marker_talent_entry(
             node_id(2, 2),
-            "ANic",
             "燃灰",
             ICON_INCINERATE,
             [
@@ -412,42 +392,6 @@ def build_entries() -> list[dict[str, object]]:
                     int(incinerate_explosion_damage(level)),
                 )
                 for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
-            ],
-            lambda level: [
-                mod(
-                    "Nic1",
-                    incinerate_stack_damage(level),
-                    O.T_UNREAL,
-                    level=level,
-                ),
-                mod(
-                    "Nic2",
-                    incinerate_explosion_damage(level),
-                    O.T_UNREAL,
-                    level=level,
-                ),
-                mod("Nic3", 250.0, O.T_UNREAL, level=level),
-                mod(
-                    "Nic4",
-                    incinerate_explosion_damage(level),
-                    O.T_UNREAL,
-                    level=level,
-                ),
-                mod("Nic5", 250.0, O.T_UNREAL, level=level),
-                mod("Nic6", 0.2, O.T_UNREAL, level=level),
-                mod("abuf", "BNic", O.T_STRING, level=level),
-                mod(
-                    "atar",
-                    "neutral,enemies,organic",
-                    O.T_STRING,
-                    level=level,
-                ),
-                mod("adur", 4.0, O.T_UNREAL, level=level),
-                mod("ahdu", 4.0, O.T_UNREAL, level=level),
-                mod("acdn", 0.0, O.T_UNREAL, level=level),
-                mod("amcs", 0, O.T_INT, level=level),
-                mod("acas", 0.0, O.T_UNREAL, level=level),
-                mod("aran", 0.0, O.T_UNREAL, level=level),
             ],
         ),
         ability_entry(
@@ -609,6 +553,7 @@ def run_full_port(
     work: Path,
     talent_ability: Path,
     talent_item: Path,
+    object_source: Path,
 ) -> None:
     env = dict(os.environ)
     env.update({
@@ -626,7 +571,7 @@ def run_full_port(
         "--config",
         WING_CONFIG,
         "--object-source",
-        str(OBJECT_TEMPLATE),
+        str(object_source),
         "--output",
         str(output),
         "--extra-script",
@@ -809,16 +754,19 @@ def verify(output: Path) -> None:
             "arar": ICON_MOVEMENT,
         },
         "T106": {
+            "old": "AIst",
             "alev": ATTRIBUTE_TALENT_LEVELS,
             "aart": ICON_CLEAVE,
             "arar": ICON_CLEAVE,
         },
         "T107": {
+            "old": "AIst",
             "alev": ATTRIBUTE_TALENT_LEVELS,
             "aart": ICON_BARRAGE,
             "arar": ICON_BARRAGE,
         },
         "T108": {
+            "old": "AIst",
             "alev": ATTRIBUTE_TALENT_LEVELS,
             "aart": ICON_INCINERATE,
             "arar": ICON_INCINERATE,
@@ -871,69 +819,33 @@ def verify(output: Path) -> None:
         if ident not in abilities:
             raise SystemExit("talent node missing: " + ident)
         fields = talent_fields(ident)
+        if "old" in expected:
+            if abilities[ident][1] != expected["old"]:
+                raise SystemExit(
+                    "%s base mismatch: %r != %r"
+                    % (
+                        ident,
+                        abilities[ident][1],
+                        expected["old"],
+                    )
+                )
         for key, value in expected.items():
+            if key == "old":
+                continue
             if not field_matches(fields.get(key), value):
                 raise SystemExit(
                     "%s field mismatch: %r != %r"
                     % (ident, fields.get(key), value)
                 )
-    for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1):
-        cleave = talent_fields("T106")
-        for field, value in (
-            ("nca1", 0.35),
-            ("aare", cleave_radius(level)),
-        ):
-            if not field_matches(cleave.get((field, level)), value):
-                raise SystemExit(
-                    "T106 level %d %s mismatch: %r != %r"
-                    % (
-                        level,
-                        field,
-                        cleave.get((field, level)),
-                        value,
+    for ident in ("T106", "T107", "T108"):
+        marker = talent_fields(ident)
+        for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1):
+            for field in ("Istr", "Iagi", "Iint"):
+                if not field_matches(marker.get((field, level)), 0):
+                    raise SystemExit(
+                        "%s level %d %s is not zero"
+                        % (ident, level, field)
                     )
-                )
-
-        barrage = talent_fields("T107")
-        for field, value in (
-            ("Efk1", 30.0),
-            ("Efk2", 9999.0),
-            ("Efk3", barrage_targets(level)),
-            ("aare", 550.0),
-        ):
-            if not field_matches(barrage.get((field, level)), value):
-                raise SystemExit(
-                    "T107 level %d %s mismatch: %r != %r"
-                    % (
-                        level,
-                        field,
-                        barrage.get((field, level)),
-                        value,
-                    )
-                )
-
-        incinerate = talent_fields("T108")
-        for field, value in (
-            ("Nic1", incinerate_stack_damage(level)),
-            ("Nic2", incinerate_explosion_damage(level)),
-            ("Nic3", 250.0),
-            ("Nic4", incinerate_explosion_damage(level)),
-            ("Nic5", 250.0),
-            ("Nic6", 0.2),
-            ("abuf", "BNic"),
-            ("adur", 4.0),
-            ("ahdu", 4.0),
-        ):
-            if not field_matches(incinerate.get((field, level)), value):
-                raise SystemExit(
-                    "T108 level %d %s mismatch: %r != %r"
-                    % (
-                        level,
-                        field,
-                        incinerate.get((field, level)),
-                        value,
-                    )
-                )
     for index, expected in (
         (0, ("Ilif", 1, 200)),
         (1, ("Ihpr", 1, 6)),
@@ -1030,6 +942,14 @@ def verify(output: Path) -> None:
         b"GetHeroStr(u, true)",
         b"GetHeroAgi(u, true)",
         b"GetHeroInt(u, true)",
+        b"function TT_ApplyCleaveTalent takes unit caster, unit victim, real attackDamage",
+        b"function TT_ApplyBarrageTalent takes unit caster, unit victim returns nothing",
+        b"function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing",
+        b"function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer heroIndex",
+        b"function TT_OnAnyUnitDeath takes nothing returns nothing",
+        b"call TriggerAddAction(TT_DEATH_TRIGGER, function TT_OnAnyUnitDeath)",
+        b"set TT_FX_TABLE = InitHashtable()",
+        b'"talentstats"',
         b"call TT_SyncAttributeTalents(u)",
         b"if GetUnitAbilityLevel(u, 'T100') > 0 then",
         b"if GetUnitAbilityLevel(u, 'T101') > 0 then",
@@ -1139,12 +1059,16 @@ def main() -> int:
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--work", type=Path, default=DEFAULT_WORK)
+    parser.add_argument("--object-source", type=Path, default=OBJECT_TEMPLATE)
     args = parser.parse_args()
     source = args.source.resolve()
     output = args.output.resolve()
     work = args.work.resolve()
+    object_source = args.object_source.resolve()
     if not source.is_file():
         raise SystemExit("source missing")
+    if not object_source.is_file():
+        raise SystemExit("object source missing")
     if output.exists():
         raise SystemExit("output exists")
     if work.exists() and any(work.iterdir()):
@@ -1159,6 +1083,7 @@ def main() -> int:
         work / "full",
         talent_ability,
         talent_item,
+        object_source,
     )
     verify(output)
     print("output:", output)

@@ -413,7 +413,7 @@ def breakthrough_buff_entries() -> list[dict[str, object]]:
                 mod("ftip", "破势"),
                 mod(
                     "fube",
-                    "连续攻击同一目标时，每层攻击速度 +10%%，最多 5 层。"
+                    "连续攻击同一目标时，每层攻击速度 +10%，最多 5 层。"
                     "满 5 层后的下一次攻击触发战争践踏并眩晕 1.5 秒。",
                 ),
                 mod("fart", ICON_BREAKTHROUGH),

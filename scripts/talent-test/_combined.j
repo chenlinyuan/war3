@@ -642,6 +642,36 @@ function TT_HideTalentBooks takes unit u returns nothing
     endif
 endfunction
 
+function TT_AttributeTalentLevel takes integer statValue returns integer
+    local integer level = 1
+    if statValue <= 30 then
+        return 1
+    endif
+    set level = 1 + (statValue - 30) / 10
+    if level > 10 then
+        set level = 10
+    endif
+    return level
+endfunction
+
+function TT_SyncAttributeTalent takes unit u, integer abilityId, integer desiredLevel returns nothing
+    local integer currentLevel = GetUnitAbilityLevel(u, abilityId)
+    if currentLevel <= 0 then
+        return
+    endif
+    if currentLevel != desiredLevel then
+        call SetUnitAbilityLevel(u, abilityId, desiredLevel)
+    endif
+    call UnitMakeAbilityPermanent(u, true, abilityId)
+    call BlzUnitHideAbility(u, abilityId, true)
+endfunction
+
+function TT_SyncAttributeTalents takes unit u returns nothing
+    call TT_SyncAttributeTalent(u, 'T106', TT_AttributeTalentLevel(GetHeroStr(u, true)))
+    call TT_SyncAttributeTalent(u, 'T107', TT_AttributeTalentLevel(GetHeroAgi(u, true)))
+    call TT_SyncAttributeTalent(u, 'T108', TT_AttributeTalentLevel(GetHeroInt(u, true)))
+endfunction
+
 function TT_ClearTalentArtifact takes unit u returns nothing
     local integer i = 0
     local item it
@@ -1313,6 +1343,7 @@ function TT_EnsureHeroNow takes unit u returns nothing
         call TT_EnsureTalentMaster(u, heroIndex)
     endif
     call TT_HideTalentBooks(u)
+    call TT_SyncAttributeTalents(u)
     if GetUnitAbilityLevel(u, 'T405') > 0 then
         call TT_ValidateTalentPoints(u)
         return
@@ -1376,6 +1407,7 @@ function TT_OnHeroSkill takes nothing returns nothing
     endif
     set heroIndex = TT_RegisterHero(u)
     call TT_CaptureTalentState(u)
+    call TT_SyncAttributeTalents(u)
     call TT_QuickSaveCampaignState(u)
     call TT_LogHeroState(u, heroIndex, "HERO_SKILL")
     call TT_LogFlush()
@@ -1507,6 +1539,7 @@ function TT_SyncPlayers takes nothing returns nothing
                     call TT_EnsureHero(u)
                     call TT_ResetNativeTalents(u)
                 endif
+                call TT_SyncAttributeTalents(u)
             endif
         endloop
         set playerIndex = playerIndex + 1

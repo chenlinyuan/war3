@@ -1777,6 +1777,9 @@ function TT_OnDamage takes nothing returns nothing
     local unit attacker = GetEventDamageSource()
     local real damage = GetEventDamage()
     local integer selected = 0
+    if TT_AOE_BUSY and victim != null and attacker != null and damage > 0.0 then
+        call TT_LogAppend("event=TALENT_DAMAGE_EVENT source=" + GetUnitName(attacker) + " target=" + GetUnitName(victim) + " damage=" + R2S(damage))
+    endif
     if victim != null and damage > 0.0 and IsUnitType(victim, UNIT_TYPE_HERO) and GetUnitAbilityLevel(victim, 'T112') > 0 then
         call BlzSetEventDamage(damage * 0.60)
         set damage = GetEventDamage()

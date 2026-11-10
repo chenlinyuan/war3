@@ -49,7 +49,7 @@ timer TT_POINT_TIMER = null
 integer TT_CAMPAIGN_CHAPTER = 1
 integer TT_MAX_LEVEL = 10
 integer TT_POINT_COUNT = 6
-integer TT_LOG_SIZE = 256
+integer TT_LOG_SIZE = 1024
 integer TT_LOG_COUNT = 0
 integer TT_LOG_NEXT = 0
 integer TT_LOG_SEQ = 0
@@ -1837,6 +1837,9 @@ function TT_OnDamage takes nothing returns nothing
     local unit attacker = GetEventDamageSource()
     local real damage = GetEventDamage()
     local integer selected = 0
+    if TT_AOE_BUSY and victim != null and attacker != null and damage > 0.0 then
+        call TT_LogAppend("event=TALENT_DAMAGE_EVENT source=" + GetUnitName(attacker) + " target=" + GetUnitName(victim) + " damage=" + R2S(damage))
+    endif
     if victim != null and damage > 0.0 and IsUnitType(victim, UNIT_TYPE_HERO) and GetUnitAbilityLevel(victim, 'T112') > 0 then
         call BlzSetEventDamage(damage * 0.60)
         set damage = GetEventDamage()

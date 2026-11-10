@@ -347,6 +347,7 @@ def _verify_script(
         "event=INCINERATE_EXPLODE",
         "event=INCINERATE_EXPLODE_HIT",
         "event=TALENT_STATS",
+        "event=TALENT_DAMAGE_EVENT",
         "call TT_SyncAttributeTalents(u)",
         "TT_EarnedTalentPoints",
         "TT_TALENT_MASTER_LEVEL",

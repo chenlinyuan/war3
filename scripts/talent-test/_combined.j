@@ -696,6 +696,14 @@ function TT_SyncAttributeTalent takes unit u, integer abilityId, integer desired
     call BlzUnitHideAbility(u, abilityId, true)
 endfunction
 
+function TT_ClearBreakthroughBuffs takes unit u returns nothing
+    call UnitRemoveAbility(u, 'B64D')
+    call UnitRemoveAbility(u, 'B64E')
+    call UnitRemoveAbility(u, 'B64F')
+    call UnitRemoveAbility(u, 'B64G')
+    call UnitRemoveAbility(u, 'B64H')
+endfunction
+
 function TT_SetBreakthroughStacks takes unit u, integer heroIndex, integer stacks returns nothing
     if heroIndex < 0 then
         return
@@ -715,8 +723,27 @@ function TT_SetBreakthroughStacks takes unit u, integer heroIndex, integer stack
         endif
         call UnitMakeAbilityPermanent(u, true, 'T118')
         call BlzUnitHideAbility(u, 'T118', true)
+        if stacks > 0 then
+            call TT_ClearBreakthroughBuffs(u)
+            if GetUnitAbilityLevel(u, 'T11A') == 0 then
+                call UnitAddAbility(u, 'T11A')
+            endif
+            if GetUnitAbilityLevel(u, 'T11A') != stacks then
+                call SetUnitAbilityLevel(u, 'T11A', stacks)
+            endif
+            call UnitMakeAbilityPermanent(u, true, 'T11A')
+            call BlzUnitHideAbility(u, 'T11A', true)
+        elseif GetUnitAbilityLevel(u, 'T11A') > 0 then
+            call UnitRemoveAbility(u, 'T11A')
+            call TT_ClearBreakthroughBuffs(u)
+        endif
     elseif GetUnitAbilityLevel(u, 'T118') > 0 then
         call UnitRemoveAbility(u, 'T118')
+        call TT_ClearBreakthroughBuffs(u)
+    endif
+    if GetUnitAbilityLevel(u, 'T107') <= 0 and GetUnitAbilityLevel(u, 'T11A') > 0 then
+        call UnitRemoveAbility(u, 'T11A')
+        call TT_ClearBreakthroughBuffs(u)
     endif
 endfunction
 

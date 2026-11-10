@@ -36,6 +36,10 @@ CHILD_START = 200
 ATTRIBUTE_TALENT_LEVELS = 10
 BREAKTHROUGH_SPEED_ID = "T118"
 BREAKTHROUGH_STUN_ID = "T119"
+BREAKTHROUGH_STATUS_ID = "T11A"
+BREAKTHROUGH_BUFF_IDS = (
+    "B64D", "B64E", "B64F", "B64G", "B64H",
+)
 FULL_PORT = HERE / "port_alas_jass_map.py"
 TALENT_SCRIPT = ROOT / "scripts" / "talent-test"
 WING_CONFIG = "wings_config_forsaken_301"
@@ -72,7 +76,7 @@ ICON_CHAIN = (
     r"ReplaceableTextures\CommandButtons\BTNChainLightning.blp"
 )
 ICON_BREAKTHROUGH = (
-    r"ReplaceableTextures\CommandButtons\BTNBootsOfSpeed.blp"
+    r"ReplaceableTextures\CommandButtons\BTNWarStomp.blp"
 )
 ICON_INCINERATE = (
     r"ReplaceableTextures\CommandButtons\BTNIncinerate.blp"
@@ -363,6 +367,59 @@ def breakthrough_stun_entry() -> dict[str, object]:
     )
 
 
+def breakthrough_status_entry() -> dict[str, object]:
+    mods = [
+        mod("anam", "破势"),
+        mod("aart", ICON_BREAKTHROUGH),
+        mod("arar", ICON_BREAKTHROUGH),
+        mod("aite", 1),
+        mod("aher", 0),
+        mod("alev", 5),
+        mod("aare", 1.0, O.T_UNREAL, level=1),
+        mod("atar", "self", O.T_STRING, level=1),
+        mod("Oae1", 0.0, O.T_UNREAL, level=1, column=1),
+        mod("Oae2", 0.0, O.T_UNREAL, level=1, column=2),
+    ]
+    for level, buff_id in enumerate(BREAKTHROUGH_BUFF_IDS, 1):
+        mods.append(mod("atp1", "破势", level=level))
+        mods.append(
+            mod(
+                "aub1",
+                "破势 %d/5：攻击速度 +%d%%。"
+                % (level, level * 10),
+                level=level,
+            )
+        )
+        mods.append(
+            mod("abuf", buff_id, O.T_STRING, level=level)
+        )
+    return {
+        "old": "AOae",
+        "new": BREAKTHROUGH_STATUS_ID,
+        "mods": mods,
+    }
+
+
+def breakthrough_buff_entries() -> list[dict[str, object]]:
+    entries = []
+    for level, buff_id in enumerate(BREAKTHROUGH_BUFF_IDS, 1):
+        entries.append({
+            "old": "BOae",
+            "new": buff_id,
+            "mods": [
+                mod("fnam", "破势"),
+                mod("ftip", "破势 %d/5" % level),
+                mod(
+                    "fube",
+                    "攻击速度 +%d%%。连续攻击同一目标并在满 5 层后"
+                    "触发战争践踏。" % (level * 10),
+                ),
+                mod("fart", ICON_BREAKTHROUGH),
+            ],
+        })
+    return entries
+
+
 def build_entries() -> list[dict[str, object]]:
     entries = [
         *[
@@ -387,6 +444,7 @@ def build_entries() -> list[dict[str, object]]:
         ],
         breakthrough_speed_entry(),
         breakthrough_stun_entry(),
+        breakthrough_status_entry(),
         book_entry(
             node_id(0, 0),
             "生生不息",
@@ -599,6 +657,7 @@ def doctor_object(entry: dict[str, object]) -> tuple:
 def write_talent_objects(
     ability_path: Path,
     item_path: Path,
+    buff_path: Path,
 ) -> None:
     data = DOBJ.write_objects_bytes(
         3,
@@ -612,6 +671,12 @@ def write_talent_objects(
         False,
     )
     item_path.write_bytes(item_data)
+    buff_data = DOBJ.write_objects_bytes(
+        2,
+        [doctor_object(entry) for entry in breakthrough_buff_entries()],
+        False,
+    )
+    buff_path.write_bytes(buff_data)
 
 
 def run_full_port(
@@ -620,6 +685,7 @@ def run_full_port(
     work: Path,
     talent_ability: Path,
     talent_item: Path,
+    talent_buff: Path,
     object_source: Path,
 ) -> None:
     env = dict(os.environ)
@@ -647,6 +713,8 @@ def run_full_port(
         "w3a=" + str(talent_ability),
         "--extra-object",
         "w3t=" + str(talent_item),
+        "--extra-object",
+        "w3h=" + str(talent_buff),
         "--suppress-source-backpack-auto",
     ]
     result = subprocess.run(
@@ -666,6 +734,7 @@ def verify(output: Path) -> None:
     try:
         ability = archive.read_file("war3map.w3a") or b""
         item = archive.read_file("war3map.w3t") or b""
+        buff = archive.read_file("war3map.w3h") or b""
         unit_data = archive.read_file("war3map.w3u") or b""
         script = archive.read_file("war3map.j") or b""
     finally:
@@ -694,6 +763,19 @@ def verify(output: Path) -> None:
             "mods": mods,
         }
         for _table, old, new, mods in item_entries
+        if new.replace("\0", "")
+    }
+    _buff_version, buff_entries, _buff_consumed = (
+        DOBJ.read_objects_bytes(
+            buff,
+            False,
+            fname="war3map.w3h",
+            with_end=True,
+        )
+    )
+    buffs = {
+        new.replace("\0", ""): old.replace("\0", "")
+        for _table, old, new, _mods in buff_entries
         if new.replace("\0", "")
     }
     for ident in ("I103", "I105", "I106"):
@@ -942,6 +1024,19 @@ def verify(output: Path) -> None:
                 "breakthrough stun mismatch: %r != %r"
                 % (stun_fields.get(key), value)
             )
+    status = abilities.get(BREAKTHROUGH_STATUS_ID)
+    if status is None or status[1] != "AOae":
+        raise SystemExit("breakthrough status aura missing")
+    status_fields = talent_fields(BREAKTHROUGH_STATUS_ID)
+    for level, buff_id in enumerate(BREAKTHROUGH_BUFF_IDS, 1):
+        if status_fields.get(("abuf", level)) != buff_id:
+            raise SystemExit(
+                "breakthrough status buff mismatch at level %d" % level
+            )
+        if buffs.get(buff_id) != "BOae":
+            raise SystemExit(
+                "breakthrough custom buff missing: " + buff_id
+            )
     for index, expected in (
         (0, ("Ilif", 1, 200)),
         (1, ("Ihpr", 1, 6)),
@@ -1179,13 +1274,15 @@ def main() -> int:
     work.mkdir(parents=True, exist_ok=True)
     talent_ability = work / "talent.w3a"
     talent_item = work / "talent.w3t"
-    write_talent_objects(talent_ability, talent_item)
+    talent_buff = work / "talent.w3h"
+    write_talent_objects(talent_ability, talent_item, talent_buff)
     run_full_port(
         source,
         output,
         work / "full",
         talent_ability,
         talent_item,
+        talent_buff,
         object_source,
     )
     verify(output)

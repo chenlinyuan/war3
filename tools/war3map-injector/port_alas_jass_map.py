@@ -197,8 +197,10 @@ def build_lua_map(
     }
     for spec in extra_objects:
         extension, separator, source_text = spec.partition("=")
-        if not separator or extension not in ("w3a", "w3t"):
-            raise SystemExit("--extra-object must be w3a=PATH or w3t=PATH")
+        if not separator or extension not in ("w3a", "w3t", "w3h"):
+            raise SystemExit(
+                "--extra-object must be w3a=PATH, w3t=PATH, or w3h=PATH"
+            )
         path = Path(source_text).resolve()
         if not path.is_file():
             raise SystemExit("extra object file missing: " + str(path))
@@ -383,8 +385,10 @@ def build(args: argparse.Namespace) -> int:
     extra_sources: dict[str, list[Path]] = {}
     for spec in args.extra_object:
         extension, separator, source_text = spec.partition("=")
-        if not separator or extension not in ("w3a", "w3t"):
-            raise SystemExit("--extra-object must be w3a=PATH or w3t=PATH")
+        if not separator or extension not in ("w3a", "w3t", "w3h"):
+            raise SystemExit(
+                "--extra-object must be w3a=PATH, w3t=PATH, or w3h=PATH"
+            )
         path = Path(source_text).resolve()
         if not path.is_file():
             raise SystemExit("extra object file missing: " + str(path))

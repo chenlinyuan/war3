@@ -33,6 +33,7 @@ TIER_COUNT = 6
 CHOICES_PER_TIER = 3
 CHOICE_START = 100
 CHILD_START = 200
+ATTRIBUTE_TALENT_LEVELS = 10
 FULL_PORT = HERE / "port_alas_jass_map.py"
 TALENT_SCRIPT = ROOT / "scripts" / "talent-test"
 WING_CONFIG = "wings_config_forsaken_301"
@@ -62,6 +63,15 @@ ICON_MANA = r"ReplaceableTextures\CommandButtons\BTNWellSpring.dds"
 ICON_BALANCE = r"ReplaceableTextures\CommandButtons\BTNSpiritLink.dds"
 ICON_MOVEMENT = r"ReplaceableTextures\CommandButtons\BTNBlink.dds"
 ICON_TALENT = r"ReplaceableTextures\CommandButtons\BTNTomeRed.blp"
+ICON_CLEAVE = (
+    r"ReplaceableTextures\CommandButtons\BTNCleavingAttack.blp"
+)
+ICON_BARRAGE = (
+    r"ReplaceableTextures\CommandButtons\BTNScatterRockets.blp"
+)
+ICON_INCINERATE = (
+    r"ReplaceableTextures\CommandButtons\BTNIncinerate.blp"
+)
 ICON_HAND = (
     r"ReplaceableTextures\CommandButtons"
     r"\BTNArchimondeHand_30HD.blp"
@@ -159,6 +169,47 @@ def attribute_entry(
             mod("Iint", values[2], level=1, column=2),
         ],
     )
+
+
+def cleave_radius(level: int) -> float:
+    return float(min(500, 275 + level * 25))
+
+
+def barrage_targets(level: int) -> int:
+    return 2 + (level - 1) // 3
+
+
+def incinerate_stack_damage(level: int) -> float:
+    return float(3 + level)
+
+
+def incinerate_explosion_damage(level: int) -> float:
+    return float(80 + level * 20)
+
+
+def stat_talent_entry(
+    ident: str,
+    old: str,
+    name: str,
+    icon: str,
+    tips: list[str],
+    fields_for_level,
+) -> dict[str, object]:
+    if len(tips) != ATTRIBUTE_TALENT_LEVELS:
+        raise ValueError("attribute talent tooltip count mismatch")
+    mods = [
+        mod("anam", name),
+        mod("aart", icon),
+        mod("arar", icon),
+        mod("alev", ATTRIBUTE_TALENT_LEVELS),
+        mod("aite", 1),
+        mod("aher", 0),
+    ]
+    for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1):
+        mods.append(mod("atp1", name, level=level))
+        mods.append(mod("aub1", tips[level - 1], level=level))
+        mods.extend(fields_for_level(level))
+    return {"old": old, "new": ident, "mods": mods}
 
 
 def book_entry(
@@ -287,26 +338,117 @@ def build_entries() -> list[dict[str, object]]:
             [child_id(8), child_id(9)],
             icon=ICON_MOVEMENT,
         ),
-        attribute_entry(
+        stat_talent_entry(
             node_id(2, 0),
-            "天生神力",
-            ICON_STR,
-            (10, 0, 0),
-            tip="力量 +10。",
+            "ANca",
+            "力破千军",
+            ICON_CLEAVE,
+            [
+                "仅近战攻击生效。普通攻击对主目标周围 %d 范围敌人造成 35%% 本次伤害。"
+                "力量越高，分裂范围越大。" % int(cleave_radius(level))
+                for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
+            ],
+            lambda level: [
+                mod("nca1", 0.35, O.T_UNREAL, level=level),
+                mod(
+                    "aare",
+                    cleave_radius(level),
+                    O.T_UNREAL,
+                    level=level,
+                ),
+            ],
         ),
-        attribute_entry(
+        stat_talent_entry(
             node_id(2, 1),
-            "动如脱兔",
-            ICON_AGI,
-            (0, 10, 0),
-            tip="敏捷 +10。",
+            "Aroc",
+            "万箭穿云",
+            ICON_BARRAGE,
+            [
+                "仅远程攻击生效。弹幕向周围 550 范围最多 %d 个敌人各发射一发，"
+                "每发造成 30 点伤害。敏捷越高，弹幕目标越多。"
+                % barrage_targets(level)
+                for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
+            ],
+            lambda level: [
+                mod("Efk1", 30.0, O.T_UNREAL, level=level),
+                mod("Efk2", 9999.0, O.T_UNREAL, level=level),
+                mod(
+                    "Efk3",
+                    barrage_targets(level),
+                    O.T_INT,
+                    level=level,
+                ),
+                mod("aare", 550.0, O.T_UNREAL, level=level),
+                mod(
+                    "atar",
+                    "air,ground,enemy,neutral",
+                    O.T_STRING,
+                    level=level,
+                ),
+                *(
+                    [
+                        mod(
+                            "amat",
+                            r"Abilities\Weapons\FlamingArrow\FlamingArrowMissile.mdx",
+                        ),
+                        mod("amsp", 1400.0, O.T_UNREAL),
+                    ]
+                    if level == 1
+                    else []
+                ),
+            ],
         ),
-        attribute_entry(
+        stat_talent_entry(
             node_id(2, 2),
-            "灵台清明",
-            ICON_INT,
-            (0, 0, 10),
-            tip="智力 +10。",
+            "ANic",
+            "燃灰",
+            ICON_INCINERATE,
+            [
+                "普通攻击连续命中同一目标时，第 N 次附加 N×%d 火焰伤害；"
+                "带燃灰效果的目标死亡时，对周围 250 范围造成 %d 点伤害。"
+                "智力越高，燃灰叠伤与爆炸越强。"
+                % (
+                    int(incinerate_stack_damage(level)),
+                    int(incinerate_explosion_damage(level)),
+                )
+                for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
+            ],
+            lambda level: [
+                mod(
+                    "Nic1",
+                    incinerate_stack_damage(level),
+                    O.T_UNREAL,
+                    level=level,
+                ),
+                mod(
+                    "Nic2",
+                    incinerate_explosion_damage(level),
+                    O.T_UNREAL,
+                    level=level,
+                ),
+                mod("Nic3", 250.0, O.T_UNREAL, level=level),
+                mod(
+                    "Nic4",
+                    incinerate_explosion_damage(level),
+                    O.T_UNREAL,
+                    level=level,
+                ),
+                mod("Nic5", 250.0, O.T_UNREAL, level=level),
+                mod("Nic6", 0.2, O.T_UNREAL, level=level),
+                mod("abuf", "BNic", O.T_STRING, level=level),
+                mod(
+                    "atar",
+                    "neutral,enemies,organic",
+                    O.T_STRING,
+                    level=level,
+                ),
+                mod("adur", 4.0, O.T_UNREAL, level=level),
+                mod("ahdu", 4.0, O.T_UNREAL, level=level),
+                mod("acdn", 0.0, O.T_UNREAL, level=level),
+                mod("amcs", 0, O.T_INT, level=level),
+                mod("acas", 0.0, O.T_UNREAL, level=level),
+                mod("aran", 0.0, O.T_UNREAL, level=level),
+            ],
         ),
         ability_entry(
             node_id(3, 0),
@@ -526,8 +668,22 @@ def verify(output: Path) -> None:
         for table, old, new, mods in entries
         if new.replace("\0", "")
     }
-    _item_version, _item_original, item_entries = O.read_bytes(item, "w3t")
-    items = {entry["new"]: entry for entry in item_entries}
+    _item_version, item_entries, _item_consumed = (
+        DOBJ.read_objects_bytes(
+            item,
+            False,
+            fname="war3map.w3t",
+            with_end=True,
+        )
+    )
+    items = {
+        new.replace("\0", ""): {
+            "old": old.replace("\0", ""),
+            "mods": mods,
+        }
+        for _table, old, new, mods in item_entries
+        if new.replace("\0", "")
+    }
     for ident in ("I103", "I105", "I106"):
         if ident not in items:
             raise SystemExit("artifact missing: " + ident)
@@ -565,7 +721,8 @@ def verify(output: Path) -> None:
         if bag is None:
             raise SystemExit("hero backpack missing: " + backpack)
         bag_fields = {}
-        for field, kind, level, column, value in bag["mods"]:
+        for mod in bag["mods"]:
+            field, _kind, _level, _column, value = mod[:5]
             if isinstance(value, bytes):
                 value = value.decode("utf-8", "replace")
             bag_fields[field] = value
@@ -652,23 +809,19 @@ def verify(output: Path) -> None:
             "arar": ICON_MOVEMENT,
         },
         "T106": {
-            ("Istr", 1): 10,
-            "atp1": "天生神力",
-            "aub1": "力量 +10。",
+            "alev": ATTRIBUTE_TALENT_LEVELS,
+            "aart": ICON_CLEAVE,
+            "arar": ICON_CLEAVE,
         },
         "T107": {
-            ("Iagi", 1): 10,
-            "atp1": "动如脱兔",
-            "aub1": "敏捷 +10。",
-            "aart": ICON_AGI,
-            "arar": ICON_AGI,
+            "alev": ATTRIBUTE_TALENT_LEVELS,
+            "aart": ICON_BARRAGE,
+            "arar": ICON_BARRAGE,
         },
         "T108": {
-            ("Iint", 1): 10,
-            "atp1": "灵台清明",
-            "aub1": "智力 +10。",
-            "aart": ICON_INT,
-            "arar": ICON_INT,
+            "alev": ATTRIBUTE_TALENT_LEVELS,
+            "aart": ICON_INCINERATE,
+            "arar": ICON_INCINERATE,
         },
         "T109": {
             ("Icr1", 1): 0.2,
@@ -723,6 +876,63 @@ def verify(output: Path) -> None:
                 raise SystemExit(
                     "%s field mismatch: %r != %r"
                     % (ident, fields.get(key), value)
+                )
+    for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1):
+        cleave = talent_fields("T106")
+        for field, value in (
+            ("nca1", 0.35),
+            ("aare", cleave_radius(level)),
+        ):
+            if not field_matches(cleave.get((field, level)), value):
+                raise SystemExit(
+                    "T106 level %d %s mismatch: %r != %r"
+                    % (
+                        level,
+                        field,
+                        cleave.get((field, level)),
+                        value,
+                    )
+                )
+
+        barrage = talent_fields("T107")
+        for field, value in (
+            ("Efk1", 30.0),
+            ("Efk2", 9999.0),
+            ("Efk3", barrage_targets(level)),
+            ("aare", 550.0),
+        ):
+            if not field_matches(barrage.get((field, level)), value):
+                raise SystemExit(
+                    "T107 level %d %s mismatch: %r != %r"
+                    % (
+                        level,
+                        field,
+                        barrage.get((field, level)),
+                        value,
+                    )
+                )
+
+        incinerate = talent_fields("T108")
+        for field, value in (
+            ("Nic1", incinerate_stack_damage(level)),
+            ("Nic2", incinerate_explosion_damage(level)),
+            ("Nic3", 250.0),
+            ("Nic4", incinerate_explosion_damage(level)),
+            ("Nic5", 250.0),
+            ("Nic6", 0.2),
+            ("abuf", "BNic"),
+            ("adur", 4.0),
+            ("ahdu", 4.0),
+        ):
+            if not field_matches(incinerate.get((field, level)), value):
+                raise SystemExit(
+                    "T108 level %d %s mismatch: %r != %r"
+                    % (
+                        level,
+                        field,
+                        incinerate.get((field, level)),
+                        value,
+                    )
                 )
     for index, expected in (
         (0, ("Ilif", 1, 200)),
@@ -812,6 +1022,15 @@ def verify(output: Path) -> None:
         b"function TT_TalentId takes integer heroIndex returns integer",
         b"function TT_BackpackId takes integer heroIndex returns integer",
         b"function TT_HideTalentBooks takes unit u returns nothing",
+        b"function TT_AttributeTalentLevel takes integer statValue returns integer",
+        b"function TT_SyncAttributeTalents takes unit u returns nothing",
+        b"call TT_SyncAttributeTalent(u, 'T106'",
+        b"call TT_SyncAttributeTalent(u, 'T107'",
+        b"call TT_SyncAttributeTalent(u, 'T108'",
+        b"GetHeroStr(u, true)",
+        b"GetHeroAgi(u, true)",
+        b"GetHeroInt(u, true)",
+        b"call TT_SyncAttributeTalents(u)",
         b"if GetUnitAbilityLevel(u, 'T100') > 0 then",
         b"if GetUnitAbilityLevel(u, 'T101') > 0 then",
         b"if GetUnitAbilityLevel(u, 'T102') > 0 then",
@@ -848,7 +1067,6 @@ def verify(output: Path) -> None:
         b"if TT_IsCampaignRestoreQueued(u) then",
         b"call TT_EnsureHeroNow(u)",
         b"if not TT_START_READY then",
-        b"event=ENSURE_WAIT_BACKPACK",
         b"HERO_WAIT_BACKPACK",
         b"POINT_RECONCILE_EXCESS",
         b"POINT_RECONCILE_DEFICIT",
@@ -858,7 +1076,6 @@ def verify(output: Path) -> None:
         b"function TT_ActualSelectionText takes unit u returns string",
         b"function TT_RestoreTalentState takes unit u returns nothing",
         b"function TT_EarnedTalentPoints takes unit u returns integer",
-        b"set TT_EARNED_POINTS[heroIndex] = TT_EarnedTalentPoints(u)",
         b"function TT_SyncAwardedFromMarkers takes unit u returns integer",
         b"function TT_IsAwarded takes integer heroIndex, integer index returns boolean",
         b"function TT_CampaignStore takes unit u, gamecache cache returns nothing",
@@ -877,7 +1094,7 @@ def verify(output: Path) -> None:
         b"boolean array TT_CAMPAIGN_VERIFY_PENDING",
         b"hashtable TT_RESTORE_TABLE = null",
         b"function TT_ScheduleCampaignVerify takes unit u, integer heroIndex returns nothing",
-        b"event=CAMPAIGN_REAPPLY",
+        b"CAMPAIGN_REAPPLY",
         b"event=CAMPAIGN_STORE_SAVED",
         b"string TT_LOG_FILE = \"ALAS-TalentLog.txt\"",
         b"gamecache array TT_CAMPAIGN_RESTORE_CACHES",
@@ -888,13 +1105,13 @@ def verify(output: Path) -> None:
         b"POINT_ITEM_ISSUED",
         b"POINT_GRANT_COMMITTED",
         b"event=POINT_GRANT_BLOCKED",
-        b"call UnitUseItem(u, it)",
+        b"UnitUseItem(u, it)",
         b"call TT_StartPointTimer()",
         b"call TT_ConsumeCampaignRestore(u, heroIndex)",
         b"call UnitRemoveAbility(u, talentId)",
         b"call GroupEnumUnitsSelected(g, p, null)",
         b"function TT_LogFlush takes nothing returns nothing",
-        b"call PreloadGenEnd(\"ALAS-TalentLog.txt\")",
+        b"PreloadGenEnd(TT_LOG_FILE)",
         b'"talentlog"',
         b"call UnitMakeAbilityPermanent(u, true, talentId)",
         b"EVENT_PLAYER_HERO_REVIVE_FINISH",

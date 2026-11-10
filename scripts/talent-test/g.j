@@ -18,10 +18,13 @@ boolean TT_INITED = false
 boolean TT_START_READY = false
 integer TT_HERO_COUNT = 0
 unit array TT_HEROES
+boolean array TT_RANGED_HERO
 unit array TT_INCIN_TARGET
 integer array TT_INCIN_STACKS
 integer array TT_INCIN_LEVEL
 real array TT_INCIN_EXPIRE
+integer array TT_BARRAGE_GROUP_CACHE
+integer array TT_BARRAGE_CURRENT
 boolean array TT_BACKPACK_ATTEMPTED
 integer array TT_LEVEL_MARKERS
 integer array TT_LEVEL_REQ

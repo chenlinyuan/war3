@@ -48,8 +48,33 @@ function TT_LogFlush takes nothing returns nothing
     call PreloadGenEnd(TT_LOG_FILE)
 endfunction
 
+function TT_IsRangedHero takes unit u returns boolean
+    local string weaponType
+    if u == null or GetUnitTypeId(u) == 0 then
+        return false
+    endif
+    set weaponType = BlzGetUnitWeaponStringField(u, ConvertUnitWeaponStringField('ua1w'), 0)
+    return StringCase(weaponType, false) == "missile"
+endfunction
+
+function TT_TalentId takes integer heroIndex returns integer
+    local integer offset = (heroIndex / 10) * 256 + (heroIndex - (heroIndex / 10) * 10)
+    if TT_RANGED_HERO[heroIndex] then
+        return 'R000' + offset
+    endif
+    return 'Q000' + offset
+endfunction
+
+function TT_BackpackIdForMode takes integer heroIndex, boolean rangedHero returns integer
+    local integer offset = (heroIndex / 10) * 256 + (heroIndex - (heroIndex / 10) * 10)
+    if rangedHero then
+        return 'Y000' + offset
+    endif
+    return 'Z000' + offset
+endfunction
+
 function TT_BackpackId takes integer heroIndex returns integer
-    return 'Z000' + (heroIndex / 10) * 256 + (heroIndex - (heroIndex / 10) * 10)
+    return TT_BackpackIdForMode(heroIndex, TT_RANGED_HERO[heroIndex])
 endfunction
 
 function TT_SavedBackpackIndex takes unit u returns integer
@@ -62,9 +87,11 @@ function TT_SavedBackpackIndex takes unit u returns integer
         loop
             exitwhen slot > 5
             set it = UnitItemInSlot(u, slot)
-            if it != null and GetItemTypeId(it) == TT_BackpackId(heroIndex) then
-                set it = null
-                return heroIndex
+            if it != null then
+                if GetItemTypeId(it) == TT_BackpackIdForMode(heroIndex, false) or GetItemTypeId(it) == TT_BackpackIdForMode(heroIndex, true) then
+                    set it = null
+                    return heroIndex
+                endif
             endif
             set slot = slot + 1
         endloop
@@ -86,6 +113,7 @@ function TT_RegisterHeroCore takes unit u, boolean allowNew returns integer
     loop
         exitwhen i >= TT_HERO_COUNT
         if TT_HEROES[i] == u then
+            set TT_RANGED_HERO[i] = TT_IsRangedHero(u)
             return i
         endif
         if TT_HEROES[i] != null and GetUnitTypeId(TT_HEROES[i]) == 0 then
@@ -99,6 +127,7 @@ function TT_RegisterHeroCore takes unit u, boolean allowNew returns integer
     set savedIndex = TT_SavedBackpackIndex(u)
     if savedIndex >= 0 and TT_HEROES[savedIndex] == null then
         set TT_HEROES[savedIndex] = u
+        set TT_RANGED_HERO[savedIndex] = TT_IsRangedHero(u)
         set TT_BACKPACK_ATTEMPTED[savedIndex] = true
         set TT_POINT_GRANT_FAILED[savedIndex] = false
         set TT_POINT_GRANT_FAILED_LEVEL[savedIndex] = 0
@@ -115,6 +144,7 @@ function TT_RegisterHeroCore takes unit u, boolean allowNew returns integer
         exitwhen i >= 64
         if TT_HEROES[i] == null then
             set TT_HEROES[i] = u
+            set TT_RANGED_HERO[i] = TT_IsRangedHero(u)
             set TT_BACKPACK_ATTEMPTED[i] = false
             set TT_POINT_GRANT_FAILED[i] = false
             set TT_POINT_GRANT_FAILED_LEVEL[i] = 0
@@ -191,10 +221,6 @@ function TT_FreeInventorySlots takes unit u returns integer
     return count
 endfunction
 
-function TT_TalentId takes integer heroIndex returns integer
-    return 'Q000' + (heroIndex / 10) * 256 + (heroIndex - (heroIndex / 10) * 10)
-endfunction
-
 function TT_LevelWeight takes integer index returns integer
     local integer weight = 1
     local integer i = 0
@@ -263,6 +289,7 @@ endfunction
 function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean
     local integer i = 0
     local integer desiredId = TT_BackpackId(heroIndex)
+    local integer otherId = TT_BackpackIdForMode(heroIndex, not TT_RANGED_HERO[heroIndex])
     local item it
     loop
         exitwhen i > 5
@@ -273,7 +300,7 @@ function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean
                 set it = null
                 return true
             endif
-            if GetItemTypeId(it) == 'B30B' then
+            if GetItemTypeId(it) == 'B30B' or GetItemTypeId(it) == otherId then
                 call RemoveItem(it)
             endif
         endif
@@ -622,86 +649,200 @@ function TT_SyncAttributeTalent takes unit u, integer abilityId, integer desired
 endfunction
 
 function TT_ClearNativeBarrage takes unit u returns nothing
-    if GetUnitAbilityLevel(u, 'T120') > 0 then
-        call UnitRemoveAbility(u, 'T120')
+    local integer heroIndex = TT_RegisteredHeroIndex(u)
+    local integer current = 0
+    if heroIndex >= 0 then
+        set current = TT_BARRAGE_CURRENT[heroIndex]
     endif
-    if GetUnitAbilityLevel(u, 'T121') > 0 then
-        call UnitRemoveAbility(u, 'T121')
+    if current != 0 then
+        call UnitRemoveAbility(u, current)
+        set TT_BARRAGE_CURRENT[heroIndex] = 0
     endif
-    if GetUnitAbilityLevel(u, 'T122') > 0 then
-        call UnitRemoveAbility(u, 'T122')
-    endif
+    call UnitRemoveAbility(u, 'T120')
+    call UnitRemoveAbility(u, 'T121')
+    call UnitRemoveAbility(u, 'T122')
 endfunction
 
-function TT_SyncBarrageMissileArt takes unit u, integer abilityId, boolean shouldLog returns nothing
-    local ability ab
-    local string art
-    local string resultText = "false"
-    local integer speed
-    local boolean artSet = false
-    if u == null or GetUnitTypeId(u) == 0 then
-        return
+function TT_BarrageGroupFor takes string art, integer speed returns integer
+    local string normalized = StringCase(art, false)
+    if normalized == "abilities\\weapons\\arrow\\arrowmissile.mdl" and speed == 900 then
+        return 0
+    elseif normalized == "abilities\\weapons\\bloodelfmissile\\bloodelfmissile.mdl" and speed == 900 then
+        return 1
+    elseif normalized == "abilities\\weapons\\demonhuntermissile\\demonhuntermissile.mdl" and speed == 900 then
+        return 2
+    elseif normalized == "abilities\\weapons\\demonhuntermissile\\demonhuntermissile.mdx" and speed == 1200 then
+        return 3
+    elseif normalized == "abilities\\weapons\\farseermissile\\farseermissile.mdl" and speed == 1200 then
+        return 4
+    elseif normalized == "abilities\\weapons\\fireballmissile\\fireballmissile.mdl" and speed == 900 then
+        return 5
+    elseif normalized == "abilities\\weapons\\keepergrovemissile\\keepergrovemissile.mdl" and speed == 1300 then
+        return 6
+    elseif normalized == "abilities\\weapons\\keepergrovemissile\\keepergrovemissile.mdl" and speed == 900 then
+        return 7
+    elseif normalized == "abilities\\weapons\\lichmissile\\lichmissile.mdl" and speed == 900 then
+        return 8
+    elseif normalized == "abilities\\weapons\\lordofflamemissile\\lordofflamemissile.mdl" and speed == 1200 then
+        return 9
+    elseif normalized == "abilities\\weapons\\moonpriestessmissile\\moonpriestessmissile.mdl" and speed == 900 then
+        return 10
+    elseif normalized == "abilities\\weapons\\nagaarrowmissile\\nagaarrowmissile.mdl" and speed == 1200 then
+        return 11
+    elseif normalized == "abilities\\weapons\\shadowhuntermissile\\shadowhuntermissile.mdl" and speed == 900 then
+        return 12
     endif
-    set ab = BlzGetUnitAbility(u, abilityId)
-    if ab == null then
-        if shouldLog then
-            call TT_LogAppend("event=BARRAGE_MISSILE_SYNC_FAILED hero=" + GetUnitName(u) + " ability=" + I2S(abilityId) + " reason=NO_ABILITY")
-            call TT_LogFlush()
+    return -1
+endfunction
+
+function TT_BarrageAbilityFor takes integer artGroup, integer targets returns integer
+    if artGroup == 0 then
+        if targets <= 3 then
+            return 'T120'
+        elseif targets <= 4 then
+            return 'T121'
         endif
-        return
-    endif
-    set art = BlzGetUnitWeaponStringField(u, UNIT_WEAPON_SF_ATTACK_PROJECTILE_ART, 0)
-    if art != "" then
-        set artSet = BlzSetAbilityStringLevelField(ab, ABILITY_SLF_MISSILE_ART, 0, art)
-        if artSet then
-            set resultText = "true"
+        return 'T122'
+    elseif artGroup == 1 then
+        if targets <= 3 then
+            return 'T123'
+        elseif targets <= 4 then
+            return 'T124'
         endif
+        return 'T125'
+    elseif artGroup == 2 then
+        if targets <= 3 then
+            return 'T126'
+        elseif targets <= 4 then
+            return 'T127'
+        endif
+        return 'T128'
+    elseif artGroup == 3 then
+        if targets <= 3 then
+            return 'T129'
+        elseif targets <= 4 then
+            return 'T130'
+        endif
+        return 'T131'
+    elseif artGroup == 4 then
+        if targets <= 3 then
+            return 'T132'
+        elseif targets <= 4 then
+            return 'T133'
+        endif
+        return 'T134'
+    elseif artGroup == 5 then
+        if targets <= 3 then
+            return 'T135'
+        elseif targets <= 4 then
+            return 'T136'
+        endif
+        return 'T137'
+    elseif artGroup == 6 then
+        if targets <= 3 then
+            return 'T138'
+        elseif targets <= 4 then
+            return 'T139'
+        endif
+        return 'T140'
+    elseif artGroup == 7 then
+        if targets <= 3 then
+            return 'T141'
+        elseif targets <= 4 then
+            return 'T142'
+        endif
+        return 'T143'
+    elseif artGroup == 8 then
+        if targets <= 3 then
+            return 'T144'
+        elseif targets <= 4 then
+            return 'T145'
+        endif
+        return 'T146'
+    elseif artGroup == 9 then
+        if targets <= 3 then
+            return 'T147'
+        elseif targets <= 4 then
+            return 'T148'
+        endif
+        return 'T149'
+    elseif artGroup == 10 then
+        if targets <= 3 then
+            return 'T150'
+        elseif targets <= 4 then
+            return 'T151'
+        endif
+        return 'T152'
+    elseif artGroup == 11 then
+        if targets <= 3 then
+            return 'T153'
+        elseif targets <= 4 then
+            return 'T154'
+        endif
+        return 'T155'
+    elseif artGroup == 12 then
+        if targets <= 3 then
+            return 'T156'
+        elseif targets <= 4 then
+            return 'T157'
+        endif
+        return 'T158'
     endif
-    set speed = R2I(BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_PROJECTILE_SPEED, 0))
-    if speed > 0 then
-        call BlzSetAbilityIntegerField(ab, ABILITY_IF_MISSILE_SPEED, speed)
-    endif
-    if shouldLog then
-        call TT_LogAppend("event=BARRAGE_MISSILE_SYNC hero=" + GetUnitName(u) + " ability=" + I2S(abilityId) + " art=" + art + " result=" + resultText + " speed=" + I2S(speed))
-        call TT_LogFlush()
-    endif
-    set ab = null
+    return 0
 endfunction
 
 function TT_SyncNativeBarrage takes unit u returns nothing
     local integer level
+    local integer heroIndex
+    local integer artGroup
+    local integer current
+    local integer speed
+    local string art
     local integer desired
-    local integer current = 0
     if u == null or GetUnitTypeId(u) == 0 then
         return
     endif
-    if GetUnitAbilityLevel(u, 'T107') <= 0 then
+    set heroIndex = TT_RegisteredHeroIndex(u)
+    if GetUnitAbilityLevel(u, 'T107') <= 0 or not TT_IsRangedHero(u) then
         call TT_ClearNativeBarrage(u)
         return
     endif
-    set level = TT_AttributeTalentLevel(GetHeroAgi(u, true))
-    if level <= 3 then
-        set desired = 'T120'
-    elseif level <= 6 then
-        set desired = 'T121'
-    else
-        set desired = 'T122'
+    set art = BlzGetUnitWeaponStringField(u, UNIT_WEAPON_SF_ATTACK_PROJECTILE_ART, 0)
+    set speed = R2I(BlzGetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_PROJECTILE_SPEED, 0))
+    set artGroup = TT_BarrageGroupFor(art, speed)
+    if artGroup < 0 then
+        if heroIndex >= 0 and TT_BARRAGE_GROUP_CACHE[heroIndex] != -2 then
+            set TT_BARRAGE_GROUP_CACHE[heroIndex] = -2
+            call TT_LogAppend("event=BARRAGE_ART_UNMATCHED hero=" + GetUnitName(u) + " art=" + art + " speed=" + I2S(speed))
+            call TT_LogFlush()
+        endif
+        call TT_ClearNativeBarrage(u)
+        return
     endif
-    if GetUnitAbilityLevel(u, 'T120') > 0 then
-        set current = 'T120'
-    elseif GetUnitAbilityLevel(u, 'T121') > 0 then
-        set current = 'T121'
-    elseif GetUnitAbilityLevel(u, 'T122') > 0 then
-        set current = 'T122'
+    if heroIndex >= 0 and TT_BARRAGE_GROUP_CACHE[heroIndex] != artGroup + 1 then
+        set TT_BARRAGE_GROUP_CACHE[heroIndex] = artGroup + 1
+        call TT_LogAppend("event=BARRAGE_ART_GROUP hero=" + GetUnitName(u) + " group=" + I2S(artGroup) + " art=" + art + " speed=" + I2S(speed))
+        call TT_LogFlush()
+    endif
+    set level = TT_AttributeTalentLevel(GetHeroAgi(u, true))
+    set desired = TT_BarrageAbilityFor(artGroup, TT_BarrageTargetCount(level))
+    if heroIndex >= 0 then
+        set current = TT_BARRAGE_CURRENT[heroIndex]
+    else
+        set current = 0
     endif
     if current != desired then
         call TT_ClearNativeBarrage(u)
-        call UnitAddAbility(u, desired)
-        call TT_LogAppend("event=BARRAGE_NATIVE_SYNC hero=" + GetUnitName(u) + " agi=" + I2S(GetHeroAgi(u, true)) + " level=" + I2S(level) + " targets=" + I2S(TT_BarrageTargetCount(level)) + " ability=" + I2S(desired))
-        call TT_LogFlush()
+        if desired != 0 then
+            call UnitAddAbility(u, desired)
+            if heroIndex >= 0 then
+                set TT_BARRAGE_CURRENT[heroIndex] = desired
+            endif
+            call TT_LogAppend("event=BARRAGE_NATIVE_SYNC hero=" + GetUnitName(u) + " agi=" + I2S(GetHeroAgi(u, true)) + " level=" + I2S(level) + " targets=" + I2S(TT_BarrageTargetCount(level)) + " group=" + I2S(artGroup) + " art=" + art + " speed=" + I2S(speed) + " ability=" + I2S(desired))
+            call TT_LogFlush()
+        endif
     endif
     if GetUnitAbilityLevel(u, desired) > 0 then
-        call TT_SyncBarrageMissileArt(u, desired, current != desired)
         call UnitMakeAbilityPermanent(u, true, desired)
         call BlzUnitHideAbility(u, desired, true)
     endif

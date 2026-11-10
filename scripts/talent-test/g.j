@@ -25,6 +25,9 @@ integer array TT_INCIN_LEVEL
 real array TT_INCIN_EXPIRE
 integer array TT_BARRAGE_GROUP_CACHE
 integer array TT_BARRAGE_CURRENT
+unit array TT_BREAKTHROUGH_TARGET
+integer array TT_BREAKTHROUGH_STACKS
+real array TT_BREAKTHROUGH_EXPIRE
 boolean array TT_BACKPACK_ATTEMPTED
 integer array TT_LEVEL_MARKERS
 integer array TT_LEVEL_REQ

@@ -602,6 +602,10 @@ function TT_ChainRadius takes integer level returns real
     return I2R(400 + level * 10)
 endfunction
 
+function TT_BreakthroughDamage takes integer level returns integer
+    return 60 + level * 15
+endfunction
+
 function TT_AttributeTalentLevel takes integer statValue returns integer
     local integer level = 1
     if statValue <= 30 then
@@ -624,6 +628,52 @@ function TT_SyncAttributeTalent takes unit u, integer abilityId, integer desired
     endif
     call UnitMakeAbilityPermanent(u, true, abilityId)
     call BlzUnitHideAbility(u, abilityId, true)
+endfunction
+
+function TT_SetBreakthroughStacks takes unit u, integer heroIndex, integer stacks returns nothing
+    if heroIndex < 0 then
+        return
+    endif
+    if stacks < 0 then
+        set stacks = 0
+    elseif stacks > 5 then
+        set stacks = 5
+    endif
+    set TT_BREAKTHROUGH_STACKS[heroIndex] = stacks
+    if GetUnitAbilityLevel(u, 'T107') > 0 then
+        if GetUnitAbilityLevel(u, 'T118') == 0 then
+            call UnitAddAbility(u, 'T118')
+        endif
+        if GetUnitAbilityLevel(u, 'T118') != stacks + 1 then
+            call SetUnitAbilityLevel(u, 'T118', stacks + 1)
+        endif
+        call UnitMakeAbilityPermanent(u, true, 'T118')
+        call BlzUnitHideAbility(u, 'T118', true)
+    elseif GetUnitAbilityLevel(u, 'T118') > 0 then
+        call UnitRemoveAbility(u, 'T118')
+    endif
+endfunction
+
+function TT_SyncBreakthroughTalent takes unit u returns nothing
+    local integer heroIndex = TT_RegisteredHeroIndex(u)
+    local real now = TimerGetElapsed(TT_LOG_CLOCK)
+    if heroIndex < 0 then
+        return
+    endif
+    if GetUnitAbilityLevel(u, 'T107') <= 0 then
+        call TT_SetBreakthroughStacks(u, heroIndex, 0)
+        set TT_BREAKTHROUGH_TARGET[heroIndex] = null
+        return
+    endif
+    if TT_BREAKTHROUGH_TARGET[heroIndex] != null and GetUnitTypeId(TT_BREAKTHROUGH_TARGET[heroIndex]) == 0 then
+        set TT_BREAKTHROUGH_TARGET[heroIndex] = null
+        set TT_BREAKTHROUGH_STACKS[heroIndex] = 0
+    endif
+    if now > TT_BREAKTHROUGH_EXPIRE[heroIndex] then
+        set TT_BREAKTHROUGH_TARGET[heroIndex] = null
+        set TT_BREAKTHROUGH_STACKS[heroIndex] = 0
+    endif
+    call TT_SetBreakthroughStacks(u, heroIndex, TT_BREAKTHROUGH_STACKS[heroIndex])
 endfunction
 
 function TT_ClearNativeBarrage takes unit u returns nothing
@@ -830,6 +880,7 @@ function TT_SyncAttributeTalents takes unit u returns nothing
     call TT_SyncAttributeTalent(u, 'T106', TT_AttributeTalentLevel(GetHeroStr(u, true)))
     call TT_SyncAttributeTalent(u, 'T107', TT_AttributeTalentLevel(GetHeroAgi(u, true)))
     call TT_SyncAttributeTalent(u, 'T108', TT_AttributeTalentLevel(GetHeroInt(u, true)))
+    call TT_SyncBreakthroughTalent(u)
 endfunction
 
 function TT_CleaveRadiusForLevel takes integer level returns real
@@ -1056,6 +1107,75 @@ function TT_ApplyChainTalent takes unit caster, unit victim, real attackDamage r
     set target = null
     set hitTargets = null
     set t = null
+endfunction
+
+function TT_BreakthroughWarStomp takes unit caster, unit victim returns nothing
+    local group g
+    local unit target
+    local unit dummy
+    local real x = GetUnitX(victim)
+    local real y = GetUnitY(victim)
+    local real damage
+    local integer level = TT_AttributeTalentLevel(GetHeroAgi(caster, true))
+    local integer hitCount = 0
+    local boolean wasBusy = TT_AOE_BUSY
+    local real beforeLife
+    local real afterLife
+    if caster == null or victim == null then
+        return
+    endif
+    set damage = I2R(60 + level * 15)
+    set g = CreateGroup()
+    set TT_AOE_BUSY = true
+    call GroupEnumUnitsInRange(g, x, y, 250.0, null)
+    loop
+        set target = FirstOfGroup(g)
+        exitwhen target == null
+        call GroupRemoveUnit(g, target)
+        if TT_IsTalentAoeTarget(caster, target) then
+            set beforeLife = GetWidgetLife(target)
+            call UnitDamageTarget(caster, target, damage, true, false, ATTACK_TYPE_HERO, DAMAGE_TYPE_NORMAL, WEAPON_TYPE_WHOKNOWS)
+            set afterLife = GetWidgetLife(target)
+            set hitCount = hitCount + 1
+            call TT_LogAppend("event=BREAKTHROUGH_HIT hero=" + GetUnitName(caster) + " victim=" + GetUnitName(target) + " agi=" + I2S(GetHeroAgi(caster, true)) + " level=" + I2S(level) + " damage=" + R2S(damage) + " lifeBefore=" + R2S(beforeLife) + " lifeAfter=" + R2S(afterLife))
+        endif
+    endloop
+    set TT_AOE_BUSY = wasBusy
+    set dummy = CreateUnit(GetOwningPlayer(caster), 'n100', x, y, 0.0)
+    if dummy != null then
+        call UnitAddAbility(dummy, 'T119')
+        call IssueImmediateOrder(dummy, "stomp")
+        call UnitApplyTimedLife(dummy, 'BTLF', 0.50)
+    endif
+    call TT_ShowTalentEffectAt("Abilities\\Spells\\Orc\\WarStomp\\WarStompCaster.mdl", x, y)
+    call TT_LogAppend("event=BREAKTHROUGH_STOMP hero=" + GetUnitName(caster) + " level=" + I2S(level) + " damage=" + R2S(damage) + " radius=250.0 stun=1.5 hits=" + I2S(hitCount))
+    call TT_LogFlush()
+    call DestroyGroup(g)
+    set dummy = null
+    set target = null
+    set g = null
+endfunction
+
+function TT_ApplyBreakthroughTalent takes unit caster, unit victim returns nothing
+    local integer heroIndex = TT_RegisteredHeroIndex(caster)
+    local integer stacks
+    local real now = TimerGetElapsed(TT_LOG_CLOCK)
+    if TT_AOE_BUSY or caster == null or victim == null or heroIndex < 0 then
+        return
+    endif
+    if TT_BREAKTHROUGH_TARGET[heroIndex] != victim or now > TT_BREAKTHROUGH_EXPIRE[heroIndex] then
+        set stacks = 1
+    elseif TT_BREAKTHROUGH_STACKS[heroIndex] >= 5 then
+        call TT_BreakthroughWarStomp(caster, victim)
+        set stacks = 0
+    else
+        set stacks = TT_BREAKTHROUGH_STACKS[heroIndex] + 1
+    endif
+    set TT_BREAKTHROUGH_TARGET[heroIndex] = victim
+    set TT_BREAKTHROUGH_EXPIRE[heroIndex] = now + 3.0
+    call TT_SetBreakthroughStacks(caster, heroIndex, stacks)
+    call TT_LogAppend("event=BREAKTHROUGH_STACK hero=" + GetUnitName(caster) + " victim=" + GetUnitName(victim) + " agi=" + I2S(GetHeroAgi(caster, true)) + " stacks=" + I2S(stacks) + " attackSpeedPct=" + I2S(stacks * 10))
+    call TT_LogFlush()
 endfunction
 
 function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing
@@ -1699,6 +1819,8 @@ function TT_ResetTalents takes unit u returns nothing
         set i = i + 1
     endloop
     call TT_ClearNativeBarrage(u)
+    call TT_SetBreakthroughStacks(u, heroIndex, 0)
+    set TT_BREAKTHROUGH_TARGET[heroIndex] = null
     set i = 0
     loop
         exitwhen i >= 10
@@ -2080,7 +2202,7 @@ function TT_OnDamage takes nothing returns nothing
             if selected == 106 then
                 call TT_ApplyCleaveTalent(attacker, victim, damage)
             elseif selected == 107 then
-                call TT_ApplyChainTalent(attacker, victim, damage)
+                call TT_ApplyBreakthroughTalent(attacker, victim)
             elseif selected == 108 then
                 call TT_ApplyIncinerateTalent(attacker, victim)
             endif
@@ -2157,12 +2279,12 @@ function TT_OnChat takes nothing returns nothing
             set agiValue = GetHeroAgi(u, true)
             set intValue = GetHeroInt(u, true)
             set derivedLevel = TT_AttributeTalentLevel(intValue)
-            call TT_LogAppend("event=TALENT_STATS hero=" + GetUnitName(u) + " str=" + I2S(strValue) + " agi=" + I2S(agiValue) + " int=" + I2S(intValue) + " cleaveRadius=" + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + " chainTargets=" + I2S(TT_ChainTargetCount(TT_AttributeTalentLevel(agiValue))) + " chainDamagePct=" + I2S(TT_ChainDamagePercent(TT_AttributeTalentLevel(agiValue))) + " chainRadius=" + R2S(TT_ChainRadius(TT_AttributeTalentLevel(agiValue))) + " burnStack=" + I2S(3 + derivedLevel) + " burnExplosion=" + I2S(80 + derivedLevel * 20))
+            call TT_LogAppend("event=TALENT_STATS hero=" + GetUnitName(u) + " str=" + I2S(strValue) + " agi=" + I2S(agiValue) + " int=" + I2S(intValue) + " cleaveRadius=" + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + " breakthroughDamage=" + I2S(TT_BreakthroughDamage(TT_AttributeTalentLevel(agiValue))) + " burnStack=" + I2S(3 + derivedLevel) + " burnExplosion=" + I2S(80 + derivedLevel * 20))
             call TT_LogFlush()
             call DisplayTextToPlayer(p, 0, 0, "|cff32cd32[天赋属性]|r 力量 " + I2S(strValue) + "，敏捷 " + I2S(agiValue) + "，智力 " + I2S(intValue) + "。")
-            call DisplayTextToPlayer(p, 0, 0, "分裂半径 " + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + "；雷霆额外目标 " + I2S(TT_ChainTargetCount(TT_AttributeTalentLevel(agiValue))) + "，每跳 " + I2S(TT_ChainDamagePercent(TT_AttributeTalentLevel(agiValue))) + "% 攻击伤害；燃灰每层 " + I2S(3 + derivedLevel) + "，爆炸 " + I2S(80 + derivedLevel * 20) + "。")
+            call DisplayTextToPlayer(p, 0, 0, "分裂半径 " + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + "；破势每层攻速 +10%，满层践踏伤害 " + I2S(TT_BreakthroughDamage(TT_AttributeTalentLevel(agiValue))) + "、眩晕 1.5 秒；燃灰每层 " + I2S(3 + derivedLevel) + "，爆炸 " + I2S(80 + derivedLevel * 20) + "。")
             if heroIndex >= 0 then
-                call DisplayTextToPlayer(p, 0, 0, "当前选择 " + TT_ActualSelectionText(u) + "；燃灰层数 " + I2S(TT_INCIN_STACKS[heroIndex]) + "。")
+                call DisplayTextToPlayer(p, 0, 0, "当前选择 " + TT_ActualSelectionText(u) + "；破势层数 " + I2S(TT_BREAKTHROUGH_STACKS[heroIndex]) + "；燃灰层数 " + I2S(TT_INCIN_STACKS[heroIndex]) + "。")
             endif
         else
             call DisplayTextToPlayer(p, 0, 0, "|cffff4444[天赋属性]|r 请先选中一个英雄。")

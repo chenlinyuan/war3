@@ -27,6 +27,7 @@ from doctor.data import w3i as W3I  # noqa: E402
 class TalentBundle:
     ability_object: Path
     item_object: Path
+    buff_object: Path
     source_script_dir: Path
     chapter_levels: dict[str, int]
     scripts: dict[int, Path]
@@ -51,6 +52,7 @@ def _object_ids(
     prefix = "war3campaign." if campaign_prefix else "war3map."
     ability_data = archive.read_file(prefix + "w3a") or b""
     item_data = archive.read_file(prefix + "w3t") or b""
+    buff_data = archive.read_file(prefix + "w3h") or b""
     found: set[str] = set()
     if ability_data:
         _version, entries, _consumed = DOBJ.read_objects_bytes(
@@ -69,6 +71,18 @@ def _object_ids(
             item_data,
             False,
             fname=prefix + "w3t",
+            with_end=True,
+        )
+        found.update(
+            new.replace("\0", "")
+            for _table, _old, new, _mods in entries
+            if new.replace("\0", "")
+        )
+    if buff_data:
+        _version, entries, _consumed = DOBJ.read_objects_bytes(
+            buff_data,
+            False,
+            fname=prefix + "w3h",
             with_end=True,
         )
         found.update(
@@ -134,7 +148,7 @@ def _scan_campaign(source: Path) -> tuple[set[str], dict[str, int]]:
     return existing, levels
 
 
-def _generated_ids() -> tuple[set[str], set[str]]:
+def _generated_ids() -> tuple[set[str], set[str], set[str]]:
     abilities = {
         str(entry["new"])
         for entry in TALENT.build_entries()
@@ -143,7 +157,11 @@ def _generated_ids() -> tuple[set[str], set[str]]:
         str(entry["new"])
         for entry in TALENT.build_item_entries()
     }
-    return abilities, items
+    buffs = {
+        str(entry["new"])
+        for entry in TALENT.breakthrough_buff_entries()
+    }
+    return abilities, items, buffs
 
 
 def _render_script(work: Path, level_cap: int) -> Path:
@@ -223,9 +241,14 @@ def prepare_bundle(
         existing, level_cap = _read_chapter(source)
         levels = {chapter_name: level_cap}
 
-    generated_abilities, generated_items = _generated_ids()
+    generated_abilities, generated_items, generated_buffs = (
+        _generated_ids()
+    )
     collisions = sorted(
-        ((generated_abilities | generated_items) & existing)
+        (
+            (generated_abilities | generated_items | generated_buffs)
+            & existing
+        )
     )
     if collisions:
         raise ValueError(
@@ -235,7 +258,12 @@ def prepare_bundle(
 
     ability_object = work / "talent.w3a"
     item_object = work / "talent.w3t"
-    TALENT.write_talent_objects(ability_object, item_object)
+    buff_object = work / "talent.w3h"
+    TALENT.write_talent_objects(
+        ability_object,
+        item_object,
+        buff_object,
+    )
     unique_levels = sorted(set(levels.values()))
     scripts = {
         level_cap: _render_script(work, level_cap)
@@ -254,6 +282,7 @@ def prepare_bundle(
     return TalentBundle(
         ability_object=ability_object,
         item_object=item_object,
+        buff_object=buff_object,
         source_script_dir=TALENT.TALENT_SCRIPT,
         chapter_levels=levels,
         scripts=scripts,
@@ -456,6 +485,7 @@ def _verify_archive(
     try:
         ability_data = archive.read_file("war3map.w3a") or b""
         item_data = archive.read_file("war3map.w3t") or b""
+        buff_data = archive.read_file("war3map.w3h") or b""
         info_data = archive.read_file("war3map.w3i") or b""
         lua_script = archive.read_file("war3map.lua") or b""
         jass_script = (
@@ -468,7 +498,7 @@ def _verify_archive(
         script_type = "lua" if lua_script else "jass"
     finally:
         archive.close()
-    if not ability_data or not item_data or not script:
+    if not ability_data or not item_data or not buff_data or not script:
         raise ValueError(
             display_name + " is missing talent objects or script"
         )
@@ -482,6 +512,78 @@ def _verify_archive(
         )
     abilities = _entries(ability_data, True)
     items = _entries(item_data, False)
+    buffs = _entries(buff_data, False)
+    for ident, base in (
+        (TALENT.BREAKTHROUGH_SPEED_ID, "AIsx"),
+        (TALENT.BREAKTHROUGH_STUN_ID, "AOws"),
+        (TALENT.BREAKTHROUGH_STATUS_ID, "AOae"),
+    ):
+        if ident not in abilities or abilities[ident][0] != base:
+            raise ValueError(
+                display_name + ": " + ident
+                + " is missing or is not based on " + base
+            )
+    breakthrough_buff = TALENT.BREAKTHROUGH_BUFF_IDS[0]
+    if (
+        breakthrough_buff not in buffs
+        or buffs[breakthrough_buff][0] != "BOae"
+    ):
+        raise ValueError(
+            display_name + ": " + breakthrough_buff
+            + " is missing or is not based on BOae"
+        )
+    for ident in ("B64E", "B64F", "B64G", "B64H"):
+        if ident in buffs:
+            raise ValueError(
+                display_name + " still contains duplicate status buff "
+                + ident
+            )
+    speed_fields = _field_map(
+        abilities[TALENT.BREAKTHROUGH_SPEED_ID][1]
+    )
+    for level in range(1, 7):
+        actual = speed_fields.get(("Isx1", level))
+        expected = (level - 1) * 0.10
+        if actual is None or abs(float(actual) - expected) > 0.000001:
+            raise ValueError(
+                display_name + ": breakthrough speed level "
+                + str(level) + " is incorrect"
+            )
+    stun_fields = _field_map(
+        abilities[TALENT.BREAKTHROUGH_STUN_ID][1]
+    )
+    for field, expected in (
+        ("aare", 250.0),
+        ("Wrs1", 0.0),
+        ("adur", 1.5),
+        ("ahdu", 1.5),
+    ):
+        actual = stun_fields.get((field, 1))
+        if actual is None or abs(float(actual) - expected) > 0.000001:
+            raise ValueError(
+                display_name + ": breakthrough stomp "
+                + field + " is incorrect"
+            )
+    status_fields = _field_map(
+        abilities[TALENT.BREAKTHROUGH_STATUS_ID][1]
+    )
+    for level in range(1, 6):
+        if status_fields.get(("abuf", level)) != breakthrough_buff:
+            raise ValueError(
+                display_name + ": breakthrough status level "
+                + str(level) + " uses the wrong buff"
+            )
+    buff_fields = _field_map(buffs[breakthrough_buff][1])
+    if (
+        buff_fields.get("fnam") != "破势"
+        or buff_fields.get("ftip") != "破势"
+        or not buff_fields.get("fube")
+        or not buff_fields.get("fart")
+    ):
+        raise ValueError(
+            display_name + ": " + breakthrough_buff
+            + " has incomplete status text or icon"
+        )
     for ident in ("I103", "I105", "I106"):
         if ident not in items:
             raise ValueError(

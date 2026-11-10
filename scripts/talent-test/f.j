@@ -743,13 +743,18 @@ function TT_ApplyBarrageTalent takes unit caster, unit victim returns nothing
     local real y
     local integer level
     local integer remaining
+    local integer total
+    local integer hitCount = 0
     if TT_AOE_BUSY or caster == null or victim == null then
         return
     endif
     set level = TT_AttributeTalentLevel(GetHeroAgi(caster, true))
-    set remaining = TT_BarrageTargetCount(level) - 1
+    set total = TT_BarrageTargetCount(level)
+    set remaining = total - 1
     set x = GetUnitX(victim)
     set y = GetUnitY(victim)
+    call TT_ShowTalentText(caster, "弹幕 " + I2S(total) + "目标")
+    call TT_LogAppend("event=BARRAGE_START hero=" + GetUnitName(caster) + " victim=" + GetUnitName(victim) + " agi=" + I2S(GetHeroAgi(caster, true)) + " level=" + I2S(level) + " maxTargets=" + I2S(total))
     set g = CreateGroup()
     set TT_AOE_BUSY = true
     call GroupEnumUnitsInRange(g, x, y, 550.0, null)
@@ -760,11 +765,16 @@ function TT_ApplyBarrageTalent takes unit caster, unit victim returns nothing
         if target != victim and TT_IsTalentAoeTarget(caster, target) then
             call UnitDamageTarget(caster, target, 30.0, true, false, ATTACK_TYPE_HERO, DAMAGE_TYPE_NORMAL, WEAPON_TYPE_WHOKNOWS)
             call TT_ShowTalentEffectTarget("Abilities\\Weapons\\FlamingArrow\\FlamingArrowMissile.mdx", target)
+            call TT_ShowTalentText(target, "-30")
+            set hitCount = hitCount + 1
+            call TT_LogAppend("event=BARRAGE_HIT index=" + I2S(hitCount) + " target=" + GetUnitName(target) + " damage=30")
             set remaining = remaining - 1
         endif
     endloop
     set TT_AOE_BUSY = false
     call DestroyGroup(g)
+    call TT_LogAppend("event=BARRAGE_END hero=" + GetUnitName(caster) + " hits=" + I2S(hitCount) + " maxExtra=" + I2S(total - 1))
+    call TT_LogFlush()
     set target = null
     set g = null
 endfunction
@@ -775,6 +785,8 @@ function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing
     local integer stacks
     local real now
     local real bonus
+    local real beforeLife
+    local real afterLife
     if TT_AOE_BUSY or caster == null or victim == null then
         return
     endif
@@ -797,11 +809,15 @@ function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing
     set TT_INCIN_LEVEL[heroIndex] = level
     set TT_INCIN_EXPIRE[heroIndex] = now + 4.0
     set bonus = I2R(stacks * (3 + level))
+    set beforeLife = GetWidgetLife(victim)
     set TT_AOE_BUSY = true
     call UnitDamageTarget(caster, victim, bonus, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_FIRE, WEAPON_TYPE_WHOKNOWS)
     set TT_AOE_BUSY = false
+    set afterLife = GetWidgetLife(victim)
     call TT_ShowTalentText(victim, "+" + I2S(R2I(bonus)))
     call TT_ShowTalentEffectTarget("Abilities\\Spells\\Other\\Incinerate\\IncinerateBuff.mdx", victim)
+    call TT_LogAppend("event=INCINERATE_HIT hero=" + GetUnitName(caster) + " victim=" + GetUnitName(victim) + " int=" + I2S(GetHeroInt(caster, true)) + " level=" + I2S(level) + " stack=" + I2S(stacks) + " bonus=" + R2S(bonus) + " lifeBefore=" + R2S(beforeLife) + " lifeAfter=" + R2S(afterLife))
+    call TT_LogFlush()
 endfunction
 
 function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer heroIndex returns nothing
@@ -812,6 +828,9 @@ function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer hero
     local real damage
     local integer level = TT_INCIN_LEVEL[heroIndex]
     local boolean wasBusy = TT_AOE_BUSY
+    local integer hitCount = 0
+    local real beforeLife
+    local real afterLife
     if caster == null or victim == null then
         return
     endif
@@ -821,13 +840,19 @@ function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer hero
     set g = CreateGroup()
     set TT_AOE_BUSY = true
     call TT_ShowTalentEffectAt("Abilities\\Spells\\Other\\Incinerate\\FireLordDeathExplode.mdx", x, y)
+    call TT_LogAppend("event=INCINERATE_EXPLODE hero=" + GetUnitName(caster) + " victim=" + GetUnitName(victim) + " level=" + I2S(level) + " damage=" + R2S(damage))
     call GroupEnumUnitsInRange(g, x, y, 250.0, null)
     loop
         set target = FirstOfGroup(g)
         exitwhen target == null
         call GroupRemoveUnit(g, target)
         if target != victim and TT_IsTalentAoeTarget(caster, target) then
+            set beforeLife = GetWidgetLife(target)
             call UnitDamageTarget(caster, target, damage, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_FIRE, WEAPON_TYPE_WHOKNOWS)
+            set afterLife = GetWidgetLife(target)
+            set hitCount = hitCount + 1
+            call TT_ShowTalentText(target, "-" + I2S(R2I(damage)))
+            call TT_LogAppend("event=INCINERATE_EXPLODE_HIT index=" + I2S(hitCount) + " target=" + GetUnitName(target) + " expected=" + R2S(damage) + " lifeBefore=" + R2S(beforeLife) + " lifeAfter=" + R2S(afterLife))
         endif
     endloop
     set TT_AOE_BUSY = wasBusy
@@ -836,6 +861,8 @@ function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer hero
     set TT_INCIN_STACKS[heroIndex] = 0
     set TT_INCIN_LEVEL[heroIndex] = 0
     set TT_INCIN_EXPIRE[heroIndex] = 0.0
+    call TT_LogAppend("event=INCINERATE_EXPLODE_END hero=" + GetUnitName(caster) + " hits=" + I2S(hitCount))
+    call TT_LogFlush()
     set target = null
     set g = null
 endfunction
@@ -1749,6 +1776,7 @@ function TT_OnDamage takes nothing returns nothing
     local unit victim = BlzGetEventDamageTarget()
     local unit attacker = GetEventDamageSource()
     local real damage = GetEventDamage()
+    local integer selected = 0
     if victim != null and damage > 0.0 and IsUnitType(victim, UNIT_TYPE_HERO) and GetUnitAbilityLevel(victim, 'T112') > 0 then
         call BlzSetEventDamage(damage * 0.60)
         set damage = GetEventDamage()
@@ -1756,10 +1784,21 @@ function TT_OnDamage takes nothing returns nothing
     if victim != null and attacker != null and damage > 0.0 and not TT_AOE_BUSY and BlzGetEventIsAttack() then
         if IsUnitEnemy(victim, GetOwningPlayer(attacker)) and not IsUnitType(victim, UNIT_TYPE_STRUCTURE) then
             if GetUnitAbilityLevel(attacker, 'T106') > 0 then
-                call TT_ApplyCleaveTalent(attacker, victim, damage)
+                set selected = 106
             elseif GetUnitAbilityLevel(attacker, 'T107') > 0 then
-                call TT_ApplyBarrageTalent(attacker, victim)
+                set selected = 107
             elseif GetUnitAbilityLevel(attacker, 'T108') > 0 then
+                set selected = 108
+            endif
+            if selected > 0 then
+                call TT_LogAppend("event=TALENT_ATTACK hero=" + GetUnitName(attacker) + " victim=" + GetUnitName(victim) + " selected=" + I2S(selected) + " damage=" + R2S(damage) + " str=" + I2S(GetHeroStr(attacker, true)) + " agi=" + I2S(GetHeroAgi(attacker, true)) + " int=" + I2S(GetHeroInt(attacker, true)))
+                call TT_LogFlush()
+            endif
+            if selected == 106 then
+                call TT_ApplyCleaveTalent(attacker, victim, damage)
+            elseif selected == 107 then
+                call TT_ApplyBarrageTalent(attacker, victim)
+            elseif selected == 108 then
                 call TT_ApplyIncinerateTalent(attacker, victim)
             endif
         endif
@@ -1835,6 +1874,8 @@ function TT_OnChat takes nothing returns nothing
             set agiValue = GetHeroAgi(u, true)
             set intValue = GetHeroInt(u, true)
             set derivedLevel = TT_AttributeTalentLevel(intValue)
+            call TT_LogAppend("event=TALENT_STATS hero=" + GetUnitName(u) + " str=" + I2S(strValue) + " agi=" + I2S(agiValue) + " int=" + I2S(intValue) + " cleaveRadius=" + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + " barrageTargets=" + I2S(TT_BarrageTargetCount(TT_AttributeTalentLevel(agiValue))) + " burnStack=" + I2S(3 + derivedLevel) + " burnExplosion=" + I2S(80 + derivedLevel * 20))
+            call TT_LogFlush()
             call DisplayTextToPlayer(p, 0, 0, "|cff32cd32[天赋属性]|r 力量 " + I2S(strValue) + "，敏捷 " + I2S(agiValue) + "，智力 " + I2S(intValue) + "。")
             call DisplayTextToPlayer(p, 0, 0, "分裂半径 " + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + "；弹幕目标 " + I2S(TT_BarrageTargetCount(TT_AttributeTalentLevel(agiValue))) + "；燃灰每层 " + I2S(3 + derivedLevel) + "，爆炸 " + I2S(80 + derivedLevel * 20) + "。")
             if heroIndex >= 0 then

@@ -34,6 +34,8 @@ CHOICES_PER_TIER = 3
 CHOICE_START = 100
 CHILD_START = 200
 ATTRIBUTE_TALENT_LEVELS = 10
+BREAKTHROUGH_SPEED_ID = "T118"
+BREAKTHROUGH_STUN_ID = "T119"
 FULL_PORT = HERE / "port_alas_jass_map.py"
 TALENT_SCRIPT = ROOT / "scripts" / "talent-test"
 WING_CONFIG = "wings_config_forsaken_301"
@@ -68,6 +70,9 @@ ICON_CLEAVE = (
 )
 ICON_CHAIN = (
     r"ReplaceableTextures\CommandButtons\BTNChainLightning.blp"
+)
+ICON_BREAKTHROUGH = (
+    r"ReplaceableTextures\CommandButtons\BTNBootsOfSpeed.blp"
 )
 ICON_INCINERATE = (
     r"ReplaceableTextures\CommandButtons\BTNIncinerate.blp"
@@ -177,16 +182,12 @@ def cleave_radius(level: int) -> float:
     return float(min(500, 275 + level * 25))
 
 
-def chain_targets(level: int) -> int:
-    return 1 + (level - 1) // 3
+def breakthrough_damage(level: int) -> int:
+    return 60 + level * 15
 
 
-def chain_damage_percent(level: int) -> int:
-    return 18 + level * 2
-
-
-def chain_radius(level: int) -> int:
-    return 400 + level * 10
+def breakthrough_radius() -> int:
+    return 250
 
 
 def incinerate_stack_damage(level: int) -> float:
@@ -310,6 +311,58 @@ def backpack_entry(ident: str, talent: str) -> dict[str, object]:
     }
 
 
+def breakthrough_speed_entry() -> dict[str, object]:
+    mods = [
+        mod("anam", "破势追击·攻速"),
+        mod("aart", ICON_BREAKTHROUGH),
+        mod("arar", ICON_BREAKTHROUGH),
+        mod("aite", 1),
+        mod("aher", 0),
+        mod("alev", 6),
+    ]
+    for level in range(1, 7):
+        mods.append(mod("atp1", "破势追击·攻速", level=level))
+        mods.append(
+            mod(
+                "aub1",
+                "攻击速度 +%d%%。" % ((level - 1) * 10),
+                level=level,
+            )
+        )
+        mods.append(
+            mod(
+                "Isx1",
+                (level - 1) * 0.10,
+                O.T_UNREAL,
+                level=level,
+                column=1,
+            )
+        )
+    return {"old": "AIsx", "new": BREAKTHROUGH_SPEED_ID, "mods": mods}
+
+
+def breakthrough_stun_entry() -> dict[str, object]:
+    return ability_entry(
+        BREAKTHROUGH_STUN_ID,
+        "AOws",
+        "破势追击·战争践踏",
+        "造成 1.5 秒眩晕，伤害由破势追击脚本单独结算。",
+        icon=ICON_BREAKTHROUGH,
+        item_ability=0,
+        hero_ability=0,
+        extra=[
+            mod("atar", "ground,air,enemy,neutral,vulnerable", O.T_STRING, level=1),
+            mod("aare", 250.0, O.T_UNREAL, level=1),
+            mod("Wrs1", 0.0, O.T_UNREAL, level=1, column=1),
+            mod("adur", 1.5, O.T_UNREAL, level=1),
+            mod("ahdu", 1.5, O.T_UNREAL, level=1),
+            mod("acdn", 0.0, O.T_UNREAL, level=1),
+            mod("amcs", 0, O.T_INT, level=1),
+            mod("acat", "", O.T_STRING),
+        ],
+    )
+
+
 def build_entries() -> list[dict[str, object]]:
     entries = [
         *[
@@ -332,6 +385,8 @@ def build_entries() -> list[dict[str, object]]:
             )
             for index in range(TIER_COUNT)
         ],
+        breakthrough_speed_entry(),
+        breakthrough_stun_entry(),
         book_entry(
             node_id(0, 0),
             "生生不息",
@@ -380,17 +435,14 @@ def build_entries() -> list[dict[str, object]]:
         ),
         marker_talent_entry(
             node_id(2, 1),
-            "雷霆连锁",
-            ICON_CHAIN,
+            "破势追击",
+            ICON_BREAKTHROUGH,
             [
-                "普通攻击命中后，以主目标为起点向周围 %d 范围连锁攻击"
-                "最多 %d 个额外目标，每次造成本次攻击 %d%% 伤害。"
-                "敏捷越高，连锁目标、范围和伤害越高。"
-                % (
-                    chain_radius(level),
-                    chain_targets(level),
-                    chain_damage_percent(level),
-                )
+                "连续攻击同一目标时，每次获得 1 层破势，每层攻速 +10%%，"
+                "最多 5 层。满 5 层后的下一次同目标攻击触发战争践踏，"
+                "对目标周围 %d 范围造成 %d 点伤害并清空层数。"
+                "切换目标或停手 3 秒会断连。敏捷提高践踏伤害。"
+                % (breakthrough_radius(), breakthrough_damage(level))
                 for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
             ],
         ),
@@ -779,8 +831,8 @@ def verify(output: Path) -> None:
         "T107": {
             "old": "AIst",
             "alev": ATTRIBUTE_TALENT_LEVELS,
-            "aart": ICON_CHAIN,
-            "arar": ICON_CHAIN,
+            "aart": ICON_BREAKTHROUGH,
+            "arar": ICON_BREAKTHROUGH,
         },
         "T108": {
             "old": "AIst",
@@ -863,6 +915,33 @@ def verify(output: Path) -> None:
                         "%s level %d %s is not zero"
                         % (ident, level, field)
                     )
+    speed_buff = abilities.get(BREAKTHROUGH_SPEED_ID)
+    if speed_buff is None or speed_buff[1] != "AIsx":
+        raise SystemExit("breakthrough speed ability missing")
+    speed_fields = talent_fields(BREAKTHROUGH_SPEED_ID)
+    for level in range(1, 7):
+        if not field_matches(
+            speed_fields.get(("Isx1", level)),
+            (level - 1) * 0.10,
+        ):
+            raise SystemExit(
+                "breakthrough speed mismatch at level %d" % level
+            )
+    stun = abilities.get(BREAKTHROUGH_STUN_ID)
+    if stun is None or stun[1] != "AOws":
+        raise SystemExit("breakthrough stun ability missing")
+    stun_fields = talent_fields(BREAKTHROUGH_STUN_ID)
+    for key, value in (
+        (("aare", 1), 250.0),
+        (("Wrs1", 1), 0.0),
+        (("adur", 1), 1.5),
+        (("ahdu", 1), 1.5),
+    ):
+        if not field_matches(stun_fields.get(key), value):
+            raise SystemExit(
+                "breakthrough stun mismatch: %r != %r"
+                % (stun_fields.get(key), value)
+            )
     for index, expected in (
         (0, ("Ilif", 1, 200)),
         (1, ("Ihpr", 1, 6)),
@@ -960,7 +1039,7 @@ def verify(output: Path) -> None:
         b"GetHeroAgi(u, true)",
         b"GetHeroInt(u, true)",
         b"function TT_ApplyCleaveTalent takes unit caster, unit victim, real attackDamage",
-        b"function TT_ApplyChainTalent takes unit caster, unit victim, real attackDamage",
+        b"function TT_ApplyBreakthroughTalent takes unit caster, unit victim returns nothing",
         b"function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing",
         b"function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer heroIndex",
         b"function TT_OnAnyUnitDeath takes nothing returns nothing",
@@ -968,7 +1047,7 @@ def verify(output: Path) -> None:
         b"set TT_FX_TABLE = InitHashtable()",
         b'"talentstats"',
         b"event=TALENT_ATTACK",
-        b"event=CHAIN_HIT",
+        b"event=BREAKTHROUGH_STOMP",
         b"event=INCINERATE_HIT",
         b"event=INCINERATE_EXPLODE",
         b"event=INCINERATE_EXPLODE_HIT",

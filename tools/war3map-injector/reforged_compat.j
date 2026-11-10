@@ -1,5 +1,7 @@
 // Minimal Reforged stubs used only by the classic pjass syntax check.
 constant native ConvertUnitRealField takes integer i returns integer
+constant native ConvertAbilityStringLevelField takes integer i returns integer
+constant native ConvertAbilityIntegerField takes integer i returns integer
 
 globals
     constant playerunitevent EVENT_PLAYER_UNIT_DAMAGED = ConvertPlayerUnitEvent(308)
@@ -19,6 +21,8 @@ globals
     constant integer UNIT_WEAPON_SF_ATTACK_PROJECTILE_ART = 4
     constant integer UNIT_WEAPON_BF_ATTACKS_ENABLED = 5
     constant integer UNIT_WEAPON_BF_ATTACK_SHOW_UI = 6
+    constant integer ABILITY_SLF_MISSILE_ART = ConvertAbilityStringLevelField('amat')
+    constant integer ABILITY_IF_MISSILE_SPEED = ConvertAbilityIntegerField('amsp')
 endglobals
 
 function ConvertLoadoutSlot takes integer i returns integer
@@ -101,6 +105,18 @@ function BlzGetUnitWeaponStringField takes unit whichUnit, integer whichField, i
 endfunction
 
 function BlzSetUnitWeaponStringField takes unit whichUnit, integer whichField, integer index, string value returns boolean
+    return false
+endfunction
+
+function BlzGetUnitAbility takes unit whichUnit, integer abilId returns ability
+    return null
+endfunction
+
+function BlzSetAbilityStringLevelField takes ability whichAbility, integer whichField, integer level, string value returns boolean
+    return false
+endfunction
+
+function BlzSetAbilityIntegerField takes ability whichAbility, integer whichField, integer value returns boolean
     return false
 endfunction
 

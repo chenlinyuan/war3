@@ -658,7 +658,6 @@ function TT_SetBreakthroughStacks takes unit u, integer heroIndex, integer stack
         call UnitMakeAbilityPermanent(u, true, 'T118')
         call BlzUnitHideAbility(u, 'T118', true)
         if stacks > 0 then
-            call TT_ClearBreakthroughBuffs(u)
             if GetUnitAbilityLevel(u, 'T11A') == 0 then
                 call UnitAddAbility(u, 'T11A')
             endif
@@ -976,7 +975,7 @@ function TT_ShowTalentEffectTarget takes string model, unit target returns nothi
     set fx = null
 endfunction
 
-function TT_ShowTalentText takes unit target, string text returns nothing
+function TT_ShowColoredTalentText takes unit target, string text, integer red, integer green, integer blue returns nothing
     local texttag tt
     if target == null then
         return
@@ -984,12 +983,20 @@ function TT_ShowTalentText takes unit target, string text returns nothing
     set tt = CreateTextTag()
     call SetTextTagPosUnit(tt, target, 40.0)
     call SetTextTagText(tt, text, 0.023)
-    call SetTextTagColor(tt, 255, 128, 0, 255)
+    call SetTextTagColor(tt, red, green, blue, 255)
     call SetTextTagVelocity(tt, 0.0, 0.03)
     call SetTextTagPermanent(tt, false)
     call SetTextTagLifespan(tt, 1.0)
     call SetTextTagFadepoint(tt, 0.8)
     set tt = null
+endfunction
+
+function TT_ShowTalentText takes unit target, string text returns nothing
+    call TT_ShowColoredTalentText(target, text, 255, 128, 0)
+endfunction
+
+function TT_ShowMagicTalentText takes unit target, string text returns nothing
+    call TT_ShowColoredTalentText(target, text, 64, 160, 255)
 endfunction
 
 function TT_ApplyCleaveTalent takes unit caster, unit victim, real attackDamage returns nothing
@@ -1240,7 +1247,7 @@ function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing
     call UnitDamageTarget(caster, victim, bonus, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_FIRE, WEAPON_TYPE_WHOKNOWS)
     set TT_AOE_BUSY = false
     set afterLife = GetWidgetLife(victim)
-    call TT_ShowTalentText(victim, "+" + I2S(R2I(bonus)))
+    call TT_ShowMagicTalentText(victim, I2S(R2I(bonus)))
     call TT_ShowTalentEffectTarget("Abilities\\Spells\\Other\\Incinerate\\IncinerateBuff.mdx", victim)
     call TT_LogAppend("event=INCINERATE_HIT hero=" + GetUnitName(caster) + " victim=" + GetUnitName(victim) + " int=" + I2S(GetHeroInt(caster, true)) + " level=" + I2S(level) + " stack=" + I2S(stacks) + " bonus=" + R2S(bonus) + " lifeBefore=" + R2S(beforeLife) + " lifeAfter=" + R2S(afterLife))
     call TT_LogFlush()
@@ -1277,7 +1284,7 @@ function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer hero
             call UnitDamageTarget(caster, target, damage, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_FIRE, WEAPON_TYPE_WHOKNOWS)
             set afterLife = GetWidgetLife(target)
             set hitCount = hitCount + 1
-            call TT_ShowTalentText(target, "-" + I2S(R2I(damage)))
+            call TT_ShowMagicTalentText(target, "-" + I2S(R2I(damage)))
             call TT_LogAppend("event=INCINERATE_EXPLODE_HIT index=" + I2S(hitCount) + " target=" + GetUnitName(target) + " expected=" + R2S(damage) + " lifeBefore=" + R2S(beforeLife) + " lifeAfter=" + R2S(afterLife))
         endif
     endloop

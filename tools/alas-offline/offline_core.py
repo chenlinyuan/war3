@@ -3001,6 +3001,8 @@ class OfflineBuilder:
                     "w3a=" + str(talent_bundle.ability_object),
                     "--extra-object",
                     "w3t=" + str(talent_bundle.item_object),
+                    "--extra-object",
+                    "w3h=" + str(talent_bundle.buff_object),
                     "--suppress-source-backpack-auto",
                 ])
             if wild_drop_bundle is not None:
@@ -3033,6 +3035,7 @@ class OfflineBuilder:
                 for extension, path in (
                     ("w3a", talent_bundle.ability_object),
                     ("w3t", talent_bundle.item_object),
+                    ("w3h", talent_bundle.buff_object),
                 ):
                     campaign_args.extend([
                         "--extra-object",
@@ -3077,6 +3080,7 @@ class OfflineBuilder:
                     for extension, path in (
                         ("w3a", talent_bundle.ability_object),
                         ("w3t", talent_bundle.item_object),
+                        ("w3h", talent_bundle.buff_object),
                     ):
                         lua_args.extend([
                             "--extra-object",

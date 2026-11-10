@@ -648,6 +648,15 @@ function TT_HideTalentBooks takes unit u returns nothing
     endif
 endfunction
 
+function TT_BarrageTargetCount takes integer level returns integer
+    if level <= 3 then
+        return 3
+    elseif level <= 6 then
+        return 4
+    endif
+    return 5
+endfunction
+
 function TT_AttributeTalentLevel takes integer statValue returns integer
     local integer level = 1
     if statValue <= 30 then
@@ -672,18 +681,65 @@ function TT_SyncAttributeTalent takes unit u, integer abilityId, integer desired
     call BlzUnitHideAbility(u, abilityId, true)
 endfunction
 
+function TT_ClearNativeBarrage takes unit u returns nothing
+    if GetUnitAbilityLevel(u, 'T120') > 0 then
+        call UnitRemoveAbility(u, 'T120')
+    endif
+    if GetUnitAbilityLevel(u, 'T121') > 0 then
+        call UnitRemoveAbility(u, 'T121')
+    endif
+    if GetUnitAbilityLevel(u, 'T122') > 0 then
+        call UnitRemoveAbility(u, 'T122')
+    endif
+endfunction
+
+function TT_SyncNativeBarrage takes unit u returns nothing
+    local integer level
+    local integer desired
+    local integer current = 0
+    if u == null or GetUnitTypeId(u) == 0 then
+        return
+    endif
+    if GetUnitAbilityLevel(u, 'T107') <= 0 then
+        call TT_ClearNativeBarrage(u)
+        return
+    endif
+    set level = TT_AttributeTalentLevel(GetHeroAgi(u, true))
+    if level <= 3 then
+        set desired = 'T120'
+    elseif level <= 6 then
+        set desired = 'T121'
+    else
+        set desired = 'T122'
+    endif
+    if GetUnitAbilityLevel(u, 'T120') > 0 then
+        set current = 'T120'
+    elseif GetUnitAbilityLevel(u, 'T121') > 0 then
+        set current = 'T121'
+    elseif GetUnitAbilityLevel(u, 'T122') > 0 then
+        set current = 'T122'
+    endif
+    if current != desired then
+        call TT_ClearNativeBarrage(u)
+        call UnitAddAbility(u, desired)
+        call TT_LogAppend("event=BARRAGE_NATIVE_SYNC hero=" + GetUnitName(u) + " agi=" + I2S(GetHeroAgi(u, true)) + " level=" + I2S(level) + " targets=" + I2S(TT_BarrageTargetCount(level)) + " ability=" + I2S(desired))
+        call TT_LogFlush()
+    endif
+    if GetUnitAbilityLevel(u, desired) > 0 then
+        call UnitMakeAbilityPermanent(u, true, desired)
+        call BlzUnitHideAbility(u, desired, true)
+    endif
+endfunction
+
 function TT_SyncAttributeTalents takes unit u returns nothing
     call TT_SyncAttributeTalent(u, 'T106', TT_AttributeTalentLevel(GetHeroStr(u, true)))
     call TT_SyncAttributeTalent(u, 'T107', TT_AttributeTalentLevel(GetHeroAgi(u, true)))
     call TT_SyncAttributeTalent(u, 'T108', TT_AttributeTalentLevel(GetHeroInt(u, true)))
+    call TT_SyncNativeBarrage(u)
 endfunction
 
 function TT_CleaveRadiusForLevel takes integer level returns real
     return RMinBJ(500.0, 275.0 + I2R(level) * 25.0)
-endfunction
-
-function TT_BarrageTargetCount takes integer level returns integer
-    return 2 + (level - 1) / 3
 endfunction
 
 function TT_IsTalentAoeTarget takes unit caster, unit target returns boolean
@@ -792,49 +848,6 @@ function TT_ApplyCleaveTalent takes unit caster, unit victim, real attackDamage 
     endloop
     set TT_AOE_BUSY = false
     call DestroyGroup(g)
-    set target = null
-    set g = null
-endfunction
-
-function TT_ApplyBarrageTalent takes unit caster, unit victim returns nothing
-    local group g
-    local unit target
-    local real x
-    local real y
-    local integer level
-    local integer remaining
-    local integer total
-    local integer hitCount = 0
-    if TT_AOE_BUSY or caster == null or victim == null then
-        return
-    endif
-    set level = TT_AttributeTalentLevel(GetHeroAgi(caster, true))
-    set total = TT_BarrageTargetCount(level)
-    set remaining = total - 1
-    set x = GetUnitX(victim)
-    set y = GetUnitY(victim)
-    call TT_ShowTalentText(caster, "弹幕 " + I2S(total) + "目标")
-    call TT_LogAppend("event=BARRAGE_START hero=" + GetUnitName(caster) + " victim=" + GetUnitName(victim) + " agi=" + I2S(GetHeroAgi(caster, true)) + " level=" + I2S(level) + " maxTargets=" + I2S(total))
-    set g = CreateGroup()
-    set TT_AOE_BUSY = true
-    call GroupEnumUnitsInRange(g, x, y, 550.0, null)
-    loop
-        set target = FirstOfGroup(g)
-        exitwhen target == null or remaining <= 0
-        call GroupRemoveUnit(g, target)
-        if target != victim and TT_IsTalentAoeTarget(caster, target) then
-            call UnitDamageTarget(caster, target, 30.0, true, false, ATTACK_TYPE_HERO, DAMAGE_TYPE_NORMAL, WEAPON_TYPE_WHOKNOWS)
-            call TT_ShowTalentEffectTarget("Abilities\\Weapons\\FlamingArrow\\FlamingArrowMissile.mdx", target)
-            call TT_ShowTalentText(target, "-30")
-            set hitCount = hitCount + 1
-            call TT_LogAppend("event=BARRAGE_HIT index=" + I2S(hitCount) + " target=" + GetUnitName(target) + " damage=30")
-            set remaining = remaining - 1
-        endif
-    endloop
-    set TT_AOE_BUSY = false
-    call DestroyGroup(g)
-    call TT_LogAppend("event=BARRAGE_END hero=" + GetUnitName(caster) + " hits=" + I2S(hitCount) + " maxExtra=" + I2S(total - 1))
-    call TT_LogFlush()
     set target = null
     set g = null
 endfunction
@@ -1479,6 +1492,7 @@ function TT_ResetTalents takes unit u returns nothing
         call UnitRemoveAbility(u, TT_TalentAbilityId(100 + i))
         set i = i + 1
     endloop
+    call TT_ClearNativeBarrage(u)
     set i = 0
     loop
         exitwhen i >= 10
@@ -1860,7 +1874,8 @@ function TT_OnDamage takes nothing returns nothing
             if selected == 106 then
                 call TT_ApplyCleaveTalent(attacker, victim, damage)
             elseif selected == 107 then
-                call TT_ApplyBarrageTalent(attacker, victim)
+                call TT_LogAppend("event=BARRAGE_NATIVE_HIT hero=" + GetUnitName(attacker) + " target=" + GetUnitName(victim) + " damage=" + R2S(damage) + " agi=" + I2S(GetHeroAgi(attacker, true)) + " targets=" + I2S(TT_BarrageTargetCount(TT_AttributeTalentLevel(GetHeroAgi(attacker, true)))))
+                call TT_LogFlush()
             elseif selected == 108 then
                 call TT_ApplyIncinerateTalent(attacker, victim)
             endif

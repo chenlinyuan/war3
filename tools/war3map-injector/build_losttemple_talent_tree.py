@@ -37,9 +37,7 @@ ATTRIBUTE_TALENT_LEVELS = 10
 BREAKTHROUGH_SPEED_ID = "T118"
 BREAKTHROUGH_STUN_ID = "T119"
 BREAKTHROUGH_STATUS_ID = "T11A"
-BREAKTHROUGH_BUFF_IDS = (
-    "B64D", "B64E", "B64F", "B64G", "B64H",
-)
+BREAKTHROUGH_BUFF_IDS = ("B64D",)
 FULL_PORT = HERE / "port_alas_jass_map.py"
 TALENT_SCRIPT = ROOT / "scripts" / "talent-test"
 WING_CONFIG = "wings_config_forsaken_301"
@@ -380,7 +378,7 @@ def breakthrough_status_entry() -> dict[str, object]:
         mod("Oae1", 0.0, O.T_UNREAL, level=1, column=1),
         mod("Oae2", 0.0, O.T_UNREAL, level=1, column=2),
     ]
-    for level, buff_id in enumerate(BREAKTHROUGH_BUFF_IDS, 1):
+    for level in range(1, 6):
         mods.append(mod("atp1", "破势", level=level))
         mods.append(
             mod(
@@ -391,7 +389,12 @@ def breakthrough_status_entry() -> dict[str, object]:
             )
         )
         mods.append(
-            mod("abuf", buff_id, O.T_STRING, level=level)
+            mod(
+                "abuf",
+                BREAKTHROUGH_BUFF_IDS[0],
+                O.T_STRING,
+                level=level,
+            )
         )
     return {
         "old": "AOae",
@@ -401,23 +404,22 @@ def breakthrough_status_entry() -> dict[str, object]:
 
 
 def breakthrough_buff_entries() -> list[dict[str, object]]:
-    entries = []
-    for level, buff_id in enumerate(BREAKTHROUGH_BUFF_IDS, 1):
-        entries.append({
+    return [
+        {
             "old": "BOae",
-            "new": buff_id,
+            "new": BREAKTHROUGH_BUFF_IDS[0],
             "mods": [
                 mod("fnam", "破势"),
-                mod("ftip", "破势 %d/5" % level),
+                mod("ftip", "破势"),
                 mod(
                     "fube",
-                    "攻击速度 +%d%%。连续攻击同一目标并在满 5 层后"
-                    "触发战争践踏。" % (level * 10),
+                    "连续攻击同一目标时，每层攻击速度 +10%%，最多 5 层。"
+                    "满 5 层后的下一次攻击触发战争践踏并眩晕 1.5 秒。",
                 ),
                 mod("fart", ICON_BREAKTHROUGH),
             ],
-        })
-    return entries
+        }
+    ]
 
 
 def build_entries() -> list[dict[str, object]]:
@@ -1028,15 +1030,13 @@ def verify(output: Path) -> None:
     if status is None or status[1] != "AOae":
         raise SystemExit("breakthrough status aura missing")
     status_fields = talent_fields(BREAKTHROUGH_STATUS_ID)
-    for level, buff_id in enumerate(BREAKTHROUGH_BUFF_IDS, 1):
-        if status_fields.get(("abuf", level)) != buff_id:
+    for level in range(1, 6):
+        if status_fields.get(("abuf", level)) != BREAKTHROUGH_BUFF_IDS[0]:
             raise SystemExit(
                 "breakthrough status buff mismatch at level %d" % level
             )
-        if buffs.get(buff_id) != "BOae":
-            raise SystemExit(
-                "breakthrough custom buff missing: " + buff_id
-            )
+    if buffs.get(BREAKTHROUGH_BUFF_IDS[0]) != "BOae":
+        raise SystemExit("breakthrough custom buff missing")
     for index, expected in (
         (0, ("Ilif", 1, 200)),
         (1, ("Ihpr", 1, 6)),

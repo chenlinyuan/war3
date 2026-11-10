@@ -111,33 +111,12 @@ function TT_LogFlush takes nothing returns nothing
     call PreloadGenEnd(TT_LOG_FILE)
 endfunction
 
-function TT_IsRangedHero takes unit u returns boolean
-    local string weaponType
-    if u == null or GetUnitTypeId(u) == 0 then
-        return false
-    endif
-    set weaponType = BlzGetUnitWeaponStringField(u, ConvertUnitWeaponStringField('ua1w'), 0)
-    return StringCase(weaponType, false) == "missile"
-endfunction
-
 function TT_TalentId takes integer heroIndex returns integer
-    local integer offset = (heroIndex / 10) * 256 + (heroIndex - (heroIndex / 10) * 10)
-    if TT_RANGED_HERO[heroIndex] then
-        return 'R000' + offset
-    endif
-    return 'Q000' + offset
-endfunction
-
-function TT_BackpackIdForMode takes integer heroIndex, boolean rangedHero returns integer
-    local integer offset = (heroIndex / 10) * 256 + (heroIndex - (heroIndex / 10) * 10)
-    if rangedHero then
-        return 'Y000' + offset
-    endif
-    return 'Z000' + offset
+    return 'Q000' + (heroIndex / 10) * 256 + (heroIndex - (heroIndex / 10) * 10)
 endfunction
 
 function TT_BackpackId takes integer heroIndex returns integer
-    return TT_BackpackIdForMode(heroIndex, TT_RANGED_HERO[heroIndex])
+    return 'Z000' + (heroIndex / 10) * 256 + (heroIndex - (heroIndex / 10) * 10)
 endfunction
 
 function TT_SavedBackpackIndex takes unit u returns integer
@@ -151,7 +130,7 @@ function TT_SavedBackpackIndex takes unit u returns integer
             exitwhen slot > 5
             set it = UnitItemInSlot(u, slot)
             if it != null then
-                if GetItemTypeId(it) == TT_BackpackIdForMode(heroIndex, false) or GetItemTypeId(it) == TT_BackpackIdForMode(heroIndex, true) then
+                if GetItemTypeId(it) == TT_BackpackId(heroIndex) then
                     set it = null
                     return heroIndex
                 endif
@@ -176,7 +155,6 @@ function TT_RegisterHeroCore takes unit u, boolean allowNew returns integer
     loop
         exitwhen i >= TT_HERO_COUNT
         if TT_HEROES[i] == u then
-            set TT_RANGED_HERO[i] = TT_IsRangedHero(u)
             return i
         endif
         if TT_HEROES[i] != null and GetUnitTypeId(TT_HEROES[i]) == 0 then
@@ -190,7 +168,6 @@ function TT_RegisterHeroCore takes unit u, boolean allowNew returns integer
     set savedIndex = TT_SavedBackpackIndex(u)
     if savedIndex >= 0 and TT_HEROES[savedIndex] == null then
         set TT_HEROES[savedIndex] = u
-        set TT_RANGED_HERO[savedIndex] = TT_IsRangedHero(u)
         set TT_BACKPACK_ATTEMPTED[savedIndex] = true
         set TT_POINT_GRANT_FAILED[savedIndex] = false
         set TT_POINT_GRANT_FAILED_LEVEL[savedIndex] = 0
@@ -207,7 +184,6 @@ function TT_RegisterHeroCore takes unit u, boolean allowNew returns integer
         exitwhen i >= 64
         if TT_HEROES[i] == null then
             set TT_HEROES[i] = u
-            set TT_RANGED_HERO[i] = TT_IsRangedHero(u)
             set TT_BACKPACK_ATTEMPTED[i] = false
             set TT_POINT_GRANT_FAILED[i] = false
             set TT_POINT_GRANT_FAILED_LEVEL[i] = 0
@@ -352,7 +328,6 @@ endfunction
 function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean
     local integer i = 0
     local integer desiredId = TT_BackpackId(heroIndex)
-    local integer otherId = TT_BackpackIdForMode(heroIndex, not TT_RANGED_HERO[heroIndex])
     local item it
     loop
         exitwhen i > 5
@@ -363,7 +338,7 @@ function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean
                 set it = null
                 return true
             endif
-            if GetItemTypeId(it) == 'B30B' or GetItemTypeId(it) == otherId then
+            if GetItemTypeId(it) == 'B30B' then
                 call RemoveItem(it)
             endif
         endif
@@ -678,13 +653,16 @@ function TT_HideTalentBooks takes unit u returns nothing
     endif
 endfunction
 
-function TT_BarrageTargetCount takes integer level returns integer
-    if level <= 3 then
-        return 3
-    elseif level <= 6 then
-        return 4
-    endif
-    return 5
+function TT_ChainTargetCount takes integer level returns integer
+    return 1 + (level - 1) / 3
+endfunction
+
+function TT_ChainDamagePercent takes integer level returns integer
+    return 18 + level * 2
+endfunction
+
+function TT_ChainRadius takes integer level returns real
+    return I2R(400 + level * 10)
 endfunction
 
 function TT_AttributeTalentLevel takes integer statValue returns integer
@@ -866,7 +844,7 @@ function TT_SyncNativeBarrage takes unit u returns nothing
         return
     endif
     set heroIndex = TT_RegisteredHeroIndex(u)
-    if GetUnitAbilityLevel(u, 'T107') <= 0 or not TT_IsRangedHero(u) then
+    if GetUnitAbilityLevel(u, 'T107') <= 0 then
         call TT_ClearNativeBarrage(u)
         return
     endif
@@ -888,7 +866,7 @@ function TT_SyncNativeBarrage takes unit u returns nothing
         call TT_LogFlush()
     endif
     set level = TT_AttributeTalentLevel(GetHeroAgi(u, true))
-    set desired = TT_BarrageAbilityFor(artGroup, TT_BarrageTargetCount(level))
+    set desired = TT_BarrageAbilityFor(artGroup, 3)
     if heroIndex >= 0 then
         set current = TT_BARRAGE_CURRENT[heroIndex]
     else
@@ -901,7 +879,7 @@ function TT_SyncNativeBarrage takes unit u returns nothing
             if heroIndex >= 0 then
                 set TT_BARRAGE_CURRENT[heroIndex] = desired
             endif
-            call TT_LogAppend("event=BARRAGE_NATIVE_SYNC hero=" + GetUnitName(u) + " agi=" + I2S(GetHeroAgi(u, true)) + " level=" + I2S(level) + " targets=" + I2S(TT_BarrageTargetCount(level)) + " group=" + I2S(artGroup) + " art=" + art + " speed=" + I2S(speed) + " ability=" + I2S(desired))
+            call TT_LogAppend("event=BARRAGE_NATIVE_SYNC hero=" + GetUnitName(u) + " agi=" + I2S(GetHeroAgi(u, true)) + " level=" + I2S(level) + " group=" + I2S(artGroup) + " art=" + art + " speed=" + I2S(speed) + " ability=" + I2S(desired))
             call TT_LogFlush()
         endif
     endif
@@ -915,7 +893,6 @@ function TT_SyncAttributeTalents takes unit u returns nothing
     call TT_SyncAttributeTalent(u, 'T106', TT_AttributeTalentLevel(GetHeroStr(u, true)))
     call TT_SyncAttributeTalent(u, 'T107', TT_AttributeTalentLevel(GetHeroAgi(u, true)))
     call TT_SyncAttributeTalent(u, 'T108', TT_AttributeTalentLevel(GetHeroInt(u, true)))
-    call TT_SyncNativeBarrage(u)
 endfunction
 
 function TT_CleaveRadiusForLevel takes integer level returns real
@@ -1030,6 +1007,118 @@ function TT_ApplyCleaveTalent takes unit caster, unit victim, real attackDamage 
     call DestroyGroup(g)
     set target = null
     set g = null
+endfunction
+
+function TT_ChainNextTarget takes unit caster, unit source, group hitTargets, real radius returns unit
+    local group candidates = CreateGroup()
+    local unit candidate
+    local unit best = null
+    local real x = GetUnitX(source)
+    local real y = GetUnitY(source)
+    local real dx
+    local real dy
+    local real distance
+    local real bestDistance = radius * radius + 1.0
+    call GroupEnumUnitsInRange(candidates, x, y, radius, null)
+    loop
+        set candidate = FirstOfGroup(candidates)
+        exitwhen candidate == null
+        call GroupRemoveUnit(candidates, candidate)
+        if TT_IsTalentAoeTarget(caster, candidate) and not IsUnitInGroup(candidate, hitTargets) then
+            set dx = GetUnitX(candidate) - x
+            set dy = GetUnitY(candidate) - y
+            set distance = dx * dx + dy * dy
+            if distance < bestDistance then
+                set bestDistance = distance
+                set best = candidate
+            endif
+        endif
+    endloop
+    call DestroyGroup(candidates)
+    set candidate = null
+    return best
+endfunction
+
+function TT_OnChainExpire takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer i = 0
+    local lightning bolt
+    loop
+        exitwhen i >= 4
+        set bolt = LoadLightningHandle(TT_FX_TABLE, GetHandleId(t), 10 + i)
+        if bolt != null then
+            call DestroyLightning(bolt)
+        endif
+        set i = i + 1
+    endloop
+    call FlushChildHashtable(TT_FX_TABLE, GetHandleId(t))
+    call DestroyTimer(t)
+    set bolt = null
+    set t = null
+endfunction
+
+function TT_ApplyChainTalent takes unit caster, unit victim, real attackDamage returns nothing
+    local integer level
+    local integer maximumTargets
+    local integer jump = 1
+    local real chainDamage
+    local real radius
+    local unit source
+    local unit target
+    local group hitTargets
+    local timer t = null
+    local lightning bolt
+    local real sourceX
+    local real sourceY
+    local real targetX
+    local real targetY
+    local real beforeLife
+    local real afterLife
+    if TT_AOE_BUSY or caster == null or victim == null then
+        return
+    endif
+    set level = TT_AttributeTalentLevel(GetHeroAgi(caster, true))
+    set maximumTargets = TT_ChainTargetCount(level)
+    set chainDamage = attackDamage * I2R(TT_ChainDamagePercent(level)) * 0.01
+    set radius = TT_ChainRadius(level)
+    set source = victim
+    set hitTargets = CreateGroup()
+    call GroupAddUnit(hitTargets, victim)
+    if TT_FX_TABLE != null then
+        set t = CreateTimer()
+    endif
+    set TT_AOE_BUSY = true
+    loop
+        set target = TT_ChainNextTarget(caster, source, hitTargets, radius)
+        exitwhen target == null or jump > maximumTargets
+        call GroupAddUnit(hitTargets, target)
+        set sourceX = GetUnitX(source)
+        set sourceY = GetUnitY(source)
+        set targetX = GetUnitX(target)
+        set targetY = GetUnitY(target)
+        if t != null then
+            set bolt = AddLightningEx("CLPB", true, sourceX, sourceY, GetUnitFlyHeight(source) + 60.0, targetX, targetY, GetUnitFlyHeight(target) + 60.0)
+            call SaveLightningHandle(TT_FX_TABLE, GetHandleId(t), 9 + jump, bolt)
+        endif
+        set beforeLife = GetWidgetLife(target)
+        call UnitDamageTarget(caster, target, chainDamage, true, false, ATTACK_TYPE_HERO, DAMAGE_TYPE_NORMAL, WEAPON_TYPE_WHOKNOWS)
+        set afterLife = GetWidgetLife(target)
+        call TT_ShowTalentText(target, "-" + I2S(R2I(chainDamage)))
+        call TT_LogAppend("event=CHAIN_HIT hero=" + GetUnitName(caster) + " victim=" + GetUnitName(target) + " agi=" + I2S(GetHeroAgi(caster, true)) + " level=" + I2S(level) + " jump=" + I2S(jump) + " damage=" + R2S(chainDamage) + " lifeBefore=" + R2S(beforeLife) + " lifeAfter=" + R2S(afterLife))
+        set source = target
+        set target = null
+        set jump = jump + 1
+    endloop
+    set TT_AOE_BUSY = false
+    if t != null then
+        call TimerStart(t, 0.30, false, function TT_OnChainExpire)
+    endif
+    call DestroyGroup(hitTargets)
+    set bolt = null
+    set source = null
+    set target = null
+    set hitTargets = null
+    set t = null
 endfunction
 
 function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing
@@ -2054,8 +2143,7 @@ function TT_OnDamage takes nothing returns nothing
             if selected == 106 then
                 call TT_ApplyCleaveTalent(attacker, victim, damage)
             elseif selected == 107 then
-                call TT_LogAppend("event=BARRAGE_NATIVE_HIT hero=" + GetUnitName(attacker) + " target=" + GetUnitName(victim) + " damage=" + R2S(damage) + " agi=" + I2S(GetHeroAgi(attacker, true)) + " targets=" + I2S(TT_BarrageTargetCount(TT_AttributeTalentLevel(GetHeroAgi(attacker, true)))))
-                call TT_LogFlush()
+                call TT_ApplyChainTalent(attacker, victim, damage)
             elseif selected == 108 then
                 call TT_ApplyIncinerateTalent(attacker, victim)
             endif
@@ -2132,10 +2220,10 @@ function TT_OnChat takes nothing returns nothing
             set agiValue = GetHeroAgi(u, true)
             set intValue = GetHeroInt(u, true)
             set derivedLevel = TT_AttributeTalentLevel(intValue)
-            call TT_LogAppend("event=TALENT_STATS hero=" + GetUnitName(u) + " str=" + I2S(strValue) + " agi=" + I2S(agiValue) + " int=" + I2S(intValue) + " cleaveRadius=" + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + " barrageTargets=" + I2S(TT_BarrageTargetCount(TT_AttributeTalentLevel(agiValue))) + " burnStack=" + I2S(3 + derivedLevel) + " burnExplosion=" + I2S(80 + derivedLevel * 20))
+            call TT_LogAppend("event=TALENT_STATS hero=" + GetUnitName(u) + " str=" + I2S(strValue) + " agi=" + I2S(agiValue) + " int=" + I2S(intValue) + " cleaveRadius=" + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + " chainTargets=" + I2S(TT_ChainTargetCount(TT_AttributeTalentLevel(agiValue))) + " chainDamagePct=" + I2S(TT_ChainDamagePercent(TT_AttributeTalentLevel(agiValue))) + " chainRadius=" + R2S(TT_ChainRadius(TT_AttributeTalentLevel(agiValue))) + " burnStack=" + I2S(3 + derivedLevel) + " burnExplosion=" + I2S(80 + derivedLevel * 20))
             call TT_LogFlush()
             call DisplayTextToPlayer(p, 0, 0, "|cff32cd32[天赋属性]|r 力量 " + I2S(strValue) + "，敏捷 " + I2S(agiValue) + "，智力 " + I2S(intValue) + "。")
-            call DisplayTextToPlayer(p, 0, 0, "分裂半径 " + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + "；弹幕目标 " + I2S(TT_BarrageTargetCount(TT_AttributeTalentLevel(agiValue))) + "；燃灰每层 " + I2S(3 + derivedLevel) + "，爆炸 " + I2S(80 + derivedLevel * 20) + "。")
+            call DisplayTextToPlayer(p, 0, 0, "分裂半径 " + R2S(TT_CleaveRadiusForLevel(TT_AttributeTalentLevel(strValue))) + "；雷霆额外目标 " + I2S(TT_ChainTargetCount(TT_AttributeTalentLevel(agiValue))) + "，每跳 " + I2S(TT_ChainDamagePercent(TT_AttributeTalentLevel(agiValue))) + "% 攻击伤害；燃灰每层 " + I2S(3 + derivedLevel) + "，爆炸 " + I2S(80 + derivedLevel * 20) + "。")
             if heroIndex >= 0 then
                 call DisplayTextToPlayer(p, 0, 0, "当前选择 " + TT_ActualSelectionText(u) + "；燃灰层数 " + I2S(TT_INCIN_STACKS[heroIndex]) + "。")
             endif

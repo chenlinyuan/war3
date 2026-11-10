@@ -307,7 +307,6 @@ def _verify_script(
     for marker in (
         "TT_SavedBackpackIndex",
         "TT_IsTalentHero",
-        "TT_IsRangedHero",
         "function TT_EnsureBackpack",
         "TT_GrantEarnedPoints",
         "TT_ClearTalentMilestones",
@@ -334,6 +333,7 @@ def _verify_script(
         "GetHeroAgi(u, true)",
         "GetHeroInt(u, true)",
         "TT_ApplyCleaveTalent",
+        "TT_ApplyChainTalent",
         "TT_ApplyIncinerateTalent",
         "TT_ExplodeIncinerateTalent",
         "TT_OnAnyUnitDeath",
@@ -341,14 +341,7 @@ def _verify_script(
         "set TT_FX_TABLE = InitHashtable()",
         '"talentstats"',
         "event=TALENT_ATTACK",
-        "function TT_BarrageGroupFor takes string art, integer speed returns integer",
-        "function TT_BarrageAbilityFor takes integer artGroup, integer targets returns integer",
-        "function TT_SyncNativeBarrage takes unit u returns nothing",
-        "call UnitAddAbility(u, desired)",
-        "event=BARRAGE_NATIVE_SYNC",
-        "event=BARRAGE_ART_GROUP",
-        "event=BARRAGE_ART_UNMATCHED",
-        "event=BARRAGE_NATIVE_HIT",
+        "event=CHAIN_HIT",
         "event=INCINERATE_HIT",
         "event=INCINERATE_EXPLODE",
         "event=INCINERATE_EXPLODE_HIT",
@@ -495,9 +488,9 @@ def _verify_archive(
                 display_name + " is missing artifact " + ident
             )
     for index in range(TALENT.HERO_POOL_SIZE):
-        for ranged in (False, True):
-            talent = TALENT.talent_pool_id(index, ranged)
-            backpack = TALENT.backpack_pool_id(index, ranged)
+        for _mode in (False,):
+            talent = TALENT.talent_pool_id(index)
+            backpack = TALENT.backpack_pool_id(index)
             if talent not in abilities or backpack not in items:
                 raise ValueError(
                     display_name + " is missing talent pair " + talent

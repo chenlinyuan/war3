@@ -25,9 +25,7 @@ MARKER_ID = "T405"
 ARTIFACT_MARKER_ID = "T480"
 HERO_POOL_SIZE = 64
 TALENT_ID_BASE = "Q000"
-RANGED_TALENT_ID_BASE = "R000"
 BACKPACK_ID_BASE = "Z000"
-RANGED_BACKPACK_ID_BASE = "Y000"
 EQUIPMENT_IDS = (
     "I100", "I101", "I102", "I103", "I104", "I105", "I106",
 )
@@ -36,39 +34,6 @@ CHOICES_PER_TIER = 3
 CHOICE_START = 100
 CHILD_START = 200
 ATTRIBUTE_TALENT_LEVELS = 10
-BARRAGE_ID_START = 120
-# Attack 1 must use the native "missile" weapon type for Barrage to work.
-# These groups were scanned from UnitWeapons/UnitUI/UnitAbilities and
-# Unit*Func. The mdx/1200 entry covers the runtime Demon Wings avatar swap.
-RANGED_PROJECTILE_GROUPS = (
-    (r"Abilities\Weapons\Arrow\ArrowMissile.mdl", 900),
-    (r"Abilities\Weapons\BloodElfMissile\BloodElfMissile.mdl", 900),
-    (r"Abilities\Weapons\DemonHunterMissile\DemonHunterMissile.mdl", 900),
-    (r"Abilities\Weapons\DemonHunterMissile\DemonHunterMissile.mdx", 1200),
-    (r"Abilities\Weapons\FarseerMissile\FarseerMissile.mdl", 1200),
-    (r"Abilities\Weapons\FireBallMissile\FireBallMissile.mdl", 900),
-    (r"Abilities\Weapons\KeeperGroveMissile\KeeperGroveMissile.mdl", 1300),
-    (r"Abilities\Weapons\KeeperGroveMissile\KeeperGroveMissile.mdl", 900),
-    (r"Abilities\Weapons\LichMissile\LichMissile.mdl", 900),
-    (r"Abilities\Weapons\LordofFlameMissile\LordofFlameMissile.mdl", 1200),
-    (r"Abilities\Weapons\MoonPriestessMissile\MoonPriestessMissile.mdl", 900),
-    (r"Abilities\Weapons\NagaArrowMissile\NagaArrowMissile.mdl", 1200),
-    (r"Abilities\Weapons\ShadowHunterMissile\ShadowHunterMissile.mdl", 900),
-)
-RANGED_HERO_IDS = (
-    "Nbrn", "Usyl",
-    "Hblm", "Hkal",
-    "Eevm", "Eidm", "Eilm",
-    "Odrt", "Ofar", "Othr",
-    "Hamg", "Hant", "Hgam", "Hjai",
-    "Ecen", "Ekgg",
-    "Efur", "Ekee", "Emfr", "Emns",
-    "Uclc", "Uktl", "Ulic",
-    "Nfir",
-    "Emoo", "Etyr", "Hvwd",
-    "Hvsh", "Nngs",
-    "Orkn", "Oshd",
-)
 FULL_PORT = HERE / "port_alas_jass_map.py"
 TALENT_SCRIPT = ROOT / "scripts" / "talent-test"
 WING_CONFIG = "wings_config_forsaken_301"
@@ -101,8 +66,8 @@ ICON_TALENT = r"ReplaceableTextures\CommandButtons\BTNTomeRed.blp"
 ICON_CLEAVE = (
     r"ReplaceableTextures\CommandButtons\BTNCleavingAttack.blp"
 )
-ICON_BARRAGE = (
-    r"ReplaceableTextures\CommandButtons\BTNScatterRockets.blp"
+ICON_CHAIN = (
+    r"ReplaceableTextures\CommandButtons\BTNChainLightning.blp"
 )
 ICON_INCINERATE = (
     r"ReplaceableTextures\CommandButtons\BTNIncinerate.blp"
@@ -153,12 +118,12 @@ def child_id(index: int) -> str:
     return "T%03d" % (CHILD_START + index)
 
 
-def talent_pool_id(index: int, ranged: bool = False) -> str:
-    return "%s%03d" % (RANGED_TALENT_ID_BASE[0] if ranged else TALENT_ID_BASE[0], index)
+def talent_pool_id(index: int) -> str:
+    return "Q%03d" % index
 
 
-def backpack_pool_id(index: int, ranged: bool = False) -> str:
-    return "%s%03d" % (RANGED_BACKPACK_ID_BASE[0] if ranged else BACKPACK_ID_BASE[0], index)
+def backpack_pool_id(index: int) -> str:
+    return "Z%03d" % index
 
 
 def ability_entry(
@@ -212,12 +177,16 @@ def cleave_radius(level: int) -> float:
     return float(min(500, 275 + level * 25))
 
 
-def barrage_targets(level: int) -> int:
-    if level <= 3:
-        return 3
-    if level <= 6:
-        return 4
-    return 5
+def chain_targets(level: int) -> int:
+    return 1 + (level - 1) // 3
+
+
+def chain_damage_percent(level: int) -> int:
+    return 18 + level * 2
+
+
+def chain_radius(level: int) -> int:
+    return 400 + level * 10
 
 
 def incinerate_stack_damage(level: int) -> float:
@@ -273,35 +242,6 @@ def marker_talent_entry(
     )
 
 
-def native_barrage_entry(
-    ident: str,
-    total_targets: int,
-    projectile_art: str,
-    projectile_speed: int,
-) -> dict[str, object]:
-    if total_targets not in (3, 4, 5):
-        raise ValueError("native barrage target count must be 3, 4, or 5")
-    return ability_entry(
-        ident,
-        "Aroc",
-        "万箭穿云（%d目标）" % total_targets,
-        "原生弹幕攻击，总目标数 %d。" % total_targets,
-        icon=ICON_BARRAGE,
-        item_ability=0,
-        hero_ability=0,
-        extra=[
-            mod("achd", 0),
-            mod("atar", "ground,air,enemy,neutral,vulnerable", O.T_STRING, level=1),
-            mod("aare", 550.0, O.T_UNREAL, level=1),
-            mod("amat", projectile_art, O.T_STRING),
-            mod("amsp", float(projectile_speed), O.T_UNREAL),
-            mod("Efk1", 0.0, O.T_UNREAL, level=1),
-            mod("Efk2", 99999.0, O.T_UNREAL, level=1),
-            mod("Efk3", total_targets - 2, O.T_INT, level=1),
-        ],
-    )
-
-
 def book_entry(
     ident: str,
     name: str,
@@ -326,7 +266,7 @@ def book_entry(
     )
 
 
-def talent_entry(ident: str, ranged: bool = False) -> dict[str, object]:
+def talent_entry(ident: str) -> dict[str, object]:
     mods = [
         mod("anam", "通用天赋"),
         mod("aart", ICON_TALENT),
@@ -373,9 +313,8 @@ def backpack_entry(ident: str, talent: str) -> dict[str, object]:
 def build_entries() -> list[dict[str, object]]:
     entries = [
         *[
-            talent_entry(talent_pool_id(index, ranged), ranged=ranged)
+            talent_entry(talent_pool_id(index))
             for index in range(HERO_POOL_SIZE)
-            for ranged in (False, True)
         ],
         attribute_entry(MARKER_ID, "天赋初始化标记", ICON_TALENT, (0, 0, 0)),
         attribute_entry(
@@ -392,17 +331,6 @@ def build_entries() -> list[dict[str, object]]:
                 (0, 0, 0),
             )
             for index in range(TIER_COUNT)
-        ],
-        *[
-            native_barrage_entry(
-                "T%03d" % (BARRAGE_ID_START + group_index * 3 + target_index),
-                target_count,
-                projectile_art,
-                projectile_speed,
-            )
-            for group_index, (projectile_art, projectile_speed)
-            in enumerate(RANGED_PROJECTILE_GROUPS)
-            for target_index, target_count in enumerate((3, 4, 5))
         ],
         book_entry(
             node_id(0, 0),
@@ -452,12 +380,17 @@ def build_entries() -> list[dict[str, object]]:
         ),
         marker_talent_entry(
             node_id(2, 1),
-            "万箭穿云",
-            ICON_BARRAGE,
+            "雷霆连锁",
+            ICON_CHAIN,
             [
-                "仅远程攻击生效。原生弹幕向周围 550 范围最多攻击 %d 个目标"
-                "（含主目标），补充目标造成普通攻击伤害。敏捷越高，弹幕目标越多。"
-                % barrage_targets(level)
+                "普通攻击命中后，以主目标为起点向周围 %d 范围连锁攻击"
+                "最多 %d 个额外目标，每次造成本次攻击 %d%% 伤害。"
+                "敏捷越高，连锁目标、范围和伤害越高。"
+                % (
+                    chain_radius(level),
+                    chain_targets(level),
+                    chain_damage_percent(level),
+                )
                 for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
             ],
         ),
@@ -595,11 +528,10 @@ def build_entries() -> list[dict[str, object]]:
 def build_item_entries() -> list[dict[str, object]]:
     return [
         backpack_entry(
-            backpack_pool_id(index, ranged),
-            talent_pool_id(index, ranged),
+            backpack_pool_id(index),
+            talent_pool_id(index),
         )
         for index in range(HERO_POOL_SIZE)
-        for ranged in (False, True)
     ]
 
 
@@ -678,10 +610,6 @@ def run_full_port(
 
 
 def verify(output: Path) -> None:
-    if len(RANGED_HERO_IDS) != 31 or len(set(RANGED_HERO_IDS)) != 31:
-        raise SystemExit("ranged hero scan must contain 31 unique heroes")
-    if len(set(RANGED_PROJECTILE_GROUPS)) != 13:
-        raise SystemExit("expected 13 unique ranged projectile groups")
     archive = W.MPQArchive(str(output))
     try:
         ability = archive.read_file("war3map.w3a") or b""
@@ -720,9 +648,9 @@ def verify(output: Path) -> None:
         if ident not in items:
             raise SystemExit("artifact missing: " + ident)
     for index in range(HERO_POOL_SIZE):
-        for ranged in (False, True):
-            talent = talent_pool_id(index, ranged)
-            backpack = backpack_pool_id(index, ranged)
+        for _mode in (False,):
+            talent = talent_pool_id(index)
+            backpack = backpack_pool_id(index)
             master = abilities.get(talent)
             if (
                 master is None
@@ -851,8 +779,8 @@ def verify(output: Path) -> None:
         "T107": {
             "old": "AIst",
             "alev": ATTRIBUTE_TALENT_LEVELS,
-            "aart": ICON_BARRAGE,
-            "arar": ICON_BARRAGE,
+            "aart": ICON_CHAIN,
+            "arar": ICON_CHAIN,
         },
         "T108": {
             "old": "AIst",
@@ -935,38 +863,6 @@ def verify(output: Path) -> None:
                         "%s level %d %s is not zero"
                         % (ident, level, field)
                     )
-    for group_index, (projectile_art, projectile_speed) in enumerate(
-        RANGED_PROJECTILE_GROUPS
-    ):
-        for target_index, total_targets in enumerate((3, 4, 5)):
-            ident = "T%03d" % (
-                BARRAGE_ID_START + group_index * 3 + target_index
-            )
-            if ident not in abilities:
-                raise SystemExit("native barrage missing: " + ident)
-            if abilities[ident][1] != "Aroc":
-                raise SystemExit(
-                    "%s does not use Aroc: %s"
-                    % (ident, abilities[ident][1])
-                )
-            barrage = talent_fields(ident)
-            for key, value in (
-                ("alev", 1),
-                (("aite", 0), 0),
-                (("aher", 0), 0),
-                (("achd", 0), 0),
-                ("amat", projectile_art),
-                ("amsp", float(projectile_speed)),
-                (("Efk1", 1), 0.0),
-                (("Efk2", 1), 99999.0),
-                (("Efk3", 1), total_targets - 2),
-                (("aare", 1), 550.0),
-            ):
-                if not field_matches(barrage.get(key), value):
-                    raise SystemExit(
-                        "%s.%s mismatch: %r != %r"
-                        % (ident, key, barrage.get(key), value)
-                    )
     for index, expected in (
         (0, ("Ilif", 1, 200)),
         (1, ("Ihpr", 1, 6)),
@@ -1038,11 +934,7 @@ def verify(output: Path) -> None:
     )
     if not isinstance(base_iabi, str):
         base_iabi = base_iabi.decode("utf-8", "replace")
-    if any(
-        talent_pool_id(i, ranged) in base_iabi
-        for i in range(HERO_POOL_SIZE)
-        for ranged in (False, True)
-    ):
+    if any(talent_pool_id(i) in base_iabi for i in range(HERO_POOL_SIZE)):
         raise SystemExit("base B30B still uses a shared talent tree")
     for ident in EQUIPMENT_IDS:
         if ident.encode("ascii") in unit_data:
@@ -1056,11 +948,8 @@ def verify(output: Path) -> None:
         b"function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean",
         b"if not TT_EnsureBackpack(u, heroIndex) then",
         b"call TT_ResetNativeTalents(u)",
-        b"function TT_IsRangedHero takes unit u returns boolean",
         b"function TT_TalentId takes integer heroIndex returns integer",
         b"function TT_BackpackId takes integer heroIndex returns integer",
-        b"return 'R000' + offset",
-        b"return 'Y000' + offset",
         b"function TT_HideTalentBooks takes unit u returns nothing",
         b"function TT_AttributeTalentLevel takes integer statValue returns integer",
         b"function TT_SyncAttributeTalents takes unit u returns nothing",
@@ -1071,6 +960,7 @@ def verify(output: Path) -> None:
         b"GetHeroAgi(u, true)",
         b"GetHeroInt(u, true)",
         b"function TT_ApplyCleaveTalent takes unit caster, unit victim, real attackDamage",
+        b"function TT_ApplyChainTalent takes unit caster, unit victim, real attackDamage",
         b"function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing",
         b"function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer heroIndex",
         b"function TT_OnAnyUnitDeath takes nothing returns nothing",
@@ -1078,14 +968,7 @@ def verify(output: Path) -> None:
         b"set TT_FX_TABLE = InitHashtable()",
         b'"talentstats"',
         b"event=TALENT_ATTACK",
-        b"function TT_BarrageGroupFor takes string art, integer speed returns integer",
-        b"function TT_BarrageAbilityFor takes integer artGroup, integer targets returns integer",
-        b"function TT_SyncNativeBarrage takes unit u returns nothing",
-        b"call UnitAddAbility(u, desired)",
-        b"event=BARRAGE_NATIVE_SYNC",
-        b"event=BARRAGE_ART_GROUP",
-        b"event=BARRAGE_ART_UNMATCHED",
-        b"event=BARRAGE_NATIVE_HIT",
+        b"event=CHAIN_HIT",
         b"event=INCINERATE_HIT",
         b"event=INCINERATE_EXPLODE",
         b"event=INCINERATE_EXPLODE_HIT",
@@ -1190,7 +1073,7 @@ def verify(output: Path) -> None:
     if b"CreateItem(TT_BackpackId(heroIndex)" in script:
         raise SystemExit("talent backpack still uses detached item creation")
     print(
-        "verified 64 melee and 64 ranged six-tier talent trees, "
+        "verified 64 six-tier talent trees, "
         "per-hero backpack owners, and ALAS artifacts"
     )
 

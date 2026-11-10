@@ -34,6 +34,7 @@ CHOICES_PER_TIER = 3
 CHOICE_START = 100
 CHILD_START = 200
 ATTRIBUTE_TALENT_LEVELS = 10
+NATIVE_BARRAGE_IDS = ("T120", "T121", "T122")
 FULL_PORT = HERE / "port_alas_jass_map.py"
 TALENT_SCRIPT = ROOT / "scripts" / "talent-test"
 WING_CONFIG = "wings_config_forsaken_301"
@@ -134,14 +135,16 @@ def ability_entry(
     *,
     extra: list[tuple[str, int, int, int, object]] | None = None,
     icon: str | None = None,
+    item_ability: int = 1,
+    hero_ability: int = 0,
 ) -> dict[str, object]:
     mods = [
         mod("anam", name),
         mod("atp1", name, level=1),
         mod("aub1", tip, level=1),
         mod("alev", 1),
-        mod("aite", 1),
-        mod("aher", 0),
+        mod("aite", item_ability),
+        mod("aher", hero_ability),
     ]
     if icon:
         mods.extend([mod("aart", icon), mod("arar", icon)])
@@ -176,7 +179,11 @@ def cleave_radius(level: int) -> float:
 
 
 def barrage_targets(level: int) -> int:
-    return 2 + (level - 1) // 3
+    if level <= 3:
+        return 3
+    if level <= 6:
+        return 4
+    return 5
 
 
 def incinerate_stack_damage(level: int) -> float:
@@ -228,6 +235,29 @@ def marker_talent_entry(
             mod("Istr", 0, O.T_INT, level=level, column=3),
             mod("Iagi", 0, O.T_INT, level=level, column=1),
             mod("Iint", 0, O.T_INT, level=level, column=2),
+        ],
+    )
+
+
+def native_barrage_entry(ident: str, total_targets: int) -> dict[str, object]:
+    if total_targets not in (3, 4, 5):
+        raise ValueError("native barrage target count must be 3, 4, or 5")
+    return ability_entry(
+        ident,
+        "Aroc",
+        "万箭穿云（%d目标）" % total_targets,
+        "原生弹幕攻击，总目标数 %d。" % total_targets,
+        icon=ICON_BARRAGE,
+        item_ability=0,
+        hero_ability=0,
+        extra=[
+            mod("achd", 0),
+            mod("atar", "ground,air,enemy,neutral,vulnerable", O.T_STRING, level=1),
+            mod("aare", 550.0, O.T_UNREAL, level=1),
+            mod("amsp", 1400.0, O.T_UNREAL),
+            mod("Efk1", 0.0, O.T_UNREAL, level=1),
+            mod("Efk2", 99999.0, O.T_UNREAL, level=1),
+            mod("Efk3", total_targets - 2, O.T_INT, level=1),
         ],
     )
 
@@ -322,6 +352,13 @@ def build_entries() -> list[dict[str, object]]:
             )
             for index in range(TIER_COUNT)
         ],
+        *[
+            native_barrage_entry(ident, targets)
+            for ident, targets in zip(
+                NATIVE_BARRAGE_IDS,
+                (3, 4, 5),
+            )
+        ],
         book_entry(
             node_id(0, 0),
             "生生不息",
@@ -373,8 +410,8 @@ def build_entries() -> list[dict[str, object]]:
             "万箭穿云",
             ICON_BARRAGE,
             [
-                "仅远程攻击生效。弹幕向周围 550 范围最多 %d 个敌人各发射一发，"
-                "每发造成 30 点伤害。敏捷越高，弹幕目标越多。"
+                "仅远程攻击生效。原生弹幕向周围 550 范围最多攻击 %d 个目标"
+                "（含主目标），补充目标造成普通攻击伤害。敏捷越高，弹幕目标越多。"
                 % barrage_targets(level)
                 for level in range(1, ATTRIBUTE_TALENT_LEVELS + 1)
             ],
@@ -846,6 +883,33 @@ def verify(output: Path) -> None:
                         "%s level %d %s is not zero"
                         % (ident, level, field)
                     )
+    for ident, total_targets in zip(
+        NATIVE_BARRAGE_IDS,
+        (3, 4, 5),
+    ):
+        if ident not in abilities:
+            raise SystemExit("native barrage missing: " + ident)
+        if abilities[ident][1] != "Aroc":
+            raise SystemExit(
+                "%s does not use Aroc: %s"
+                % (ident, abilities[ident][1])
+            )
+        barrage = talent_fields(ident)
+        for key, value in (
+            ("alev", 1),
+            (("aite", 0), 0),
+            (("aher", 0), 0),
+            (("achd", 0), 0),
+            (("Efk1", 1), 0.0),
+            (("Efk2", 1), 99999.0),
+            (("Efk3", 1), total_targets - 2),
+            (("aare", 1), 550.0),
+        ):
+            if not field_matches(barrage.get(key), value):
+                raise SystemExit(
+                    "%s.%s mismatch: %r != %r"
+                    % (ident, key, barrage.get(key), value)
+                )
     for index, expected in (
         (0, ("Ilif", 1, 200)),
         (1, ("Ihpr", 1, 6)),
@@ -943,7 +1007,6 @@ def verify(output: Path) -> None:
         b"GetHeroAgi(u, true)",
         b"GetHeroInt(u, true)",
         b"function TT_ApplyCleaveTalent takes unit caster, unit victim, real attackDamage",
-        b"function TT_ApplyBarrageTalent takes unit caster, unit victim returns nothing",
         b"function TT_ApplyIncinerateTalent takes unit caster, unit victim returns nothing",
         b"function TT_ExplodeIncinerateTalent takes unit caster, unit victim, integer heroIndex",
         b"function TT_OnAnyUnitDeath takes nothing returns nothing",
@@ -951,8 +1014,10 @@ def verify(output: Path) -> None:
         b"set TT_FX_TABLE = InitHashtable()",
         b'"talentstats"',
         b"event=TALENT_ATTACK",
-        b"event=BARRAGE_START",
-        b"event=BARRAGE_HIT",
+        b"function TT_SyncNativeBarrage takes unit u returns nothing",
+        b"call UnitAddAbility(u, desired)",
+        b"event=BARRAGE_NATIVE_SYNC",
+        b"event=BARRAGE_NATIVE_HIT",
         b"event=INCINERATE_HIT",
         b"event=INCINERATE_EXPLODE",
         b"event=INCINERATE_EXPLODE_HIT",

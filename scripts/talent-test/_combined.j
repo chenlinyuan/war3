@@ -1424,11 +1424,24 @@ function TT_ChoiceWeight takes integer tier returns integer
     return weight
 endfunction
 
+function TT_TierSlot takes integer tier returns integer
+    if tier == 1 then
+        return 2
+    elseif tier == 2 then
+        return 1
+    endif
+    return tier
+endfunction
+
+function TT_TierNodeCode takes integer tier, integer choice returns integer
+    return 100 + TT_TierSlot(tier) * 3 + choice
+endfunction
+
 function TT_ReadTierChoice takes unit u, integer tier returns integer
     local integer choice = 0
     loop
         exitwhen choice >= 3
-        if GetUnitAbilityLevel(u, TT_TalentAbilityId(100 + tier * 3 + choice)) > 0 then
+        if GetUnitAbilityLevel(u, TT_TalentAbilityId(TT_TierNodeCode(tier, choice))) > 0 then
             return choice + 1
         endif
         set choice = choice + 1
@@ -1577,7 +1590,7 @@ function TT_RestoreTalentState takes unit u returns nothing
         exitwhen tier >= 6
         set choice = TT_SavedTierChoice(heroIndex, tier)
         if choice > 0 then
-            set abilityId = TT_TalentAbilityId(100 + tier * 3 + choice - 1)
+            set abilityId = TT_TalentAbilityId(TT_TierNodeCode(tier, choice - 1))
             if GetUnitAbilityLevel(u, abilityId) == 0 then
                 call UnitAddAbility(u, abilityId)
             endif

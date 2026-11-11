@@ -28,6 +28,7 @@ class TalentBundle:
     ability_object: Path
     item_object: Path
     buff_object: Path
+    breakthrough_buff_id: str
     source_script_dir: Path
     chapter_levels: dict[str, int]
     scripts: dict[int, Path]
@@ -148,10 +149,30 @@ def _scan_campaign(source: Path) -> tuple[set[str], dict[str, int]]:
     return existing, levels
 
 
-def _generated_ids() -> tuple[set[str], set[str], set[str]]:
+def _choose_breakthrough_buff_id(existing: set[str]) -> str:
+    preferred = TALENT.BREAKTHROUGH_BUFF_ID_BASE
+    if preferred not in existing:
+        return preferred
+    first_value = int(preferred[1:], 16)
+    for start, stop in (
+        (first_value + 1, 0x1000),
+        (0x400, first_value),
+    ):
+        for value in range(start, stop):
+            candidate = "B%03X" % value
+            if candidate not in existing:
+                return candidate
+    raise ValueError(
+        "universal talents could not find a free breakthrough buff ID"
+    )
+
+
+def _generated_ids(
+    breakthrough_buff_id: str = TALENT.BREAKTHROUGH_BUFF_ID_BASE,
+) -> tuple[set[str], set[str], set[str]]:
     abilities = {
         str(entry["new"])
-        for entry in TALENT.build_entries()
+        for entry in TALENT.build_entries(breakthrough_buff_id)
     }
     items = {
         str(entry["new"])
@@ -159,16 +180,54 @@ def _generated_ids() -> tuple[set[str], set[str], set[str]]:
     }
     buffs = {
         str(entry["new"])
-        for entry in TALENT.breakthrough_buff_entries()
+        for entry in TALENT.breakthrough_buff_entries(
+            breakthrough_buff_id
+        )
     }
     return abilities, items, buffs
 
 
-def _render_script(work: Path, level_cap: int) -> Path:
+def _patch_talent_script_id(target: Path, breakthrough_buff_id: str) -> None:
+    old_literal = "'" + TALENT.BREAKTHROUGH_BUFF_ID_BASE + "'"
+    new_literal = "'" + breakthrough_buff_id + "'"
+    patched = 0
+    for path in sorted(target.glob("*.j")):
+        text = path.read_text(encoding="utf-8")
+        count = text.count(old_literal)
+        if not count:
+            continue
+        path.write_text(
+            text.replace(old_literal, new_literal),
+            encoding="utf-8",
+            newline="\n",
+        )
+        patched += count
+    if not patched:
+        raise ValueError(
+            "talent script has no breakthrough buff ID anchor"
+        )
+    runtime = (target / "f.j").read_text(encoding="utf-8")
+    if runtime.count(new_literal) != 1:
+        raise ValueError(
+            "talent runtime must reference the breakthrough buff once"
+        )
+    if breakthrough_buff_id != TALENT.BREAKTHROUGH_BUFF_ID_BASE:
+        if old_literal in runtime:
+            raise ValueError(
+                "talent runtime still references the occupied buff ID"
+            )
+
+
+def _render_script(
+    work: Path,
+    level_cap: int,
+    breakthrough_buff_id: str,
+) -> Path:
     target = work / "scripts" / ("level-%d" % level_cap)
     if target.is_dir():
         return target
     shutil.copytree(TALENT.TALENT_SCRIPT, target)
+    _patch_talent_script_id(target, breakthrough_buff_id)
     globals_path = target / "g.j"
     text = globals_path.read_text(encoding="utf-8")
     updated, count = re.subn(
@@ -186,12 +245,13 @@ def _render_chapter_script(
     work: Path,
     level_cap: int,
     chapter_index: int,
+    breakthrough_buff_id: str,
 ) -> Path:
     target = work / "scripts" / ("chapter-%02d" % chapter_index)
     if target.is_dir():
         return target
     shutil.copytree(
-        _render_script(work, level_cap),
+        _render_script(work, level_cap, breakthrough_buff_id),
         target,
     )
     globals_path = target / "g.j"
@@ -241,8 +301,9 @@ def prepare_bundle(
         existing, level_cap = _read_chapter(source)
         levels = {chapter_name: level_cap}
 
+    breakthrough_buff_id = _choose_breakthrough_buff_id(existing)
     generated_abilities, generated_items, generated_buffs = (
-        _generated_ids()
+        _generated_ids(breakthrough_buff_id)
     )
     collisions = sorted(
         (
@@ -263,10 +324,15 @@ def prepare_bundle(
         ability_object,
         item_object,
         buff_object,
+        breakthrough_buff_id,
     )
     unique_levels = sorted(set(levels.values()))
     scripts = {
-        level_cap: _render_script(work, level_cap)
+        level_cap: _render_script(
+            work,
+            level_cap,
+            breakthrough_buff_id,
+        )
         for level_cap in unique_levels
     }
     chapter_scripts: dict[str, Path] = {}
@@ -276,6 +342,7 @@ def prepare_bundle(
                 work,
                 levels[chapter],
                 index,
+                breakthrough_buff_id,
             )
             for index, chapter in enumerate(expected_chapters, 1)
         }
@@ -283,6 +350,7 @@ def prepare_bundle(
         ability_object=ability_object,
         item_object=item_object,
         buff_object=buff_object,
+        breakthrough_buff_id=breakthrough_buff_id,
         source_script_dir=TALENT.TALENT_SCRIPT,
         chapter_levels=levels,
         scripts=scripts,
@@ -353,6 +421,9 @@ def _verify_script(
         "TT_CaptureTalentState",
         "TT_ActualSelectionText",
         "TT_RestoreTalentState",
+        "function TT_TierSlot takes integer tier returns integer",
+        "function TT_TierNodeCode takes integer tier, integer choice returns integer",
+        "return 100 + TT_TierSlot(tier) * 3 + choice",
         "TT_AttributeTalentLevel",
         "TT_SyncAttributeTalents",
         "call TT_SyncAttributeTalent(u, 'T106'",
@@ -436,6 +507,7 @@ def _verify_script(
     for forbidden in (
         "set highest = master",
         "set target = master",
+        "TT_TalentAbilityId(100 + tier * 3 +",
     ):
         if forbidden in text:
             raise ValueError(
@@ -480,6 +552,7 @@ def _verify_archive(
     path: Path,
     level_cap: int,
     display_name: str,
+    breakthrough_buff_id: str,
 ) -> None:
     archive = W.MPQArchive(str(path))
     try:
@@ -523,7 +596,7 @@ def _verify_archive(
                 display_name + ": " + ident
                 + " is missing or is not based on " + base
             )
-    breakthrough_buff = TALENT.BREAKTHROUGH_BUFF_IDS[0]
+    breakthrough_buff = breakthrough_buff_id
     if (
         breakthrough_buff not in buffs
         or buffs[breakthrough_buff][0] != "BOae"
@@ -533,7 +606,7 @@ def _verify_archive(
             + " is missing or is not based on BOae"
         )
     for ident in ("B64E", "B64F", "B64G", "B64H"):
-        if ident in buffs:
+        if ident != breakthrough_buff and ident in buffs:
             raise ValueError(
                 display_name + " still contains duplicate status buff "
                 + ident
@@ -605,7 +678,7 @@ def _verify_archive(
                 )
             for tier in range(TALENT.TIER_COUNT):
                 expected = ",".join(
-                    TALENT.node_id(tier, choice)
+                    TALENT.tier_node_id(tier, choice)
                     for choice in range(TALENT.CHOICES_PER_TIER)
                 )
                 if master.get(("aabi", tier + 1)) != expected:
@@ -652,6 +725,7 @@ def verify_bundle(output: Path, bundle: TalentBundle) -> None:
                         temp,
                         level_cap,
                         name,
+                        bundle.breakthrough_buff_id,
                     )
                 finally:
                     temp.unlink(missing_ok=True)
@@ -659,4 +733,9 @@ def verify_bundle(output: Path, bundle: TalentBundle) -> None:
             outer.close()
         return
     level_cap = next(iter(bundle.chapter_levels.values()))
-    _verify_archive(output, level_cap, output.name)
+    _verify_archive(
+        output,
+        level_cap,
+        output.name,
+        bundle.breakthrough_buff_id,
+    )

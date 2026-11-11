@@ -31,13 +31,17 @@ EQUIPMENT_IDS = (
 )
 TIER_COUNT = 6
 CHOICES_PER_TIER = 3
+# Displayed tier -> semantic node group. Combat stays T106-T108 and
+# mobility stays T103-T105; only their unlock positions are exchanged.
+TIER_SLOT_ORDER = (0, 2, 1, 3, 4, 5)
 CHOICE_START = 100
 CHILD_START = 200
 ATTRIBUTE_TALENT_LEVELS = 10
 BREAKTHROUGH_SPEED_ID = "T118"
 BREAKTHROUGH_STUN_ID = "T119"
 BREAKTHROUGH_STATUS_ID = "T11A"
-BREAKTHROUGH_BUFF_IDS = ("B64D",)
+BREAKTHROUGH_BUFF_ID_BASE = "B64D"
+BREAKTHROUGH_BUFF_IDS = (BREAKTHROUGH_BUFF_ID_BASE,)
 FULL_PORT = HERE / "port_alas_jass_map.py"
 TALENT_SCRIPT = ROOT / "scripts" / "talent-test"
 WING_CONFIG = "wings_config_forsaken_301"
@@ -119,6 +123,10 @@ def mod(
 
 def node_id(tier: int, choice: int) -> str:
     return "T%03d" % (CHOICE_START + tier * CHOICES_PER_TIER + choice)
+
+
+def tier_node_id(tier: int, choice: int) -> str:
+    return node_id(TIER_SLOT_ORDER[tier], choice)
 
 
 def child_id(index: int) -> str:
@@ -285,7 +293,7 @@ def talent_entry(ident: str) -> dict[str, object]:
     for tier in range(TIER_COUNT):
         mods.append(mod(
             "aabi",
-            ",".join(node_id(tier, choice) for choice in range(3)),
+            ",".join(tier_node_id(tier, choice) for choice in range(3)),
             level=tier + 1,
         ))
     return {"old": OPENER_ID, "new": ident, "mods": mods}
@@ -365,7 +373,9 @@ def breakthrough_stun_entry() -> dict[str, object]:
     )
 
 
-def breakthrough_status_entry() -> dict[str, object]:
+def breakthrough_status_entry(
+    breakthrough_buff_id: str = BREAKTHROUGH_BUFF_ID_BASE,
+) -> dict[str, object]:
     mods = [
         mod("anam", "破势"),
         mod("aart", ICON_BREAKTHROUGH),
@@ -391,7 +401,7 @@ def breakthrough_status_entry() -> dict[str, object]:
         mods.append(
             mod(
                 "abuf",
-                BREAKTHROUGH_BUFF_IDS[0],
+                breakthrough_buff_id,
                 O.T_STRING,
                 level=level,
             )
@@ -403,11 +413,13 @@ def breakthrough_status_entry() -> dict[str, object]:
     }
 
 
-def breakthrough_buff_entries() -> list[dict[str, object]]:
+def breakthrough_buff_entries(
+    breakthrough_buff_id: str = BREAKTHROUGH_BUFF_ID_BASE,
+) -> list[dict[str, object]]:
     return [
         {
             "old": "BOae",
-            "new": BREAKTHROUGH_BUFF_IDS[0],
+            "new": breakthrough_buff_id,
             "mods": [
                 mod("fnam", "破势"),
                 mod("ftip", "破势"),
@@ -422,7 +434,9 @@ def breakthrough_buff_entries() -> list[dict[str, object]]:
     ]
 
 
-def build_entries() -> list[dict[str, object]]:
+def build_entries(
+    breakthrough_buff_id: str = BREAKTHROUGH_BUFF_ID_BASE,
+) -> list[dict[str, object]]:
     entries = [
         *[
             talent_entry(talent_pool_id(index))
@@ -446,7 +460,7 @@ def build_entries() -> list[dict[str, object]]:
         ],
         breakthrough_speed_entry(),
         breakthrough_stun_entry(),
-        breakthrough_status_entry(),
+        breakthrough_status_entry(breakthrough_buff_id),
         book_entry(
             node_id(0, 0),
             "生生不息",
@@ -660,10 +674,14 @@ def write_talent_objects(
     ability_path: Path,
     item_path: Path,
     buff_path: Path,
+    breakthrough_buff_id: str = BREAKTHROUGH_BUFF_ID_BASE,
 ) -> None:
     data = DOBJ.write_objects_bytes(
         3,
-        [doctor_object(entry) for entry in build_entries()],
+        [
+            doctor_object(entry)
+            for entry in build_entries(breakthrough_buff_id)
+        ],
         True,
     )
     ability_path.write_bytes(data)
@@ -675,7 +693,10 @@ def write_talent_objects(
     item_path.write_bytes(item_data)
     buff_data = DOBJ.write_objects_bytes(
         2,
-        [doctor_object(entry) for entry in breakthrough_buff_entries()],
+        [
+            doctor_object(entry)
+            for entry in breakthrough_buff_entries(breakthrough_buff_id)
+        ],
         False,
     )
     buff_path.write_bytes(buff_data)
@@ -807,7 +828,7 @@ def verify(output: Path) -> None:
                 raise SystemExit("wrong tier count: " + talent)
             for tier in range(TIER_COUNT):
                 expected = ",".join(
-                    node_id(tier, choice)
+                    tier_node_id(tier, choice)
                     for choice in range(3)
                 )
                 if master_fields.get(("aabi", tier + 1)) != expected:
@@ -1158,6 +1179,13 @@ def verify(output: Path) -> None:
         b"if GetUnitAbilityLevel(u, 'T114') > 0 then",
         b"function TT_ResetTalents takes unit u returns nothing",
         b"function TT_TalentAbilityId takes integer abilityCode returns integer",
+        b"function TT_TierSlot takes integer tier returns integer",
+        b"function TT_TierNodeCode takes integer tier, integer choice returns integer",
+        b"if tier == 1 then",
+        b"return 2",
+        b"elseif tier == 2 then",
+        b"return 1",
+        b"return 100 + TT_TierSlot(tier) * 3 + choice",
         b"call BlzResetUnitTalents(u)",
         b"function TT_ClearTalentMilestones takes unit u returns nothing",
         b"call TT_GrantEarnedPoints(u)",
@@ -1246,6 +1274,8 @@ def verify(output: Path) -> None:
         raise SystemExit("source backpack autogrant still active")
     if b"CreateItem(TT_BackpackId(heroIndex)" in script:
         raise SystemExit("talent backpack still uses detached item creation")
+    if b"TT_TalentAbilityId(100 + tier * 3 +" in script:
+        raise SystemExit("talent tier mapping still assumes physical order")
     print(
         "verified 64 six-tier talent trees, "
         "per-hero backpack owners, and ALAS artifacts"

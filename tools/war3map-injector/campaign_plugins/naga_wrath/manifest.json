@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "name": "naga-wrath",
+  "title": "娜迦之怒-暗涌初现",
+  "source_sha256": "ab9df75bb6b1397ae6ad1601af3024617af1b81f79b9429446efe693ab94338c",
+  "chapters": [
+    "fennuairen.w3x",
+    "fennuceshi.w3m",
+    "fennudiany.w3x",
+    "fennudidi.w3m",
+    "fennuer.w3x",
+    "fennuggou.w3x",
+    "fennuguo.w3x",
+    "fennuing.w3x",
+    "fennujieju.w3m",
+    "fennuliu.w3m",
+    "fennuqi.w3m",
+    "fennurenlei.w3m",
+    "fennusi.w3m",
+    "fennuwu.w3x",
+    "fennuwuyaowang.w3x",
+    "fennuyi.w3x",
+    "kaitoudianying.w3m"
+  ],
+  "key_policy": {
+    "default": false,
+    "true": [
+      "CWSCW",
+      "NJCWHJWB",
+      "NJCWHMZ",
+      "NJCWHPJS",
+      "NJCWHYSS",
+      "NJCWLUBU",
+      "NJCWSYLS",
+      "NJCWYJZW",
+      "NJCWZJI",
+      "NJGFXM",
+      "NJGGZ",
+      "NJJBLLDH",
+      "NJJFDH",
+      "NJJFHZSQ",
+      "NJMCZLDH",
+      "NJPIFU",
+      "ZBNJSKUI",
+      "ZBNJTMSY",
+      "ZBNJTXZS"
+    ],
+    "false": []
+  },
+  "rules": {
+    "main_hero_death": {
+      "main_units": [
+        "udg_yilidan",
+        "udg_fashiqi"
+      ]
+    }
+  },
+  "object_rules": {
+    "permanent_artifact_charges": {
+      "extension": "w3t",
+      "field": "iuse",
+      "value": 0,
+      "item_ids": [
+        "I60M",
+        "I60N",
+        "I60Q"
+      ]
+    }
+  },
+  "backpack_switch": {
+    "ability_ids": [
+      "A63G"
+    ],
+    "source": "切换背包(B)",
+    "object_fields": [
+      "uabi"
+    ],
+    "runtime_grants": [
+      "UnitAddAbilityBJ",
+      "UnitMakeAbilityPermanent"
+    ]
+  },
+  "intentional_failure_paths_preserved": [
+    "Protected story units dying",
+    "Critical prop or objective failures authored by the campaign",
+    "Defeat when the campaign-controlled main heroes die"
+  ],
+  "runtime_tests": [
+    "Claim every purchased pet and artifact redeem item.",
+    "Confirm companion and pet deaths do not defeat the player.",
+    "Confirm the authored defeat still occurs when the campaign main heroes die.",
+    "Complete representative chapters and verify GO transitions and final cinematics."
+  ]
+}

@@ -73,7 +73,7 @@ def spell_entry():
         "|cff9d5cff消耗当前生命 20%，不会致死。|r"
     )
     return {
-        "old": "ANcl",
+        "old": "AOws",
         "new": SPELL_ID,
         "mods": [
             ["anam", O.T_STRING, 0, 0, "冰封践踏"],
@@ -89,17 +89,19 @@ def spell_entry():
             ["alev", O.T_INT, 0, 0, 1],
             ["aite", O.T_INT, 0, 0, 0],
             ["aher", O.T_INT, 0, 0, 0],
-            ["Ncl1", O.T_UNREAL, 1, 1, 0.0],
-            ["Ncl2", O.T_INT, 1, 2, 0],
-            ["Ncl3", O.T_INT, 1, 3, 1],
-            ["Ncl4", O.T_UNREAL, 1, 4, 0.0],
-            ["Ncl5", O.T_INT, 1, 5, 0],
-            ["Ncl6", O.T_STRING, 1, 6, "froststomp"],
+            ["atar", O.T_STRING, 1, 0, "air,ground,enemy,neutral,vulnerable"],
+            ["aare", O.T_UNREAL, 1, 0, 250.0],
+            ["Wrs1", O.T_UNREAL, 1, 1, 0.0],
+            ["adur", O.T_UNREAL, 1, 0, 0.0],
+            ["ahdu", O.T_UNREAL, 1, 0, 0.0],
+            ["abuf", O.T_STRING, 1, 0, ""],
             ["acdn", O.T_UNREAL, 1, 0, 10.0],
             ["amcs", O.T_INT, 1, 0, 100],
             ["acat", O.T_STRING, 0, 0, ""],
             ["arpx", O.T_INT, 0, 0, 2],
             ["aubx", O.T_INT, 0, 0, 1],
+            ["abpx", O.T_INT, 0, 0, 2],
+            ["abpy", O.T_INT, 0, 0, 1],
         ],
     }
 

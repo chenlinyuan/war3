@@ -5,8 +5,7 @@ The map is the canonical LostTempleLV_BladeMaster30.w3x produced by
 build_lost_temple_30.py.  This patch adds:
 
 * item I106, based on gcel;
-* A110 (+15 agility) and A111 (agility-scaled 15%..200% attack speed)
-  inside hidden spellbook A116;
+* A110 (+15 agility) and A111 (+100% attack speed) as item passives;
 * a damage-event growth passive with a 1% chance to permanently grant
   1 agility without a cap;
 * A113, a one-level Channel ability added/removed by equipment sync;
@@ -72,17 +71,9 @@ SPEED_ID = "A111"
 SPELLBOOK_ID = "A116"
 
 ITEM_NAME = "\u57c3\u8f9b\u8bfa\u65af\u6218\u5203"
-ATTACK_SPEED_AGI_MULT = 0.005
-ATTACK_SPEED_MIN = 0.15
-ATTACK_SPEED_MAX = 2.0
-ATTACK_SPEED_STEP = 0.05
-ATTACK_SPEED_LEVELS = (
-    int(round((ATTACK_SPEED_MAX - ATTACK_SPEED_MIN) / ATTACK_SPEED_STEP))
-    + 1
-)
+ATTACK_SPEED_BONUS = 1.0
 ATTACK_SPEED_DESCRIPTION = (
-    "\u653b\u51fb\u901f\u5ea6\u968f\u654f\u6377\u63d0\u5347\uff1a"
-    "\u654f\u6377\u00d70.5%\uff0c\u6700\u4f4e 15%\uff0c\u6700\u9ad8 200%\u3002"
+    "\u653b\u51fb\u901f\u5ea6 +100%\u3002"
 )
 ITEM_TOOLTIP = (
     "|cffff8c00\u795e\u5668|r|n|n"
@@ -90,7 +81,7 @@ ITEM_TOOLTIP = (
     "|cff5ddf26" + ATTACK_SPEED_DESCRIPTION + "|r|n"
     "|cff5ddf26\u957f\u5203\u98ce\u66b4\uff1a\u8fd1\u6218\u57fa\u7840\u653b\u51fb\u9020\u6210 15% \u987a\u5288\u4f24\u5bb3\u3002|r|n"
     "|cff5ddf26\u90aa\u9b42\u6dec\u70bc\uff1a\u57fa\u7840\u653b\u51fb\u6709 2% \u51e0\u7387"
-    "\u6c38\u4e45\u63d0\u5347 1 \u70b9\u654f\u6377\u3002\u4e0d\u8bbe\u4e0a\u9650\u3002|r|n"
+    "\u6c38\u4e45\u63d0\u5347 1 \u70b9\u654f\u6377\u3002|r|n"
     "|cff66ccff装备后获得技能：雷霆冲锋（C）。|r"
 )
 CHARGE_NAME = "雷霆冲锋"
@@ -130,23 +121,17 @@ def warglaive_attack_speed_mods():
         mod("arar", ICON_PATH),
         mod("atp1", "\u57c3\u8f9b\u8bfa\u65af\u00b7\u901f\u5ea6"),
         mod("aub1", ATTACK_SPEED_DESCRIPTION),
-        mod("alev", ATTACK_SPEED_LEVELS),
+        mod("alev", 1),
         mod("aite", 1),
         mod("aher", 0),
-    ]
-    mods.extend(
         mod(
             "Isx1",
-            round(
-                ATTACK_SPEED_MIN + (level - 1) * ATTACK_SPEED_STEP,
-                2,
-            ),
+            ATTACK_SPEED_BONUS,
             typ=objparse.T_UNREAL,
-            level=level,
+            level=1,
             column=1,
-        )
-        for level in range(1, ATTACK_SPEED_LEVELS + 1)
-    )
+        ),
+    ]
     return mods
 
 
@@ -578,13 +563,8 @@ WGL_V3_GLOBALS = """
     hashtable WGL_STACK_TIMER_HT = null
     hashtable WGL_COOLDOWN_HT = null
     hashtable WGL_GROWTH_HT = null
-    trigger WGL_ATTACK_SPEED_TRIGGER = null
+    hashtable WGL_DEFERRED_HT = null
     timer WGL_COOLDOWN_CLOCK = null
-    real WGL_ATTACK_SPEED_AGI_MULT = 0.005
-    real WGL_ATTACK_SPEED_MIN = 0.15
-    real WGL_ATTACK_SPEED_MAX = 2.0
-    real WGL_ATTACK_SPEED_STEP = 0.05
-    integer WGL_ATTACK_SPEED_LEVELS = 38
     integer WGL_GROWTH_CHANCE_PERCENT = 2
     real WGL_GROWTH_ATTACK_GUARD = 0.12
     real WGL_CHARGE_BASE_DISTANCE = 100.0
@@ -604,51 +584,27 @@ WGL_V3_FUNCTIONS = r"""
 // WARGLAIVE OF AZZINOTH - SCRIPTED BARBARIC CHARGE
 //============================================================================
 function WGL_HasWarglaive takes unit u returns boolean
+    local integer slot = 0
     local item it
-    local boolean found
     if u == null or GetUnitTypeId(u) == 0 then
         return false
     endif
     if WGL_ITEM_ACTIVE then
-        set it = BlzUnitItemInEquipmentSlot(u, ConvertLoadoutSlot(8))
-        set found = it != null and GetItemTypeId(it) == 'I106'
-        set it = null
-        return found
+        loop
+            exitwhen slot >= 9
+            set it = BlzUnitItemInEquipmentSlot(u, ConvertLoadoutSlot(slot))
+            if it != null and GetItemTypeId(it) == 'I106' then
+                set it = null
+                return true
+            endif
+            set slot = slot + 1
+        endloop
     endif
+    set it = null
     return UnitHasItemOfTypeBJ(u, 'I106')
 endfunction
 
 function WGL_CooldownClockTick takes nothing returns nothing
-endfunction
-
-function WGL_SyncAttackSpeed takes unit u returns nothing
-    local integer level
-    local real bonus
-    if u == null or GetUnitTypeId(u) == 0 then
-        return
-    endif
-    if not IsUnitType(u, UNIT_TYPE_HERO) or not WGL_HasWarglaive(u) then
-        return
-    endif
-    if GetUnitAbilityLevel(u, 'A111') <= 0 then
-        return
-    endif
-    set bonus = I2R(GetHeroAgi(u, true)) * WGL_ATTACK_SPEED_AGI_MULT
-    if bonus < WGL_ATTACK_SPEED_MIN then
-        set bonus = WGL_ATTACK_SPEED_MIN
-    elseif bonus > WGL_ATTACK_SPEED_MAX then
-        set bonus = WGL_ATTACK_SPEED_MAX
-    endif
-    set level = R2I(bonus / WGL_ATTACK_SPEED_STEP + 0.5)
-    set level = level - R2I(WGL_ATTACK_SPEED_MIN / WGL_ATTACK_SPEED_STEP) + 1
-    if level < 1 then
-        set level = 1
-    elseif level > WGL_ATTACK_SPEED_LEVELS then
-        set level = WGL_ATTACK_SPEED_LEVELS
-    endif
-    if GetUnitAbilityLevel(u, 'A111') != level then
-        call SetUnitAbilityLevel(u, 'A111', level)
-    endif
 endfunction
 
 function WGL_SyncUnit takes unit u returns nothing
@@ -665,11 +621,9 @@ function WGL_SyncUnit takes unit u returns nothing
         if GetUnitAbilityLevel(u, 'A116') > 0 then
             call UnitRemoveAbility(u, 'A116')
         endif
-        call WGL_SyncAttackSpeed(u)
         return
     endif
     if WGL_HasWarglaive(u) then
-        call WGL_SyncAttackSpeed(u)
         if GetUnitAbilityLevel(u, 'A113') == 0 then
             call UnitAddAbility(u, 'A113')
             call UnitMakeAbilityPermanent(u, true, 'A113')
@@ -691,6 +645,26 @@ function WGL_SyncUnit takes unit u returns nothing
         endif
         call UnitRemoveAbility(u, 'A113')
     endif
+endfunction
+
+function WGL_DeferredSync takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer timerId = GetHandleId(t)
+    local unit u = LoadUnitHandle(WGL_DEFERRED_HT, timerId, 0)
+    if u != null and GetUnitTypeId(u) != 0 then
+        call WGL_SyncUnit(u)
+    endif
+    call FlushChildHashtable(WGL_DEFERRED_HT, timerId)
+    call DestroyTimer(t)
+    set u = null
+    set t = null
+endfunction
+
+function WGL_ScheduleSync takes unit u returns nothing
+    local timer t = CreateTimer()
+    call SaveUnitHandle(WGL_DEFERRED_HT, GetHandleId(t), 0, u)
+    call TimerStart(t, 0.05, false, function WGL_DeferredSync)
+    set t = null
 endfunction
 
 function WGL_DestroyTimedEffect takes nothing returns nothing
@@ -772,7 +746,6 @@ function WGL_OnGrowthAttack takes nothing returns nothing
         return
     endif
     call SetHeroAgi(attacker, GetHeroAgi(attacker, false) + 1, true)
-    call WGL_SyncAttackSpeed(attacker)
     call WGL_ShowGrowthText(attacker)
     set attacker = null
     set victim = null
@@ -1078,8 +1051,8 @@ function WGL_OnItemEvent takes nothing returns nothing
         set u = null
         return
     endif
-    if not WGL_ITEM_ACTIVE and GetTriggerEventId() == EVENT_PLAYER_UNIT_DROP_ITEM and it != null and GetItemTypeId(it) == 'I106' then
-        if GetUnitAbilityLevel(u, 'A113') > 0 then
+    if GetTriggerEventId() == EVENT_PLAYER_UNIT_DROP_ITEM and it != null and GetItemTypeId(it) == 'I106' then
+        if not WGL_ITEM_ACTIVE and GetUnitAbilityLevel(u, 'A113') > 0 then
             set unitId = GetHandleId(u)
             set cooldownRemaining = BlzGetUnitAbilityCooldownRemaining(u, 'A113')
             if cooldownRemaining > 0.0 then
@@ -1094,13 +1067,8 @@ function WGL_OnItemEvent takes nothing returns nothing
         return
     endif
     call WGL_SyncUnit(u)
+    call WGL_ScheduleSync(u)
     set it = null
-    set u = null
-endfunction
-
-function WGL_OnHeroLevel takes nothing returns nothing
-    local unit u = GetTriggerUnit()
-    call WGL_SyncAttackSpeed(u)
     set u = null
 endfunction
 
@@ -1118,6 +1086,7 @@ function WGL_Init takes nothing returns nothing
     set WGL_STACK_TIMER_HT = InitHashtable()
     set WGL_COOLDOWN_HT = InitHashtable()
     set WGL_GROWTH_HT = InitHashtable()
+    set WGL_DEFERRED_HT = InitHashtable()
     set WGL_COOLDOWN_CLOCK = CreateTimer()
     call TimerStart(WGL_COOLDOWN_CLOCK, 8640000.0, false, function WGL_CooldownClockTick)
     set itemTrigger = CreateTrigger()
@@ -1136,9 +1105,6 @@ function WGL_Init takes nothing returns nothing
     set WGL_GROWTH_TRIGGER = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(WGL_GROWTH_TRIGGER, EVENT_PLAYER_UNIT_DAMAGED)
     call TriggerAddAction(WGL_GROWTH_TRIGGER, function WGL_OnGrowthAttack)
-    set WGL_ATTACK_SPEED_TRIGGER = CreateTrigger()
-    call TriggerRegisterAnyUnitEventBJ(WGL_ATTACK_SPEED_TRIGGER, EVENT_PLAYER_HERO_LEVEL)
-    call TriggerAddAction(WGL_ATTACK_SPEED_TRIGGER, function WGL_OnHeroLevel)
     set initial = CreateGroup()
     call GroupEnumUnitsInRect(initial, bj_mapInitialPlayableArea, null)
     call ForGroup(initial, function WGL_SyncInitialUnit)
@@ -1461,9 +1427,9 @@ def assert_patched(archive):
             raise RuntimeError("%s.%s is %r, expected %r" %
                                (ITEM_ID, field, item_fields.get(field), expected))
     if item_fields["iabi"].split(",") != ["A110", "A111", "Aclq"]:
-        raise RuntimeError("item must expose direct passives and cleave")
+        raise RuntimeError("item must expose agility, fixed speed, and cleave")
     item_tooltip = item_fields["utub"]
-    for required in ("1%", "\u6c38\u4e45\u63d0\u5347 1 \u70b9\u654f\u6377", "\u4e0d\u8bbe\u4e0a\u9650"):
+    for required in ("2%", "\u6c38\u4e45\u63d0\u5347 1 \u70b9\u654f\u6377"):
         if required not in item_tooltip:
             raise RuntimeError("item tooltip lacks " + required)
     if "\u96f7\u970d\u51b2\u950b" in item_tooltip:
@@ -1507,16 +1473,17 @@ def assert_patched(archive):
             "%s.Isx1 must use unreal(2), got %r" %
             (SPEED_ID, sorted(speed_types))
         )
-    if speed_fields.get("alev") != ATTACK_SPEED_LEVELS:
+    if speed_fields.get("alev") != 1:
         raise RuntimeError(
             "%s.alev is %r, expected %r" %
-            (SPEED_ID, speed_fields.get("alev"), ATTACK_SPEED_LEVELS)
+            (SPEED_ID, speed_fields.get("alev"), 1)
         )
-    if abs(float(speed_levels.get(1, -1)) - ATTACK_SPEED_MIN) > 0.0001:
-        raise RuntimeError("%s level 1 attack speed mismatch" % SPEED_ID)
-    if abs(float(speed_levels.get(ATTACK_SPEED_LEVELS, -1))
-           - ATTACK_SPEED_MAX) > 0.0001:
-        raise RuntimeError("%s maximum attack speed mismatch" % SPEED_ID)
+    if len(speed_levels) != 1:
+        raise RuntimeError("%s attack-speed level count is not one" % SPEED_ID)
+    if abs(float(speed_levels.get(1, -1)) - ATTACK_SPEED_BONUS) > 0.0001:
+        raise RuntimeError("%s attack speed is not +100%%" % SPEED_ID)
+    if speed_fields.get("aite") != 1:
+        raise RuntimeError("%s is not an item passive" % SPEED_ID)
     if ATTACK_SPEED_DESCRIPTION not in speed_fields.get("aub1", ""):
         raise RuntimeError("%s tooltip lacks dynamic attack speed" % SPEED_ID)
 
@@ -1639,6 +1606,8 @@ def assert_patched(archive):
         b"call SaveReal(WGL_COOLDOWN_HT, unitId, 0, TimerGetElapsed(WGL_COOLDOWN_CLOCK) + cooldownRemaining)",
         b"call BlzStartUnitAbilityCooldown(u, 'A113', cooldownRemaining)",
         b"function WGL_OnItemEvent takes nothing returns nothing",
+        b"call WGL_ScheduleSync(u)",
+        b"call TimerStart(t, 0.05, false, function WGL_DeferredSync)",
         b"function WGL_OnChargePoint takes unit caster, real targetX, real targetY, boolean consumeMana returns nothing",
         b"if not WGL_HasWarglaive(caster) then",
         b"function WGL_OnCharge takes nothing returns nothing",
@@ -1703,6 +1672,24 @@ def assert_patched(archive):
     if wgl_start < 0 or wgl_end < 0:
         raise RuntimeError("Warglaive runtime section not found")
     wgl_script = script[wgl_start:wgl_end]
+    ordered_functions = (
+        b"function WGL_SyncUnit takes unit u returns nothing",
+        b"function WGL_DeferredSync takes nothing returns nothing",
+        b"function WGL_ScheduleSync takes unit u returns nothing",
+        b"function WGL_OnItemEvent takes nothing returns nothing",
+    )
+    ordered_positions = []
+    for token in ordered_functions:
+        if wgl_script.count(token) != 1:
+            raise RuntimeError(
+                "Warglaive function definition is missing or duplicated: %r"
+                % token
+            )
+        ordered_positions.append(wgl_script.find(token))
+    if ordered_positions != sorted(ordered_positions):
+        raise RuntimeError(
+            "Warglaive functions are not ordered by JASS call dependency"
+        )
     for forbidden in (
         b"WGL_SYNC_TIMER",
         b"BlzSetUnitArmor",
@@ -1713,6 +1700,11 @@ def assert_patched(archive):
         b"AUbr",
         b"BUbr",
         b"WGL_CAST_START_TRIGGER",
+        b"WGL_ATTACK_SPEED_TRIGGER",
+        b"WGL_OnHeroLevel",
+        b"WGL_SyncAttackSpeed",
+        b"WGL_ClearAttackSpeedAbility",
+        b"SetUnitAbilityLevel(u, 'A111'",
         b"WGL_OnChargeStart",
         b"WGL_ChargeTrailTick",
         b"WGL_TRAIL_INTERVAL",

@@ -12,9 +12,96 @@
   setCount(4) + [setFlag(4) + modCount(4) + mods...]
 合并时保留现有 v3 套装边界；旧模板的 v2 条目转成一个标准套装。
 """
-import struct, sys, os
+import os
+import re
+import struct
+import sys
 
 HAS_LEVEL_COLUMN = {"w3a", "w3q", "w3d"}
+
+
+def resolve_trigstr(data: bytes, extension: str, strings: dict[int, str]) -> bytes:
+    """Resolve string-field ``TRIGSTR_nnn`` references inside object data."""
+    has_lc = extension.lower() in HAS_LEVEL_COLUMN
+    version = struct.unpack_from("<i", data, 0)[0]
+    if version not in (1, 2, 3):
+        raise ValueError("bad version %d" % version)
+    output = bytearray()
+    offset = 0
+
+    def take(size: int) -> bytes:
+        nonlocal offset
+        if size < 0 or offset + size > len(data):
+            raise ValueError("object data ends inside a field")
+        value = data[offset:offset + size]
+        output.extend(value)
+        offset += size
+        return value
+
+    def resolve_string(raw: bytes) -> bytes:
+        text = raw.decode("utf-8", "surrogateescape")
+
+        def replace(match: re.Match[str]) -> str:
+            return strings.get(int(match.group(1)), match.group(0))
+
+        resolved = re.sub(r"TRIGSTR_0*(\d+)", replace, text)
+        return resolved.encode("utf-8", "surrogateescape")
+
+    take(8)
+    original_count = struct.unpack_from("<i", data, 4)[0]
+
+    def read_entry() -> None:
+        nonlocal offset
+        take(8)
+        if version >= 3:
+            set_count = struct.unpack_from("<i", data, offset)[0]
+            take(4)
+            if set_count < 0:
+                raise ValueError("negative set count")
+            counts = []
+            for _ in range(set_count):
+                _flag, count = struct.unpack_from("<ii", data, offset)
+                take(8)
+                if count < 0:
+                    raise ValueError("negative modification count")
+                counts.append(count)
+        else:
+            count = struct.unpack_from("<i", data, offset)[0]
+            take(4)
+            if count < 0:
+                raise ValueError("negative modification count")
+            counts = [count]
+        for count in counts:
+            for _ in range(count):
+                take(4)
+                value_type = struct.unpack_from("<i", data, offset)[0]
+                take(4)
+                if has_lc:
+                    take(8)
+                if value_type in (0, 1, 2):
+                    take(4)
+                elif value_type == 3:
+                    end = data.find(b"\x00", offset)
+                    if end < 0:
+                        raise ValueError("unterminated string field")
+                    raw = data[offset:end]
+                    output.extend(resolve_string(raw) + b"\x00")
+                    offset = end + 1
+                else:
+                    raise ValueError("bad value type %d" % value_type)
+                take(4)
+
+    for _ in range(original_count):
+        read_entry()
+    custom_count = struct.unpack_from("<i", data, offset)[0]
+    take(4)
+    if custom_count < 0:
+        raise ValueError("negative custom count")
+    for _ in range(custom_count):
+        read_entry()
+    # Preserve any tolerated trailing zero padding.
+    output.extend(data[offset:])
+    return bytes(output)
 
 
 def read_all(path):

@@ -6,11 +6,11 @@
 War3.exe 没有这一层 -> 脚本初始化失败 -> 进不去（原版也一样）。把声明换成存根函数后，
 图自带实现，单机/平台都能编译。
 
-存根返回值按函数名给合理值：地图等级/排名 = --level（默认 100）、商城道具 = true
+存根返回值按函数名给合理值：地图等级/排名 = --level（默认 30）、商城道具 = true
 （全解锁，--no-mall 可关），其余 0/false/空串。
 
 用法:
-    python stub_platform_natives.py <地图> [--prefix DzAPI] [--level 100] [--no-mall] [--dry-run]
+    python stub_platform_natives.py <地图> [--prefix DzAPI] [--level 30] [--no-mall] [--dry-run]
 """
 import argparse
 import os
@@ -22,6 +22,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import war3mpq as W  # noqa: E402
 
+DEFAULT_LEVEL = 30
+
 NATIVE_RE = re.compile(
     r"^[ \t]*native[ \t]+(?P<name>[A-Za-z_][A-Za-z0-9_]*)[ \t]+takes[ \t]+"
     r"(?P<args>[^\r\n]*?)[ \t]+returns[ \t]+(?P<ret>[A-Za-z_][A-Za-z0-9_]*)"
@@ -29,7 +31,7 @@ NATIVE_RE = re.compile(
     re.M)
 
 
-def mall_stub_body(args, mall_false, mall_true):
+def mall_stub_body(args, mall_false, mall_true, mall_default=True):
     """给 DzAPI_Map_HasMallItem 生成"按 key 判断"的存根体。
 
     试玩版门禁：`HasMallItem(p,"0000GS0006") != true` → 没买正式版 → 判负；
@@ -42,16 +44,24 @@ def mall_stub_body(args, mall_false, mall_true):
     玩家一用它就 set gaoshi=10 → 下次单位死亡判胜 → 本章提前结束。
     需要某个福利时再单独加进 mall_true 白名单。
     """
+    false_keys = set(mall_false)
+    true_keys = set(mall_true)
+    overlap = false_keys & true_keys
+    if overlap:
+        raise ValueError(
+            "mall keys both whitelisted and blacklisted: "
+            + ", ".join(sorted(overlap))
+        )
     lines = []
-    for k in sorted(set(mall_false)):
+    for k in sorted(false_keys):
         lines.append('    if key == "%s" then' % k)
         lines.append("        return false")
         lines.append("    endif")
-    for k in sorted(set(mall_true)):
+    for k in sorted(true_keys):
         lines.append('    if key == "%s" then' % k)
         lines.append("        return true")
         lines.append("    endif")
-    lines.append("    return true")
+    lines.append("    return true" if mall_default else "    return false")
     return lines
 
 
@@ -83,7 +93,7 @@ def default_value(name, ret, level, mall, map_test=True):
 
 
 def stub_block(text, prefix, level, mall, in_place=False, map_test=True,
-               mall_false=(), mall_true=()):
+               mall_false=(), mall_true=(), mall_default=True):
     """返回 (新文本, [(name, args, ret)], 其它未替换的 native 名)。
 
     in_place=True 时把存根**写在 native 声明原来的位置**。
@@ -102,7 +112,7 @@ def stub_block(text, prefix, level, mall, in_place=False, map_test=True,
         found.append((name, args, ret))
         body = None
         if "hasmallitem" in name.lower() and mall:
-            body = mall_stub_body(args, mall_false, mall_true)
+            body = mall_stub_body(args, mall_false, mall_true, mall_default)
         if in_place:
             out = ["function %s takes %s returns %s" % (name, args or "nothing", ret)]
             if body is not None:
@@ -135,7 +145,7 @@ def main():
     ap.add_argument("map")
     ap.add_argument("--prefix", default="Dz,EX",
                     help="要替换的原生函数名前缀，逗号分隔（默认 Dz,EX —— 平台 API 与 JAPI 扩展）")
-    ap.add_argument("--level", type=int, default=100)
+    ap.add_argument("--level", type=int, default=DEFAULT_LEVEL)
     ap.add_argument("--no-mall", action="store_true")
     ap.add_argument("--no-map-test", action="store_true",
                     help="DzAPI_Map_IsMapTest() 返回 false（默认 true：拆掉作者的防盗版失败陷阱）")

@@ -46,6 +46,11 @@ secrets.json
 # *.mp3
 # *.wav
 
+# ---- 成品地图：统一禁止进入仓库 ----
+*.w3n
+*.w3x
+*.w3m
+
 # ---- 地图工程临时文件 ----
 # 地图备份（保留原始备份，忽略自动备份）
 *.w3m.bak
@@ -64,37 +69,34 @@ maps/*/*.blp
 maps/*/*.mdx
 maps/*/*.slk
 maps/*/*.txt
-# Python 缓存
-__pycache__/
-*.pyc
 
-# ---- Python 缓存 ----
+# Python 缓存
 __pycache__/
 *.pyc
 .venv/
 venv/
 
-# ---- ��ͼ���Ŀ¼��HKE ��ȡ���----
+# ---- 地图工作目录（HKE 提取产物）----
 maps/*.original/
-# ---- ��С���Խű� ----
+
+# ---- 小工具测试脚本 ----
 scripts/_test-min/
 
-# ---- HKE �滻�ű���ʱĿ¼ ----
+# ---- HKE 替换脚本临时目录 ----
 tools/war3map-injector/_rep/
 
-# ---- HKE ��ѹ���ĵ�ͼ�ļ�Ŀ¼ ----
+# ---- HKE 解压后的地图文件目录 ----
 maps/*/LostTemple/
-
-# ---- HKE ��ѹ���ĵ�ͼ�ļ�Ŀ¼ ----
 maps/*.w3x.orig/
 maps/*.w3m.orig/
 maps/*_extract/
 _yingling_files.txt
 
-# ---- ����Ӣ�鴫˵��ͼ(753MB, �����) ----
-maps/Ӣ�鴫˵*.w3x
+# ---- 大型本地源地图（会忽略，不入库）----
+maps/*.w3x
+maps/英雄传说*.w3x
 
-# У����ʱ�ļ�
+# 校验临时文件
 scripts/item-browser/_validate.j
 
 # ---- HKE extracted leftovers in map dirs (regenerated on each inject) ----
@@ -113,13 +115,35 @@ maps/*/war3map.mmp
 maps/*/war3mapmap.blp
 maps/*/war3mapunits.doo
 maps/*/war3mappreview.tga
+
 # extracted map folder (war3map.w3h etc) - not project content
 maps/LostTemple/LostTemple_wings/
 
-# ---- big local source maps (not project content) ----
-maps/*.w3x
-!maps/LostTemple/*.w3x
-!maps/campaign/*.w3x
-
 # ---- port_wings.py working dir ----
 maps/port/
+
+# ---- 二进制文件：禁止 git 做换行 / 编码转换 ----
+# 对象数据一旦被转码就不可用，因此统一按二进制处理。
+*.w3a binary
+*.w3t binary
+*.w3u binary
+*.w3h binary
+*.w3q binary
+*.w3b binary
+*.w3d binary
+*.w3e binary
+*.w3c binary
+*.w3s binary
+*.w3i binary
+*.w3x binary
+*.w3m binary
+*.w3n binary
+*.blp binary
+*.mdx binary
+*.mdl binary
+*.mpq binary
+*.dds binary
+*.tga binary
+*.pld binary
+*.exe binary
+*.zip binary

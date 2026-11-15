@@ -60,7 +60,12 @@ def main() -> int:
             if worker.is_file():
                 os.environ["ALAS_WORKER_EXE"] = str(worker)
                 break
+    runtime_import_paths = []
+    generated_config_dir = os.environ.get("ALAS_UNITIDS_DIR")
+    if generated_config_dir:
+        runtime_import_paths.append(generated_config_dir)
     sys.path[:0] = [
+        *runtime_import_paths,
         str(script.parent),
         str(root / "tools" / "war3map-injector"),
         str(root / "tools" / "_devos-map-doctor" / "devos-map-doctor-main"),

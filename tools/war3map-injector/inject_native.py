@@ -13,6 +13,7 @@
 import argparse
 import os
 import shutil
+import stat
 import struct
 import sys
 
@@ -23,6 +24,13 @@ import war3mpq as W  # noqa: E402
 import inject_all as IA  # noqa: E402  (复用 entry_points / 默认脚本目录)
 import inject_script_manual as ISM  # noqa: E402
 import mpq_patch as MP  # noqa: E402
+
+
+def force_writable(path):
+    try:
+        os.chmod(path, os.stat(path).st_mode | stat.S_IWRITE)
+    except OSError:
+        pass
 
 
 def find_script(archive):
@@ -134,7 +142,7 @@ def main():
             raise SystemExit("脚本入口没就位: %s" % ", ".join(bad))
         print("   脚本: %d -> %d 字节" % (len(orig), len(new)))
         # 存一份组装结果（和 HKE 流程一致，方便事后核对/排查）
-        rep = os.path.join(HERE, "_rep")
+        rep = os.environ.get("ALAS_REPORT_DIR") or os.path.join(HERE, "_rep")
         os.makedirs(rep, exist_ok=True)
         with open(os.path.join(rep, "war3map.j"), "wb") as fh:
             fh.write(new)
@@ -146,14 +154,18 @@ def main():
     print("== 写入（原生 MPQ）==")
     out_path = os.path.abspath(args.out) if args.out else None
     if out_path and out_path != map_path:
+        force_writable(out_path)
         shutil.copy2(map_path, out_path)
+        force_writable(out_path)
     target = out_path or map_path
     # 就地打补丁时，先留一份"改前"临时副本，校验要拿它做基准
     #   （否则 verify 会拿文件和自己比，报出假的不一致）
     tmp_before = None
     if target == map_path:
         tmp_before = map_path + ".verifybase"
+        force_writable(tmp_before)
         shutil.copy2(map_path, tmp_before)
+        force_writable(tmp_before)
     new_path = MP.patch(target, payload, out_path=None, backup=not args.no_backup,
                         store=args.store)
     ok = True

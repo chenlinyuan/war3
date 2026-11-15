@@ -1017,7 +1017,7 @@ function WG_ReportWings takes player p returns nothing
             call WG_FingerMarker(wg_fingerLastX2, wg_fingerLastY2, "记录:目标", 255, 220, 60)
             // 掠夺（阿克蒙德之手）自检：手上有没有这件装备 / 本图开没开
             if WG_HasHandItem(u) then
-                set s = "|cffff8800[掠夺]|r 持有阿克蒙德之手 ✓"
+                set s = "|cffff8800[掠夺]|r 持有魔神之握 ✓"
                 if WG_PLUNDER_ENABLE > 0 then
                     set s = s + "  击杀敌人时按等级掠夺金币（生命 >= "
                     set s = s + I2S(R2I(WG_PLUNDER_MIN_HP)) + "，非英雄 "
@@ -1177,7 +1177,7 @@ function WG_OnChat takes nothing returns nothing
             call WG_MountMessage(p, "请先选中一个英雄")
         else
             call UnitAddItemById(u, WG_HAND_ITEM)
-            call WG_MountMessage(p, GetUnitName(u) + " 获得 阿克蒙德之手")
+            call WG_MountMessage(p, GetUnitName(u) + " 获得 魔神之握")
         endif
     // unride: 卸下坐骑 (物品之外的备用入口)
     elseif WG_StrEqCI(cmd, "unride") then
@@ -1931,7 +1931,7 @@ endfunction
 
 function WG_ShowFingerSoulGain takes unit caster returns nothing
     local texttag tt = CreateTextTag()
-    call SetTextTagText(tt, "阿克蒙德之手·夺魂：智力 +1", 0.023)
+    call SetTextTagText(tt, "魔神之握·夺魂：智力 +1", 0.023)
     call SetTextTagPosUnit(tt, caster, 96.0)
     call SetTextTagColor(tt, 204, 0, 255, 255)
     call SetTextTagVelocity(tt, 0.0, 0.035)

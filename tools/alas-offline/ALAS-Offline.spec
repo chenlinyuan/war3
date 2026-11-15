@@ -7,7 +7,6 @@ root = app_dir.parents[1]
 wing_source = next((root / "maps").glob("*.w3x.orig"))
 
 datas = [
-    (str(app_dir), "tools/alas-offline"),
     (
         str(root / "tools" / "recover" / "patch_forsaken_301_wct.py"),
         "tools/recover",
@@ -88,11 +87,8 @@ datas = [
         str(root / "tools" / "recover" / "forsaken_sapper_tunnel_fix.lua"),
         "tools/recover",
     ),
-    (str(root / "tools" / "war3map-injector"), "tools/war3map-injector"),
     (str(root / "scripts"), "scripts"),
     (str(root / "heroes"), "heroes"),
-    (str(root / "maps" / "_wing_src"), "maps/_wing_src"),
-    (str(wing_source), "maps/" + wing_source.name),
     (
         str(
             root / "maps" / "port" / "lost_temple_30"
@@ -102,6 +98,91 @@ datas = [
     ),
 ]
 
+for source in app_dir.rglob("*"):
+    if not source.is_file():
+        continue
+    relative = source.relative_to(app_dir)
+    if (
+        any(part in {"__pycache__", ".pytest_cache"} for part in relative.parts)
+        or source.suffix.lower() in {".pyc", ".pyo"}
+        or relative.as_posix() == "ALAS-Offline.spec"
+    ):
+        continue
+    datas.append(
+        (
+            str(source),
+            str(Path("tools/alas-offline") / Path(relative).parent),
+        )
+    )
+
+injector_root = root / "tools" / "war3map-injector"
+for source in injector_root.glob("*.py"):
+    if source.name.startswith("_"):
+        continue
+    if (
+        source.name.startswith("wings_config_offline_")
+        and source.name != "wings_config_offline_template.py"
+    ):
+        continue
+    datas.append(
+        (str(source), "tools/war3map-injector")
+    )
+for name in (
+    "_wing.w3a",
+    "_wing_nohand.w3a",
+    "_wing_item.w3t",
+    "_wing_item_nohand.w3t",
+    "_wing_unit.w3u",
+    "_wing_buff.w3h",
+    "_b30b_item.w3t",
+    "_hand.w3t",
+    "_lt_hand.w3a",
+    "_itemabil.txt",
+    "paged_item_search.j",
+    "classic_item_chat.j",
+    "reforged_compat.j",
+    "_patch_hm3w_name.py",
+    "sfmpq_add_file.ps1",
+):
+    datas.append(
+        (str(injector_root / name), "tools/war3map-injector")
+    )
+datas.append(
+    (
+        str(injector_root / "_sfmpq" / "SFmpq.dll"),
+        "tools/war3map-injector/_sfmpq",
+    )
+)
+
+wing_names = (
+    "wingofthelucifer.mdx",
+    "wingblack4.blp",
+    "fwind.mdx",
+    "fwing.blp",
+    "doomgguardwings.mdx",
+    "anchibang0100.mdx",
+    "anchibang01.blp",
+    "anchibang02.blp",
+    "anchibang03.blp",
+    "anchibang04.blp",
+    "Chest_Purple.mdx",
+    "Chest_Yellow.mdx",
+    "Chest_Black.mdx",
+    "Chest_LightBlue.mdx",
+    "Chest_Legendary.mdx",
+    "ChestOrangeRunes1.blp",
+    "ChestOrangeRunes2.blp",
+    "StormfallRed.mdx",
+    "ssw1.mdx",
+)
+wing_fallback = root / "maps" / "_wing_src"
+for name in wing_names:
+    source = wing_source / name
+    if source.is_file():
+        datas.append((str(source), "maps/" + wing_source.name))
+    else:
+        datas.append((str(wing_fallback / name), "maps/_wing_src"))
+
 doctor_root = root / "tools" / "_devos-map-doctor" / "devos-map-doctor-main"
 doctor_destination = "tools/_devos-map-doctor/devos-map-doctor-main"
 for source in doctor_root.rglob("*"):
@@ -110,9 +191,7 @@ for source in doctor_root.rglob("*"):
     relative = source.relative_to(doctor_root)
     if (
         any(part.startswith(".") or part == "__pycache__" for part in relative.parts)
-        or relative.parts[0] not in {
-            "assets", "doctor", "docs", "externos", "native",
-        }
+        or relative.parts[0] not in {"assets", "doctor", "native"}
         and relative.as_posix() != "DevosMapDoctor.py"
     ):
         continue

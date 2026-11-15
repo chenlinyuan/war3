@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "name": "burning-wrath",
+  "title": "燃烧之怒v烈焰降临（更新）",
+  "source_sha256": "1ccd780a0c151921a62be3f458de9aa6cb722b77c1d4fd25ae844c2b904212ae",
+  "chapters": [
+    "ransao01.w3x",
+    "ransao02.w3x",
+    "ransao03.w3m",
+    "ransao04.w3x",
+    "ransao05.w3m",
+    "ransao06.w3x",
+    "ransao07.w3x",
+    "ransao08.w3m",
+    "ransao09.w3m",
+    "ransao010.w3m",
+    "ransao011.w3m",
+    "ransao012.w3x",
+    "ransao013.w3x",
+    "ransao014.w3m",
+    "ransao015.w3m",
+    "ransao016.w3m",
+    "ransao017.w3m",
+    "ransao018.w3x",
+    "ransao019.w3m",
+    "ransao020.w3m",
+    "ransao021.w3x",
+    "ransao022.w3m",
+    "ransao023.w3m",
+    "ransao024.w3m",
+    "ransao025.w3x"
+  ],
+  "key_policy": {
+    "default": false,
+    "true": [
+      "0000GS0006",
+      "AFD56",
+      "AKPF85",
+      "ELQSM5",
+      "ELSM5",
+      "ELSM51",
+      "FKKS",
+      "GLM4T",
+      "GYYAB",
+      "JF6521",
+      "KNSX44",
+      "KSFJ521",
+      "LLX62",
+      "MDS122",
+      "MRGG6",
+      "MRYK5",
+      "MS122",
+      "MYY4",
+      "QDXX",
+      "QHAKDD",
+      "QHCS541",
+      "QMJJ1",
+      "RRT55",
+      "SCTSS",
+      "SDHWV3",
+      "SED10",
+      "SMWW33Q",
+      "SMZA4774",
+      "TRRT2",
+      "U5566",
+      "UY6622",
+      "WWE55",
+      "X56F5",
+      "XDD33",
+      "XGF9S",
+      "XHLL7",
+      "XXGTE",
+      "YT696",
+      "ZDS50",
+      "ZHZPP3",
+      "ZLJB741",
+      "ZNU98"
+    ],
+    "false": [
+      "00GS00006",
+      "00S0M06",
+      "GYYABB",
+      "JDOLS5",
+      "MYYY4",
+      "RRYABB",
+      "RSOX255",
+      "SNZA4774",
+      "TMNYY",
+      "TU66B",
+      "URIZZ4",
+      "XHLLL7",
+      "YUTUSZ"
+    ]
+  },
+  "rules": {
+    "main_hero": "udg_ak",
+    "blocked_sentinel_items": [
+      "I67I"
+    ]
+  },
+  "object_rules": {
+    "permanent_artifact_charges": {
+      "extension": "w3t",
+      "field": "iuse",
+      "value": 0,
+      "item_ids": [
+        "I60M",
+        "I60N",
+        "I60Q",
+        "I66T",
+        "I66Z"
+      ]
+    }
+  },
+  "backpack_switch": {
+    "ability_ids": [
+      "A63G"
+    ],
+    "source": "切换背包(B)",
+    "object_fields": [
+      "uabi"
+    ],
+    "runtime_grants": [
+      "UnitAddAbilityBJ",
+      "UnitMakeAbilityPermanent"
+    ]
+  },
+  "intentional_failure_paths_preserved": [
+    "Protected objective and escort failures authored by the campaign",
+    "Defeat when the campaign main hero dies",
+    "Timed encounter failures"
+  ],
+  "runtime_tests": [
+    "Claim every purchased pet, artifact, skin, and stat redeem item.",
+    "Confirm companion and pet deaths do not defeat the player.",
+    "Confirm the authored main-hero defeat still occurs.",
+    "Verify TU66B does not delete a mainline boss and I67I cannot skip progression.",
+    "Complete representative chapters and verify GO transitions and final cinematics."
+  ]
+}

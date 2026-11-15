@@ -21,7 +21,6 @@ hashtable fr_soul_source_table = null
 hashtable fr_soul_timer_table = null
 hashtable fr_cooldown_table = null
 hashtable fr_active_fx_table = null
-hashtable fr_cast_guard_table = null
 integer fr_ground_count = 0
 item array fr_ground_items
 integer array fr_ground_keys
@@ -52,7 +51,6 @@ real FR_NOVA_CHANCE = 0.30
 real FR_ACTIVE_LIFE_COST = 0.20
 real FR_ACTIVE_MANA_COST = 100.0
 real FR_ACTIVE_COOLDOWN = 10.0
-real FR_CAST_GUARD_SECONDS = 9.5
 real FR_SOUL_NORMAL_CHANCE = 0.05
 real FR_SOUL_HERO_CHANCE = 0.50
 
@@ -698,8 +696,6 @@ endfunction
 
 function FR_OnStompCast takes nothing returns nothing
     local unit caster = GetTriggerUnit()
-    local integer unitKey
-    local real now
     if GetSpellAbilityId() != FR_SPELL_ID then
         return
     endif
@@ -707,13 +703,6 @@ function FR_OnStompCast takes nothing returns nothing
         set caster = null
         return
     endif
-    set unitKey = GetHandleId(caster)
-    set now = TimerGetElapsed(fr_clock)
-    if now < LoadReal(fr_cast_guard_table, unitKey, 0) then
-        set caster = null
-        return
-    endif
-    call SaveReal(fr_cast_guard_table, unitKey, 0, TimerGetElapsed(fr_clock) + FR_CAST_GUARD_SECONDS)
     call FR_CastStomp(caster)
     set caster = null
 endfunction
@@ -731,7 +720,6 @@ function FR_Init takes nothing returns nothing
     set fr_soul_timer_table = InitHashtable()
     set fr_cooldown_table = InitHashtable()
     set fr_active_fx_table = InitHashtable()
-    set fr_cast_guard_table = InitHashtable()
     set fr_clock = CreateTimer()
     call TimerStart(fr_clock, 8640000.0, false, function FR_NoOp)
     set fr_world = GetWorldBounds()
@@ -753,7 +741,6 @@ function FR_Init takes nothing returns nothing
     call TriggerAddAction(fr_attack_trigger, function FR_OnAttack)
 
     set fr_spell_trigger = CreateTrigger()
-    call TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_CAST)
     call TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_EFFECT)
     call TriggerAddAction(fr_spell_trigger, function FR_OnStompCast)
 

@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "name": "warsong-phantom",
+  "title": "战歌魅影-斧王之怒",
+  "source_sha256": "f7c868b92afe5d3f74c84b996bfdb34255355a16d86a60bd6b617012dfa3ba5c",
+  "chapters": [
+    "Human01.w3m",
+    "HumanX01.w3x",
+    "baiyanggu.w3m",
+    "dianyingfujia.w3x",
+    "duizhan.w3x",
+    "eling.w3x",
+    "elingqis.w3x",
+    "fangshou.w3m",
+    "fuben.w3x",
+    "jianshenger.w3x",
+    "jianshengerc.w3m",
+    "jianshengyi.w3m",
+    "jijie.w3m",
+    "mengjinger.w3x",
+    "siwzyi.w3x",
+    "zhangedian.w3x",
+    "zhangedianying.w3x",
+    "zhangesanbo.w3x",
+    "zhangeyi.w3m"
+  ],
+  "key_policy": {
+    "default": false,
+    "true": [
+      "CWDAWUYAO",
+      "CWEMLSA",
+      "CWGUANYUB",
+      "CWGUEDD",
+      "CWSBNIUR",
+      "CWSQDAWB",
+      "CWXINWA",
+      "CWZWANGLL",
+      "DHJBZLISS",
+      "DHJFLLSS",
+      "DHMUCMJSS",
+      "SBBQ",
+      "WQTDD",
+      "WQWWZB",
+      "WQZZSYO"
+    ],
+    "false": []
+  },
+  "rules": {
+    "license_cleanup": {
+      "chapters": [
+        "Human01.w3m",
+        "HumanX01.w3x",
+        "baiyanggu.w3m",
+        "duizhan.w3x",
+        "elingqis.w3x",
+        "fangshou.w3m",
+        "fuben.w3x",
+        "jianshenger.w3x",
+        "siwzyi.w3x",
+        "zhangesanbo.w3x",
+        "zhangeyi.w3m"
+      ],
+      "keys": [
+        "SBBQ",
+        "WQTDD",
+        "WQWWZB",
+        "WQZZSYO",
+        "CWDAWUYAO",
+        "CWEMLSA",
+        "CWGUEDD",
+        "CWGUANYUB",
+        "CWSBNIUR",
+        "CWXINWA",
+        "CWZWANGLL"
+      ],
+      "expected_count_per_chapter": 11
+    },
+    "main_hero_death": {
+      "main_hero": "udg_zhange",
+      "chapters": [
+        "Human01.w3m",
+        "HumanX01.w3x",
+        "baiyanggu.w3m",
+        "elingqis.w3x",
+        "fuben.w3x",
+        "jianshenger.w3x",
+        "zhangeyi.w3m"
+      ],
+      "expected_count_per_chapter": 1
+    },
+    "extra_pet_food": {
+      "chapters": [
+        "jianshenger.w3x"
+      ],
+      "unit_type": "H62F",
+      "food_unit": "earc",
+      "expected_count_per_chapter": 1
+    },
+    "fangshou_deathwing_cleanup": {
+      "chapters": [
+        "fangshou.w3m"
+      ],
+      "unit": "gg_unit_U60H_0127",
+      "dependent_triggers": [
+        "gg_trg_dafanwe______________u",
+        "gg_trg_xiaznasog"
+      ],
+      "expected_count_per_chapter": 1
+    }
+  },
+  "intentional_failure_paths_preserved": [
+    "baiyanggu: Ewrd and Etyr objective deaths",
+    "baiyanggu: enemies entering the rear camp",
+    "fangshou: n60L or n60M dying before the objective is complete",
+    "fuben: the protected enemy entering its destination region",
+    "jianshenger: the protected NPC life-loss objective and enemy-clan violation",
+    "siwzyi: the protected enemy crossing into the camp",
+    "All chapters: defeat when udg_zhange dies"
+  ],
+  "platform_native_families": [
+    "DzAPI_Map_GetMapLevel",
+    "DzAPI_Map_HasMallItem",
+    "DzAPI_GetStoredInteger",
+    "DzAPI_Map_IsMapTest"
+  ],
+  "compatibility_container": {
+    "donor_sha256": "7c173ff6b8a89740950dc9f4f4dd0866631ea403f7bfff2f72e9b89f9c9ea748",
+    "search_paths": [
+      "H:\\Games\\War3\\Campaigns\\dz\\_singleplayer_work\\_replaced\\20261115-warsong-final\\alas 战歌魅影-斧王之怒.w3n",
+      "C:\\Users\\Administrator\\Documents\\Warcraft III\\Campaigns\\alas 战歌魅影-斧王之怒.w3n"
+    ],
+    "replace_entries": [
+      "war3map.j",
+      "war3map.w3i",
+      "war3map.w3a",
+      "war3map.w3t",
+      "war3map.w3u",
+      "war3map.w3h",
+      "war3map.w3d",
+      "war3map.w3b",
+      "war3map.w3q",
+      "war3map.doo",
+      "war3map.mmp",
+      "war3mapMisc.txt"
+    ]
+  },
+  "backpack_switch": {
+    "ability_ids": [
+      "A6B7"
+    ],
+    "source": "马甲背包切换 / 切换背包(B)",
+    "object_fields": [
+      "uabi"
+    ],
+    "runtime_grants": [
+      "UnitAddAbilityBJ",
+      "UnitMakeAbilityPermanent"
+    ]
+  },
+  "expected_static_results": {
+    "active_license_cleanup": 0,
+    "generic_player_hero_death_defeats": 0,
+    "extra_pet_food_false_defeats": 0,
+    "unexpected_mall_keys": 0
+  },
+  "runtime_tests": [
+    "Confirm purchased pets and equipment can still be redeemed.",
+    "Let a non-main companion or pet die and confirm no defeat or army wipe occurs after the 5/10 second checks.",
+    "Kill udg_zhange and confirm the authored main-hero defeat still occurs.",
+    "In jianshenger, obtain or use H62F and confirm no defeat two seconds later.",
+    "Confirm no 请勿作弊开外挂 warning or whole-army cleanup appears.",
+    "Complete representative chapters and confirm normal chapter transitions or final cinematic return."
+  ]
+}

@@ -40,7 +40,11 @@ import war3mpq as W  # noqa: E402
 PY = sys.executable
 WING_DIR = ROOT / "scripts" / "wings"
 KNOWN_GARITHOS_SKIP_FIX = b"ALAS_GARITHOS_DWARF_SKIP_FIX"
-TALENT_CACHE_MARKER = b"ALAS_TALENT_CACHE_V1"
+TALENT_CACHE_MARKER = b"ALAS_TALENT_CACHE_V2"
+OLD_TALENT_CACHE_MARKER = b"ALAS_TALENT_CACHE_V1"
+CAMPAIGN_CACHE_AUDIT_MARKER = b"ALAS_CAMPAIGN_CACHE_AUDIT_V2"
+PREVIOUS_NATIVE_CAMPAIGN_STATE_MARKER = b"ALAS_NATIVE_CAMPAIGN_STATE_V1"
+NATIVE_CAMPAIGN_STATE_MARKER = b"ALAS_NATIVE_TALENT_SNAPSHOT_V1"
 
 
 def run(args: list[object], env: dict[str, str] | None = None) -> None:
@@ -169,9 +173,10 @@ def _split_jass_args(data: bytes) -> list[bytes]:
     return args
 
 
-def _append_talent_cache_call(
+def _with_calls_around(
     line: bytes,
-    call: bytes,
+    before_calls: tuple[bytes, ...],
+    after_calls: tuple[bytes, ...],
 ) -> bytes:
     if line.endswith(b"\r\n"):
         body, ending = line[:-2], b"\r\n"
@@ -180,7 +185,43 @@ def _append_talent_cache_call(
     else:
         body, ending = line, b"\r\n"
     indent = re.match(rb"[ \t]*", body).group(0)
-    return body + ending + indent + call + ending
+    output = bytearray()
+    for call in before_calls:
+        output.extend(indent + call + ending)
+    output.extend(body + ending)
+    for call in after_calls:
+        output.extend(indent + call + ending)
+    return bytes(output)
+
+
+def _append_talent_cache_call(line: bytes, call: bytes) -> bytes:
+    return _with_calls_around(line, (), (call,))
+
+
+def _replace_call_result(
+    line: bytes,
+    function_name: bytes,
+    result_global: bytes,
+) -> bytes:
+    pattern = re.compile(
+        rb"(?<![A-Za-z0-9_])call(\s+)"
+        + re.escape(function_name)
+        + rb"\s*\("
+    )
+    replacement = (
+        b"set "
+        + result_global
+        + b" =\\1"
+        + function_name
+        + b"("
+    )
+    replaced, count = pattern.subn(replacement, line, count=1)
+    if count != 1:
+        raise ValueError(
+            "cannot capture result of "
+            + function_name.decode("ascii", "replace")
+        )
+    return replaced
 
 
 def _is_call_suffix(suffix: bytes) -> bool:
@@ -191,14 +232,42 @@ def _is_call_suffix(suffix: bytes) -> bool:
 def patch_campaign_talent_cache(
     script: bytes,
 ) -> tuple[bytes, dict[str, int]]:
-    """Mirror talent state into the campaign's unit game cache."""
-    if TALENT_CACHE_MARKER in script:
+    """Normalize talent abilities before native campaign unit storage."""
+    if NATIVE_CAMPAIGN_STATE_MARKER in script:
         return script, {
-            "store": script.count(b"call TT_CampaignStore("),
-            "restore": script.count(b"call TT_CampaignRestore("),
+            "normalize": script.count(
+                b"call TT_CampaignNormalizeUnitForStore("
+            ),
+            "snapshot_store": script.count(
+                b"call TT_CampaignStoreTalentSnapshot("
+            ),
+            "snapshot_restore": script.count(
+                b"call TT_CampaignRestoreTalentSnapshot("
+            ),
+            "audit_store": script.count(b"call TT_CampaignAuditStore("),
+            "restore_probe": script.count(
+                b"call TT_CampaignAuditRestoreProbe("
+            ),
+            "save": script.count(b"call TT_CampaignAuditSave("),
         }
+    if (
+        OLD_TALENT_CACHE_MARKER in script
+        or CAMPAIGN_CACHE_AUDIT_MARKER in script
+        or PREVIOUS_NATIVE_CAMPAIGN_STATE_MARKER in script
+    ):
+        raise ValueError(
+            "campaign already uses an older campaign-state injection; "
+            "rebuild from a clean source"
+        )
     output = []
-    counts = {"store": 0, "restore": 0}
+    counts = {
+        "normalize": 0,
+        "snapshot_store": 0,
+        "snapshot_restore": 0,
+        "audit_store": 0,
+        "restore_probe": 0,
+        "save": 0,
+    }
     restore_names = (
         b"RestoreUnitLocFacingAngleBJ",
         b"RestoreUnitLocFacingPointBJ",
@@ -211,19 +280,44 @@ def patch_campaign_talent_cache(
             args, suffix = store
             if args and len(args) >= 4 and _is_call_suffix(suffix):
                 unit = args[0]
+                key = args[1]
+                mission = args[2]
                 cache = args[3]
+                result_line = _replace_call_result(
+                    line,
+                    b"StoreUnitBJ",
+                    b"TT_CAMPAIGN_STORE_RESULT",
+                )
                 output[-1:] = [
-                    _append_talent_cache_call(
-                        line,
-                        b"call TT_CampaignStore("
-                        + unit
-                        + b", "
-                        + cache
-                        + b") // "
-                        + TALENT_CACHE_MARKER,
+                    _with_calls_around(
+                        result_line,
+                        (),
+                        (
+                            b"call TT_CampaignStoreTalentSnapshot("
+                            + unit
+                            + b", "
+                            + cache
+                            + b", "
+                            + mission
+                            + b", "
+                            + key
+                            + b") // "
+                            + NATIVE_CAMPAIGN_STATE_MARKER,
+                            b"call TT_CampaignAuditStore("
+                            + unit
+                            + b", "
+                            + cache
+                            + b", "
+                            + key
+                            + b", "
+                            + mission
+                            + b", TT_CAMPAIGN_STORE_RESULT) // "
+                            + CAMPAIGN_CACHE_AUDIT_MARKER,
+                        ),
                     )
                 ]
-                counts["store"] += 1
+                counts["snapshot_store"] += 1
+                counts["audit_store"] += 1
                 continue
         for name in restore_names:
             restore = _find_jass_call(line, name)
@@ -231,19 +325,58 @@ def patch_campaign_talent_cache(
                 continue
             args, suffix = restore
             if args and len(args) >= 3 and _is_call_suffix(suffix):
+                key = args[0]
+                mission = args[1]
                 cache = args[2]
                 output[-1:] = [
-                    _append_talent_cache_call(
+                    _with_calls_around(
                         line,
-                        b"call TT_CampaignRestore("
-                        b"GetLastRestoredUnitBJ(), "
-                        + cache
-                        + b") // "
-                        + TALENT_CACHE_MARKER,
+                        (
+                            b"call TT_CampaignAuditRestoreProbe("
+                            + cache
+                            + b", "
+                            + mission
+                            + b", "
+                            + key
+                            + b") // "
+                            + CAMPAIGN_CACHE_AUDIT_MARKER,
+                        ),
+                        (
+                            b"call TT_CampaignRestoreTalentSnapshot("
+                            b"GetLastRestoredUnitBJ(), "
+                            + cache
+                            + b", "
+                            + mission
+                            + b", "
+                            + key
+                            + b") // "
+                            + NATIVE_CAMPAIGN_STATE_MARKER,
+                        ),
                     )
                 ]
-                counts["restore"] += 1
+                counts["restore_probe"] += 1
+                counts["snapshot_restore"] += 1
             break
+        save = _find_jass_call(line, b"SaveGameCacheBJ")
+        if save is not None:
+            args, suffix = save
+            if args and len(args) == 1 and _is_call_suffix(suffix):
+                cache = args[0]
+                result_line = _replace_call_result(
+                    line,
+                    b"SaveGameCacheBJ",
+                    b"TT_CAMPAIGN_SAVE_RESULT",
+                )
+                output[-1:] = [
+                    _append_talent_cache_call(
+                        result_line,
+                        b"call TT_CampaignAuditSave("
+                        + cache
+                        + b", TT_CAMPAIGN_SAVE_RESULT) // "
+                        + CAMPAIGN_CACHE_AUDIT_MARKER,
+                    )
+                ]
+                counts["save"] += 1
     return b"".join(output), counts
 
 
@@ -253,12 +386,7 @@ def has_campaign_talent_cache(script_dir: Path) -> bool:
         if not path.is_file():
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        if (
-            "function TT_CampaignStore takes unit u, gamecache cache"
-            in text
-            and "function TT_CampaignRestore takes unit u, gamecache cache"
-            in text
-        ):
+        if "function TT_CampaignNormalizeUnitForStore takes unit u" in text:
             return True
     return False
 
@@ -393,8 +521,21 @@ def validate_chapter(
             )
         if talent_cache_counts is not None:
             for marker in (
-                b"function TT_CampaignStore takes unit u, gamecache cache",
-                b"function TT_CampaignRestore takes unit u, gamecache cache",
+                b"function TT_CampaignNormalizeUnitForStore takes unit u",
+                b"function TT_CampaignStoreTalentSnapshot takes unit u, gamecache cache,",
+                b"function TT_CampaignRestoreTalentSnapshot takes unit u, gamecache cache,",
+                b"function TT_CampaignAuditAbilities takes unit u, string phase",
+                b"function TT_CampaignAuditStore takes unit u,",
+                b"function TT_CampaignAuditRestoreProbe takes gamecache cache,",
+                b"function TT_CampaignAuditSave takes gamecache cache,",
+                b"event=CAMPAIGN_NATIVE_NORMALIZE",
+                b"event=CAMPAIGN_TALENT_SNAPSHOT_STORE",
+                b"event=CAMPAIGN_TALENT_SNAPSHOT_RESTORE",
+                b"event=CAMPAIGN_TALENT_SNAPSHOT_MISSING",
+                b"event=CAMPAIGN_STORE_AUDIT",
+                b"event=CAMPAIGN_STORE_ABILITY",
+                b"event=CAMPAIGN_RESTORE_PROBE",
+                b"event=CAMPAIGN_CACHE_SAVE",
             ):
                 if marker not in script:
                     raise SystemExit(
@@ -402,18 +543,45 @@ def validate_chapter(
                         % (path.name, marker)
                     )
             for marker, expected in (
-                (b"call TT_CampaignStore(", talent_cache_counts["store"]),
                 (
-                    b"call TT_CampaignRestore(",
-                    talent_cache_counts["restore"],
+                    b"call TT_CampaignNormalizeUnitForStore(",
+                    talent_cache_counts["normalize"],
+                ),
+                (
+                    b"call TT_CampaignStoreTalentSnapshot(",
+                    talent_cache_counts["snapshot_store"],
+                ),
+                (
+                    b"call TT_CampaignRestoreTalentSnapshot(",
+                    talent_cache_counts["snapshot_restore"],
+                ),
+                (
+                    b"call TT_CampaignAuditStore(",
+                    talent_cache_counts["audit_store"],
+                ),
+                (
+                    b"call TT_CampaignAuditRestoreProbe(",
+                    talent_cache_counts["restore_probe"],
+                ),
+                (
+                    b"call TT_CampaignAuditSave(",
+                    talent_cache_counts["save"],
                 ),
             ):
                 actual = script.count(marker)
                 if actual < expected:
                     raise SystemExit(
-                        "%s has %d campaign talent cache calls; expected %d"
+                        "%s has %d native campaign state calls; expected %d"
                         % (path.name, actual, expected)
                     )
+            if b"call TT_CampaignStore(" in script:
+                raise SystemExit(
+                    "%s still calls the legacy TT_CampaignStore" % path.name
+                )
+            if b"call TT_CampaignRestore(" in script:
+                raise SystemExit(
+                    "%s still calls the legacy TT_CampaignRestore" % path.name
+                )
         item_active = ITEM.selected_equipment_mode() == "item"
         mode_value = b"true" if item_active else b"false"
         for mode_name in (
@@ -502,9 +670,10 @@ def build(args: argparse.Namespace) -> int:
     extra_objects: dict[str, list[Path]] = {}
     for spec in args.extra_object:
         extension, separator, source_text = spec.partition("=")
-        if not separator or extension not in ("w3a", "w3t", "w3h"):
+        if not separator or extension not in ("w3a", "w3t", "w3h", "w3u"):
             raise SystemExit(
-                "--extra-object must be w3a=PATH, w3t=PATH, or w3h=PATH"
+                "--extra-object must be w3a=PATH, w3t=PATH, w3h=PATH, "
+                "or w3u=PATH"
             )
         path = Path(source_text).resolve()
         if not path.is_file():
@@ -537,7 +706,10 @@ def build(args: argparse.Namespace) -> int:
         raise SystemExit(
             "preserve source not found: " + str(preserve_source)
         )
-    config_path = HERE / (config + ".py")
+    config_dir = Path(
+        __import__("os").environ.get("ALAS_UNITIDS_DIR", str(HERE))
+    )
+    config_path = config_dir / (config + ".py")
     if not config_path.is_file():
         raise SystemExit("campaign wing config not found: " + str(config_path))
     if work.exists() and any(work.iterdir()):
@@ -679,6 +851,15 @@ def build(args: argparse.Namespace) -> int:
                 "campaign loot profiles missing chapters: "
                 + ", ".join(sorted(missing_profiles))
             )
+        assets.extend(campaign_loot.assets)
+    loot_asset_names = (
+        {
+            internal.casefold()
+            for _local, internal in campaign_loot.assets
+        }
+        if campaign_loot is not None
+        else set()
+    )
     combined_dir = work / "_combined_objects"
     combined_dir.mkdir(parents=True, exist_ok=True)
     combined_sources = {}
@@ -695,6 +876,11 @@ def build(args: argparse.Namespace) -> int:
         inputs.append(HERE / wing_name)
         if extension in extra_objects:
             inputs.extend(extra_objects[extension])
+        if (
+            campaign_loot is not None
+            and extension in campaign_loot.object_sources
+        ):
+            inputs.append(campaign_loot.object_sources[extension])
         combined = combined_dir / ("combined." + extension)
         M.merge_files(
             str(combined), [str(path) for path in inputs]
@@ -712,11 +898,11 @@ def build(args: argparse.Namespace) -> int:
         )
         archive = W.MPQArchive(str(chapter))
         try:
-            present = {
-                internal.lower()
-                for _path, internal in assets
-                if archive.read_file(internal)
-            }
+            present = {}
+            for _path, internal in assets:
+                data = archive.read_file(internal)
+                if data:
+                    present[internal.casefold()] = data
         finally:
             archive.close()
 
@@ -755,28 +941,37 @@ def build(args: argparse.Namespace) -> int:
                     b"RestoreUnitBJ",
                 )
             )
+            expected_save = source_script.count(b"SaveGameCacheBJ")
             if (
-                expected_store != talent_cache_counts["store"]
-                or expected_restore != talent_cache_counts["restore"]
+                expected_store != talent_cache_counts["snapshot_store"]
+                or expected_store != talent_cache_counts["audit_store"]
+                or expected_restore
+                != talent_cache_counts["restore_probe"]
+                or expected_save != talent_cache_counts["save"]
             ):
                 raise SystemExit(
                     "%s campaign talent cache calls were not patched "
-                    "exactly: expected store/restore %d/%d, got %d/%d"
+                    "exactly: expected snapshot/store-probe/save %d/%d/%d, "
+                    "got %d/%d/%d; audit store/probe %d/%d"
                     % (
                         chapter.name,
                         expected_store,
                         expected_restore,
-                        talent_cache_counts["store"],
-                        talent_cache_counts["restore"],
+                        expected_save,
+                        talent_cache_counts["snapshot_store"],
+                        talent_cache_counts["restore_probe"],
+                        talent_cache_counts["save"],
+                        talent_cache_counts["audit_store"],
+                        talent_cache_counts["restore_probe"],
                     )
                 )
             if expected_store or expected_restore:
                 print(
-                    "talent campaign cache %s: store=%d restore=%d"
+                    "native campaign state %s: snapshot-store=%d restore-probe=%d"
                     % (
                         chapter.name,
-                        talent_cache_counts["store"],
-                        talent_cache_counts["restore"],
+                        talent_cache_counts["snapshot_store"],
+                        talent_cache_counts["restore_probe"],
                     ),
                     flush=True,
                 )
@@ -808,6 +1003,15 @@ def build(args: argparse.Namespace) -> int:
             inject += ["--file", "%s=%s" % (local, internal)]
         for local, internal in assets:
             if internal.lower() in present:
+                if (
+                    internal.casefold() in loot_asset_names
+                    and present[internal.casefold()] != local.read_bytes()
+                ):
+                    print(
+                        "%s preserves chapter-local asset variant: %s"
+                        % (chapter.name, internal),
+                        flush=True,
+                    )
                 continue
             inject += [
                 "--file", "%s=%s" % (local, internal),

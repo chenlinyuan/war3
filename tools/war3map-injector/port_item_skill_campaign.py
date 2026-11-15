@@ -75,7 +75,7 @@ SOURCE_WEAPON_ABILITY_IDS = {
 }
 WEAPON_ABILITY_IDS = SOURCE_WEAPON_ABILITY_IDS | {"A117", "A118", "A171"}
 ITEM_NAMES = {
-    "I103": "阿克蒙德之手",
+    "I103": "魔神之握",
     "I105": "霜之哀伤",
     "I106": "埃辛诺斯战刃",
 }
@@ -135,18 +135,18 @@ SILENT_HIT_IMPACT_PATH = (
 WARGLAIVE_ITEM_TOOLTIP = (
     "|cffff8c00神器|r|n|n"
     "+15 敏捷|n"
-    "|cff5ddf26攻击速度随敏捷提升：敏捷×0.5%，最低 15%，最高 200%。|r|n"
+    "攻击速度 +100%。|n"
     "|cff5ddf26顺劈：你的近战基础攻击会造成顺劈效果，"
     "将造成伤害的 15% 转嫁给附近敌方单位。|r|n"
     "|cff5ddf26邪魂淬炼：基础攻击有 2% 几率永久提升 1 点敏捷。"
-    "不设上限。|r|n"
+    "|r|n"
     "|cff66ccff装备后获得技能：雷霆冲锋（C）。|r|n|n"
     "|cffffcc00这是卡多雷强大而可怖的恶魔猎手的标志性武器。"
     "刃锋经过邪能锻造，至今仍燃烧着永不熄灭的邪焰。|r"
 )
 WARGLAIVE_ITEM_DESCRIPTION = (
     "敏捷 +15。|n"
-    "|cff5ddf26攻击速度随敏捷提升：敏捷×0.5%，最低 15%，最高 200%。|r|n"
+    "攻击速度 +100%。|n"
     "|cff5ddf26顺劈：近战基础攻击会把 15% 伤害转嫁给附近敌人。|r|n"
     "|cff5ddf26邪魂淬炼：基础攻击有 2% 概率永久提升 1 点敏捷。|r|n"
     "|cff66ccff装备后获得技能：雷霆冲锋（C）。|r"
@@ -240,9 +240,13 @@ def read_objects(archive: W.MPQArchive, name: str, with_levels: bool):
     version, entries, consumed = OBJ.read_objects_bytes(
         data, with_levels, fname=name, with_end=True
     )
-    if consumed != len(data):
-        raise SystemExit("%s: object parser consumed %d of %d bytes" %
-                         (name, consumed, len(data)))
+    trailing = data[consumed:]
+    if trailing.strip(b"\0"):
+        raise SystemExit(
+            "%s: object parser found %d non-zero trailing bytes after "
+            "consuming %d of %d bytes"
+            % (name, len(trailing), consumed, len(data))
+        )
     return version, entries
 
 
@@ -413,7 +417,7 @@ def read_objects_from_path(path: Path, ext: str):
     version, entries, consumed = OBJ.read_objects_bytes(
         data, ext in ("w3a", "w3q"), fname=path.name, with_end=True
     )
-    if consumed != len(data):
+    if data[consumed:].strip(b"\0"):
         raise SystemExit("%s: trailing object bytes" % path)
     return version, entries
 
@@ -676,7 +680,6 @@ def prepare_jass_command_scripts(
         "        if GetUnitAbilityLevel(u, 'A116') > 0 then\n"
         "            call UnitRemoveAbility(u, 'A116')\n"
         "        endif\n"
-        "        call WGL_SyncAttackSpeed(u)\n"
         "        return\n"
         "    endif\n"
     )
@@ -1330,8 +1333,8 @@ def patch_warglaive_sources(sources: dict[str, Path]) -> None:
             "utip": "埃辛诺斯战刃",
             "utub": WARGLAIVE_ITEM_TOOLTIP,
             "ides": WARGLAIVE_ITEM_DESCRIPTION,
-            "iabi": f"{WGL.SPELLBOOK_ID},Aclq",
-            "icid": WGL.SPELLBOOK_ID,
+            "iabi": "A110,A111,Aclq",
+            "icid": "",
             "iico": DEMON_WARGLAIVE_ICON,
             "ifil": "Chest_Legendary.mdx",
         },
@@ -1362,9 +1365,6 @@ def patch_warglaive_sources(sources: dict[str, Path]) -> None:
             in WGL.warglaive_attack_speed_mods()
         ],
     )
-    set_object_mod_value(
-        sources["w3a"], "w3a", "A116", "aite", 0, 0, 1
-    )
     replace_object_mod_values(
         sources["w3a"],
         "w3a",
@@ -1383,8 +1383,8 @@ def patch_warglaive_sources(sources: dict[str, Path]) -> None:
     )
     item_fields = {mod[0]: mod[4] for mod in item[3]}
     expected_item = {
-        "iabi": f"{WGL.SPELLBOOK_ID},Aclq",
-        "icid": WGL.SPELLBOOK_ID,
+        "iabi": "A110,A111,Aclq",
+        "icid": "",
         "iico": DEMON_WARGLAIVE_ICON,
         "ifil": "Chest_Legendary.mdx",
         "ides": WARGLAIVE_ITEM_DESCRIPTION,
@@ -1446,7 +1446,7 @@ def patch_frostmourne_source(sources: dict[str, Path]) -> None:
     add_custom_ability(
         sources["w3a"],
         "A105",
-        "ANcl",
+        "AOws",
         [
             ability_mod("anam", 3, "冰封践踏"),
             ability_mod("aart", 3, FROSTMOURNE_ACTIVE_ICON),
@@ -1461,17 +1461,19 @@ def patch_frostmourne_source(sources: dict[str, Path]) -> None:
             ability_mod("alev", 0, 1),
             ability_mod("aite", 0, 0),
             ability_mod("aher", 0, 0),
-            ability_mod("Ncl1", 2, 0.0, level=1, column=1),
-            ability_mod("Ncl2", 0, 0, level=1, column=2),
-            ability_mod("Ncl3", 0, 1, level=1, column=3),
-            ability_mod("Ncl4", 2, 0.0, level=1, column=4),
-            ability_mod("Ncl5", 0, 0, level=1, column=5),
-            ability_mod("Ncl6", 3, "froststomp", level=1, column=6),
+            ability_mod("atar", 3, "air,ground,enemy,neutral,vulnerable", level=1),
+            ability_mod("aare", 2, 250.0, level=1),
+            ability_mod("Wrs1", 2, 0.0, level=1, column=1),
+            ability_mod("adur", 2, 0.0, level=1),
+            ability_mod("ahdu", 2, 0.0, level=1),
+            ability_mod("abuf", 3, "", level=1),
             ability_mod("acdn", 2, 10.0, level=1),
             ability_mod("amcs", 0, 100, level=1),
             ability_mod("acat", 3, ""),
             ability_mod("arpx", 0, 2),
             ability_mod("aubx", 0, 1),
+            ability_mod("abpx", 0, 2),
+            ability_mod("abpy", 0, 1),
         ],
     )
     add_custom_ability(
@@ -1964,10 +1966,32 @@ def validate_managed_chapter_objects(
     for ident in ("A105", "A113"):
         if ident not in abilities:
             raise SystemExit("missing managed ability " + ident)
-    if abilities["A105"][0] != "ANcl":
-        raise SystemExit("A105 does not use the managed instant base")
+    if abilities["A105"][0] != "AOws":
+        raise SystemExit("A105 must use the non-Channel War Stomp shell")
     if abilities["A113"][0] != "ANcl":
         raise SystemExit("A113 does not use the managed charge base")
+    a105_fields = {
+        mod[0]: mod[4] for mod in abilities["A105"][1]
+    }
+    if (
+        field_values(abilities["A105"][1], "aord")[-1]
+        != "froststomp"
+    ):
+        raise SystemExit("A105 must use its independent froststomp order")
+    for field_id in ("Ncl1", "Ncl2", "Ncl3", "Ncl4", "Ncl5", "Ncl6"):
+        if field_id in a105_fields:
+            raise SystemExit(
+                "A105 must not retain Channel field " + field_id
+            )
+    if abs(float(a105_fields.get("Wrs1", -1))) > 0.0001:
+        raise SystemExit("A105 native War Stomp damage must remain zero")
+    if (
+        abs(float(a105_fields.get("adur", -1))) > 0.0001
+        or abs(float(a105_fields.get("ahdu", -1))) > 0.0001
+    ):
+        raise SystemExit("A105 native War Stomp stun must remain zero")
+    if a105_fields.get("abuf") != b"":
+        raise SystemExit("A105 must clear the native War Stomp buff")
     expected_aite = 0
     for ident in ("A100", "A105", "A113"):
         fields = {
@@ -1978,21 +2002,44 @@ def validate_managed_chapter_objects(
                 "%s.aite=%r, expected %d"
                 % (ident, fields.get("aite"), expected_aite)
             )
-    spellbook_fields = {
-        mod[0]: mod[4] for mod in abilities["A116"][1]
-    }
-    if int(spellbook_fields.get("aite", -1)) != 1:
-        raise SystemExit("A116 must remain an internal item spellbook")
     for ident in (
         "A101", "A102", "W091",
         "A106", "A108", "A109",
-        "A110", "A111",
+        "A110",
     ):
         fields = {
             mod[0]: mod[4] for mod in abilities[ident][1]
         }
         if int(fields.get("aite", -1)) != 1:
             raise SystemExit(ident + " must remain an item passive")
+    a111_fields = {
+        mod[0]: mod[4] for mod in abilities["A111"][1]
+    }
+    if int(a111_fields.get("aite", -1)) != 1:
+        raise SystemExit("A111 must be an item passive")
+    if int(a111_fields.get("alev", -1)) != 1:
+        raise SystemExit("A111 must contain one attack-speed level")
+    a111_levels = [
+        mod for mod in abilities["A111"][1] if mod[0] == "Isx1"
+    ]
+    if len(a111_levels) != 1 or any(
+        mod[1] != 2 for mod in a111_levels
+    ):
+        raise SystemExit("A111.Isx1 must use one unreal level")
+    if abs(float(a111_levels[0][4]) - 1.0) > 0.0001:
+        raise SystemExit("A111.Isx1 must be +100%")
+    i106_text = {
+        field_id: field_values(items["I106"][1], field_id)
+        for field_id in ("utub", "ides")
+    }
+    for field_id, values in i106_text.items():
+        text = values[-1] if values else ""
+        if "攻击速度 +100%" not in text:
+            raise SystemExit(
+                "I106." + field_id + " lost the fixed +100% attack speed"
+            )
+        if "不设上限" in text:
+            raise SystemExit("I106." + field_id + " still says 不设上限")
     for ident in ("A100", "A105", "A113"):
         fields = {mod[0]: mod[4] for mod in abilities[ident][1]}
         if fields.get("abpx") != 2 or fields.get("abpy") != 1:
@@ -2162,6 +2209,30 @@ def validate_chapter(
                 "%s: artifact pickup does not add the Warglaive ability"
                 % chapter.name
             )
+        for stale in (
+            b"fr_cast_guard_table",
+            b"FR_CAST_GUARD_SECONDS",
+            b"TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_CAST)",
+        ):
+            if stale in script:
+                raise SystemExit(
+                    "%s: obsolete Frostmourne restriction remains: %s"
+                    % (chapter.name, stale.decode("ascii"))
+                )
+        for required in (
+            b"TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_EFFECT)",
+            b"TimerStart(t, 0.05, false, WGL_DeferredSync)",
+        ):
+            if required not in script:
+                raise SystemExit(
+                    "%s: equipment runtime token is missing: %s"
+                    % (chapter.name, required.decode("ascii"))
+                )
+        if script.count(b"WGL_ScheduleSync(u)") < 2:
+            raise SystemExit(
+                "%s: equipment deferred sync call is missing"
+                % chapter.name
+            )
     finally:
         archive.close()
 
@@ -2263,14 +2334,20 @@ def main() -> int:
     extra_objects: dict[str, list[Path]] = {}
     for spec in args.extra_object:
         extension, separator, source_text = spec.partition("=")
-        if not separator or extension not in ("w3a", "w3t", "w3h"):
+        if not separator or extension not in ("w3a", "w3t", "w3h", "w3u"):
             raise SystemExit(
-                "--extra-object must be w3a=PATH, w3t=PATH, or w3h=PATH"
+                "--extra-object must be w3a=PATH, w3t=PATH, w3h=PATH, "
+                "or w3u=PATH"
             )
         path = Path(source_text).resolve()
         if not path.is_file():
             raise SystemExit("extra object file missing: " + str(path))
         extra_objects.setdefault(extension, []).append(path)
+    campaign_loot = None
+    if args.campaign_loot_manifest:
+        campaign_loot = WILD_DROPS.load_campaign_manifest(
+            args.campaign_loot_manifest.resolve()
+        )
     sources = {
         "w3a": [
             wing_sources["hand_w3a"],
@@ -2287,6 +2364,9 @@ def main() -> int:
     }
     for extension, paths in extra_objects.items():
         sources[extension].extend(paths)
+    if campaign_loot is not None:
+        for extension, path in campaign_loot.object_sources.items():
+            sources[extension].append(path)
     expected_objects = {
         ext: set().union(*(object_ids(path, ext) for path in paths))
         for ext, paths in sources.items()
@@ -2295,11 +2375,8 @@ def main() -> int:
     print("tables: %d items, %d skills" % (item_count, skill_count))
     browser_dir = prepare_browser(work, expected_objects["w3a"])
     assets = make_assets(work)
-    campaign_loot = None
-    if args.campaign_loot_manifest:
-        campaign_loot = WILD_DROPS.load_campaign_manifest(
-            args.campaign_loot_manifest.resolve()
-        )
+    if campaign_loot is not None:
+        assets.extend(campaign_loot.assets)
     extra_scripts: dict[str, Path] = {}
     if args.extra_lua_script_manifest:
         manifest_path = args.extra_lua_script_manifest.resolve()
@@ -2382,6 +2459,25 @@ def main() -> int:
     for chapter in chapters:
         chapter_key = CAMP.chapter_key(base, chapter)
         item_active = chapter_uses_item_actives(chapter)
+        chapter_assets = list(assets)
+        if campaign_loot is not None and campaign_loot.assets:
+            source_archive = W.MPQArchive(str(chapter))
+            try:
+                for local, internal in campaign_loot.assets:
+                    existing = source_archive.read_file(internal)
+                    if existing and existing != local.read_bytes():
+                        chapter_assets = [
+                            item
+                            for item in chapter_assets
+                            if item[1].casefold() != internal.casefold()
+                        ]
+                        print(
+                            "%s preserves chapter-local asset variant: %s"
+                            % (chapter_key, internal),
+                            flush=True,
+                        )
+            finally:
+                source_archive.close()
         if item_active:
             item_active_chapters += 1
         print(
@@ -2431,7 +2527,13 @@ def main() -> int:
                     "%s: universal talent Lua init is not guarded"
                     % chapter.name
                 )
-        inject_chapter(chapter, target, module, merged, assets)
+        inject_chapter(
+            chapter,
+            target,
+            module,
+            merged,
+            chapter_assets,
+        )
         validate_chapter(
             target,
             expected_objects,

@@ -133,7 +133,17 @@ def extract_objects(map_path, out_dir):
     return got
 
 
-def prepare_item_browser(work_dir, cfg_module, cfg, src_path=None):
+def prepare_item_browser(
+    work_dir,
+    cfg_module,
+    cfg,
+    src_path=None,
+    *,
+    item_catalog=None,
+    include_alas_extras=True,
+    include_skills=True,
+    include_game_units=True,
+):
     """给目标图做一份物品浏览器副本。
 
     表 = 游戏标准物品/技能（collect_items / collect_skills 从游戏数据里取）
@@ -149,7 +159,23 @@ def prepare_item_browser(work_dir, cfg_module, cfg, src_path=None):
         shutil.copy2(os.path.join(src, fn), os.path.join(dst, fn))
     env = {"WINGS_CONFIG": cfg_module, "IB_OUT_DIR": dst, "IB_EXTRA_DIR": work_dir,
            "IB_BASE_DIR": work_dir,
-           "IB_FINGER_ABILITY": cfg.HAND["finger"], "IB_CRIT_ABILITY": cfg.HAND["crit"]}
+           "IB_FINGER_ABILITY": (
+               cfg.HAND["finger"] if cfg is not None else "A000"
+           ),
+           "IB_CRIT_ABILITY": (
+               cfg.HAND["crit"] if cfg is not None else "A000"
+           )}
+    if item_catalog:
+        env["ALAS_ITEM_CATALOG"] = str(item_catalog)
+    env["ALAS_ITEM_UNION_CATALOG"] = "1"
+    item_only = (
+        item_catalog is not None
+        and not include_alas_extras
+        and not include_skills
+        and not include_game_units
+    )
+    if item_only:
+        env["IB_ITEMS_ONLY"] = "1"
     # 0) 把目标图自己的对象数据/SLK 摊到 <work>/_ibsrc（collect_* 按 war3map.* 名字找）
     if src_path:
         stage = os.path.join(work_dir, "_ibsrc")
@@ -173,20 +199,27 @@ def prepare_item_browser(work_dir, cfg_module, cfg, src_path=None):
                 outp = os.path.join(stage, internal.replace("\\", os.sep))
                 os.makedirs(os.path.dirname(outp), exist_ok=True)
                 open(outp, "wb").write(data)
-        run([PY, os.path.join(HERE, "collect_items.py")], env=env)
+        run([
+            PY,
+            os.path.join(HERE, "collect_items.py"),
+            stage,
+        ], env=env)
         run([PY, os.path.join(HERE, "collect_map_items.py"), stage], env=env)
-        run([PY, os.path.join(HERE, "collect_skills.py"), stage], env=env)
+        if include_skills:
+            run([PY, os.path.join(HERE, "collect_skills.py"), stage], env=env)
         run([PY, os.path.join(HERE, "gen_slk_tables.py"), stage], env=env)
     # 1) 本系统自己注入的东西（地图里扫不到）-> <work>/_itemids_extra.txt
-    run([PY, os.path.join(HERE, "gen_ib_extras.py"), work_dir], env=env)
+    if include_alas_extras:
+        run([PY, os.path.join(HERE, "gen_ib_extras.py"), work_dir], env=env)
     # 1b) **单位表**（`addunit` / `listunit` 用）：游戏标准单位清单，与目标图无关。
     #     ⚠ 这里以前没做 —— 战役移植那条"默认没有单位表"的记录就是这个原因。
     #     已经有现成的就用现成的（没有才现场从游戏数据里生成）。
     tbl = os.path.join(work_dir, "_unitids.txt")
-    if not os.path.exists(tbl):
-        if not os.path.exists(os.path.join(HERE, "_unitids.txt")):
+    if include_game_units and not os.path.exists(tbl):
+        unitids_dir = os.environ.get("ALAS_UNITIDS_DIR") or HERE
+        std = os.path.join(unitids_dir, "_unitids.txt")
+        if not os.path.exists(std):
             run([PY, os.path.join(HERE, "collect_game_units.py")], env=env)
-        std = os.path.join(HERE, "_unitids.txt")
         if os.path.exists(std):
             shutil.copy2(std, tbl)
             print("   单位表 -> %s（%d 行）" % (tbl, sum(1 for _ in open(tbl, encoding="utf-8"))))

@@ -639,8 +639,6 @@ endfunction
 
 function FR_OnStompCast takes nothing returns nothing
     local unit caster = GetTriggerUnit()
-    local integer unitKey
-    local real now
     if GetSpellAbilityId() != FR_SPELL_ID then
         return
     endif
@@ -648,13 +646,6 @@ function FR_OnStompCast takes nothing returns nothing
         set caster = null
         return
     endif
-    set unitKey = GetHandleId(caster)
-    set now = TimerGetElapsed(fr_clock)
-    if now < LoadReal(fr_cast_guard_table, unitKey, 0) then
-        set caster = null
-        return
-    endif
-    call SaveReal(fr_cast_guard_table, unitKey, 0, TimerGetElapsed(fr_clock) + FR_CAST_GUARD_SECONDS)
     call FR_CastStomp(caster)
     set caster = null
 endfunction
@@ -672,7 +663,6 @@ function FR_Init takes nothing returns nothing
     set fr_soul_timer_table = InitHashtable()
     set fr_cooldown_table = InitHashtable()
     set fr_active_fx_table = InitHashtable()
-    set fr_cast_guard_table = InitHashtable()
     set fr_clock = CreateTimer()
     call TimerStart(fr_clock, 8640000.0, false, function FR_NoOp)
     set fr_world = GetWorldBounds()
@@ -694,7 +684,6 @@ function FR_Init takes nothing returns nothing
     call TriggerAddAction(fr_attack_trigger, function FR_OnAttack)
 
     set fr_spell_trigger = CreateTrigger()
-    call TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_CAST)
     call TriggerRegisterAnyUnitEventBJ(fr_spell_trigger, EVENT_PLAYER_UNIT_SPELL_EFFECT)
     call TriggerAddAction(fr_spell_trigger, function FR_OnStompCast)
 

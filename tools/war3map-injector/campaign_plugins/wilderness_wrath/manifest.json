@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "name": "wilderness-wrath",
+  "title": "荒野之怒",
+  "source_sha256": "762675a812e20bc45fbe52cc56bf5ca0145fb9813fee5e68a585b11c77b0c141",
+  "chapters": [
+    "cs.w3m",
+    "kuaitu01.w3x",
+    "kuaitu010.w3m",
+    "kuaitu011.w3m",
+    "kuaitu012.w3m",
+    "kuaitu013.w3m",
+    "kuaitu014.w3m",
+    "kuaitu015.w3m",
+    "kuaitu016.w3x",
+    "kuaitu017.w3x",
+    "kuaitu018.w3x",
+    "kuaitu019.w3x",
+    "kuaitu02.w3x",
+    "kuaitu03.w3x",
+    "kuaitu04.w3x",
+    "kuaitu05.w3m",
+    "kuaitu06.w3m",
+    "kuaitu07.w3x",
+    "kuaitu08.w3x",
+    "kuaitu09.w3m"
+  ],
+  "key_policy": {
+    "default": false,
+    "true": [
+      "0000GS0007",
+      "ZJP555",
+      "MM652",
+      "DW898",
+      "FCZS7",
+      "LLZW1",
+      "GNSM5",
+      "HDS19",
+      "SYMM1",
+      "LSZW2",
+      "FAS66",
+      "ARF874",
+      "TH574",
+      "AYZC4",
+      "DFJ60",
+      "ZS698",
+      "CWSB2",
+      "YEZ150",
+      "YEZ350",
+      "SGZD8"
+    ],
+    "false": [
+      "YEZ500",
+      "SSE660",
+      "SX015",
+      "T6DS",
+      "S6S5D",
+      "QQ5564R",
+      "WS6S6S",
+      "SSD99R",
+      "Y55TT",
+      "QS2250",
+      "WW56SZZ",
+      "W5S9",
+      "YSZT",
+      "E6D66",
+      "H5J4L",
+      "HD8D2",
+      "WEE9C"
+    ]
+  },
+  "backpack_switch": {
+    "ability_ids": [
+      "A60Q"
+    ],
+    "source": "切换背包(B)",
+    "object_fields": [
+      "uabi",
+      "spb1"
+    ]
+  },
+  "object_rules": {
+    "permanent_artifact_charges": {
+      "extension": "w3t",
+      "field": "iuse",
+      "value": 0,
+      "item_ids": [
+        "I66I",
+        "I66J",
+        "I66K",
+        "I66L",
+        "I66M",
+        "I66N",
+        "I66O",
+        "I66P"
+      ]
+    }
+  },
+  "shared_rule_families": [
+    "platform native stubs and explicit mall whitelist",
+    "mall entitlement army cleanup neutralization",
+    "generic hero-death and pet-death false-defeat narrowing",
+    "GO chat literal registration and mall predicate removal",
+    "platform sentinel and duplicate-item exit removal",
+    "cache handoff validation and final cinematic cleanup"
+  ],
+  "expected_static_results": {
+    "source_chapters": 20,
+    "mass_cleanup_after_patch": 0,
+    "platform_sentinel_exits": 0,
+    "final_cinematic_cleanup_required": true
+  },
+  "runtime_tests": [
+    "Enter representative story, defense, dungeon, and final chapters.",
+    "Confirm purchased redeem items still work.",
+    "Confirm GO advances completed chapters.",
+    "Confirm protected NPC deaths, camp breaches, and main-hero death still fail as authored."
+  ]
+}

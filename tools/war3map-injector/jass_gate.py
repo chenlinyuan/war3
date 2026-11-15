@@ -39,11 +39,18 @@ def _tool():
 def _ref(tool, data=b""):
     """参考脚本目录：优先 Doctor 的 1.24，取不到才退回 JassCraft 自带的旧版。"""
     version = os.environ.get("JASS_REF_VERSION", "1.24").strip()
-    ref = os.path.join(
+    doctor = os.path.join(
         BASE, "tools", "_devos-map-doctor", "devos-map-doctor-main",
-        "doctor", "ref", version,
     )
-    return ref if os.path.exists(os.path.join(ref, "common.j")) else tool
+    candidates = (
+        os.path.join(doctor, "doctor", "ref", version),
+        os.path.join(doctor, "externos", "ref", version),
+        os.path.join(doctor, "externos", "wc3_versoes", "ref", version),
+    )
+    for ref in candidates:
+        if os.path.exists(os.path.join(ref, "common.j")):
+            return ref
+    return tool
 
 
 def _diagnostics(path, tool, ref):

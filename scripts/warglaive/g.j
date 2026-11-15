@@ -1,4 +1,5 @@
 
+    boolean WGL_ITEM_ACTIVE = false
     boolean WGL_INITED = false
     trigger WGL_CAST_TRIGGER = null
     trigger WGL_ORDER_TRIGGER = null
@@ -10,13 +11,8 @@
     hashtable WGL_STACK_TIMER_HT = null
     hashtable WGL_COOLDOWN_HT = null
     hashtable WGL_GROWTH_HT = null
-    trigger WGL_ATTACK_SPEED_TRIGGER = null
+    hashtable WGL_DEFERRED_HT = null
     timer WGL_COOLDOWN_CLOCK = null
-    real WGL_ATTACK_SPEED_AGI_MULT = 0.005
-    real WGL_ATTACK_SPEED_MIN = 0.15
-    real WGL_ATTACK_SPEED_MAX = 2.0
-    real WGL_ATTACK_SPEED_STEP = 0.05
-    integer WGL_ATTACK_SPEED_LEVELS = 38
     integer WGL_GROWTH_CHANCE_PERCENT = 2
     real WGL_GROWTH_ATTACK_GUARD = 0.12
     real WGL_CHARGE_BASE_DISTANCE = 100.0

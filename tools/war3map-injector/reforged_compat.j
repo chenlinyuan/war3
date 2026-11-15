@@ -112,6 +112,14 @@ function BlzGetUnitAbility takes unit whichUnit, integer abilId returns ability
     return null
 endfunction
 
+function BlzGetUnitAbilityByIndex takes unit whichUnit, integer index returns ability
+    return null
+endfunction
+
+function BlzGetAbilityId takes ability whichAbility returns integer
+    return 0
+endfunction
+
 function BlzSetAbilityStringLevelField takes ability whichAbility, integer whichField, integer level, string value returns boolean
     return false
 endfunction
@@ -128,6 +136,14 @@ function BlzUnitItemInEquipmentSlot takes unit whichUnit, integer loadoutSlot re
     return null
 endfunction
 
+function UnitExtendedInventorySize takes unit whichUnit returns integer
+    return 0
+endfunction
+
+function UnitItemInBagSlot takes unit whichUnit, integer itemSlot returns item
+    return null
+endfunction
+
 function BlzGetItemAbility takes item whichItem, integer abilCode returns ability
     return null
 endfunction
@@ -136,8 +152,19 @@ function BlzSetAbilityRealLevelField takes ability whichAbility, integer whichFi
     return false
 endfunction
 
+function BlzGetAbilityRealLevelField takes ability whichAbility, integer whichField, integer level returns real
+    return 0.0
+endfunction
+
 function BlzSetAbilityIntegerLevelField takes ability whichAbility, integer whichField, integer level, integer value returns boolean
     return false
+endfunction
+
+function BlzGetUnitAttackCooldown takes unit whichUnit, integer weaponIndex returns real
+    return 0.0
+endfunction
+
+function BlzSetUnitAttackCooldown takes unit whichUnit, real cooldown, integer weaponIndex returns nothing
 endfunction
 
 function BlzIsUnitInvulnerable takes unit whichUnit returns boolean

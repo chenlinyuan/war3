@@ -10,6 +10,7 @@
 import re, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+OUT_DIR = os.environ.get("ALAS_UNITIDS_DIR") or HERE
 GAME_UNITS = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units"
 
 UNIT_STRINGS = [
@@ -88,7 +89,8 @@ def main():
             for k, v in parse_strings(p).items():
                 names[k] = v
 
-    out = os.path.join(HERE, "_unitids.txt")
+    os.makedirs(OUT_DIR, exist_ok=True)
+    out = os.path.join(OUT_DIR, "_unitids.txt")
     n = 0
     with open(out, "w", encoding="utf-8") as fh:
         for uid in sorted(ids):

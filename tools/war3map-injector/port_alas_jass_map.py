@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +28,13 @@ DEFAULT_OBJECT_SOURCE = (
     ROOT / "maps" / "port" / "lost_temple_30"
     / "LostTempleLV_BladeMaster30.w3x"
 )
+
+
+def force_writable(path: Path) -> None:
+    try:
+        path.chmod(path.stat().st_mode | stat.S_IWRITE)
+    except OSError:
+        pass
 
 
 def read_script(archive) -> tuple[str, bytes, bytes]:
@@ -169,6 +177,7 @@ def build_lua_map(
     )
     env = dict(__import__("os").environ)
     env["WINGS_CONFIG"] = config_name
+    env["ALAS_REPORT_DIR"] = str(work / "inject-report")
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
 
@@ -332,8 +341,12 @@ def build(args: argparse.Namespace) -> int:
             base_script = work / "_base_no_source_backpack.j"
             base_script.write_bytes(jass.replace(source_call, b""))
     config_name = args.config
-    if not (HERE / (config_name + ".py")).is_file():
-        raise SystemExit("map wing config not found: " + config_name)
+    config_dir = Path(
+        __import__("os").environ.get("ALAS_UNITIDS_DIR", str(HERE))
+    )
+    config_path = config_dir / (config_name + ".py")
+    if not config_path.is_file():
+        raise SystemExit("map wing config not found: " + str(config_path))
     config = importlib.import_module(config_name)
     weapon_ids = getattr(
         config, "WEAPONS",
@@ -341,6 +354,7 @@ def build(args: argparse.Namespace) -> int:
     )
     env = dict(__import__("os").environ)
     env["WINGS_CONFIG"] = config_name
+    env["ALAS_REPORT_DIR"] = str(work / "inject-report")
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
 
@@ -420,7 +434,9 @@ def build(args: argparse.Namespace) -> int:
     script_dirs.extend(Path(path).resolve() for path in args.extra_script)
     P.check_script_clash(str(source), [str(path) for path in script_dirs])
     output.parent.mkdir(parents=True, exist_ok=True)
+    force_writable(output)
     shutil.copy2(source, output)
+    force_writable(output)
     inject = [
         PY, HERE / "inject_native.py", output, "--no-backup",
         "--script-internal", script_internal,

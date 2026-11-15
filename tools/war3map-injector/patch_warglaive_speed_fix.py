@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Move Warglaive A111 from item ownership to a hidden item-class hero ability."""
+"""Legacy A133 Soul-Chase experiment; not the current LostTemple requirement.
+
+The maintained Warglaive behavior keeps A111's agility-scaled 15%..200%
+attack speed. Use patch_losttemple_equipment_regressions.py for the current
+two-stage pickup sync and Frostmourne cast-guard removal.
+"""
 
 from __future__ import annotations
 

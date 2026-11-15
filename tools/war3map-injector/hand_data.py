@@ -135,8 +135,11 @@ def _canonical_hand_text(text, skill_line, soul_line, keep_lore):
     """统一阿克蒙德之手说明：被动、装备技能、剧情，剧情固定放最后。"""
     lore = ""
     if keep_lore:
-        marker = "|cffffcc00阿克蒙德"
-        position = text.find(marker)
+        position = -1
+        for marker in ("|cffffcc00魔神", "|cffffcc00阿克蒙德"):
+            position = text.find(marker)
+            if position >= 0:
+                break
         if position >= 0:
             lore = text[position:]
             text = text[:position]
@@ -244,6 +247,11 @@ def build(out_w3t, out_w3a, cfg=None):
                 mods2[i] = (mid, t, lv, col, description)
             elif mid == "unam" and t == 3 and item_name:
                 mods2[i] = (mid, t, lv, col, item_name)
+            elif mid == "utip" and t == 3 and item_name:
+                item_title = re.sub(
+                    r"\|c[0-9a-fA-F]{8}", "", item_name
+                ).replace("|r", "")
+                mods2[i] = (mid, t, lv, col, item_title)
         soul_line = ""
         if int(common.get("hand_soul_gain", 1) or 0) > 0:
             elite_chance = int(common.get("hand_soul_elite_chance", 25))
@@ -275,6 +283,27 @@ def build(out_w3t, out_w3a, cfg=None):
             #   带"物理/万能法术"标记 + 多档冷却/耗魔），模板里这条 Chain Lightning
             #   版本直接丢掉，免得同一个 ID 出现两份。
             continue
+        if new == TPL_SPEED:
+            icon = (
+                r"ReplaceableTextures\CommandButtons"
+                r"\BTNArchimondeHand_30HD.blp"
+            )
+            out_cust.append((
+                "AIi1",
+                mapping[TPL_SPEED],
+                [
+                    ("anam", 3, 0, 0, "智力加成"),
+                    ("atp1", 3, 1, 0, "智力 +30"),
+                    ("aub1", 3, 1, 0, "永久提高 30 点智力。"),
+                    ("aart", 3, 0, 0, icon),
+                    ("arar", 3, 0, 0, icon),
+                    ("alev", 0, 0, 0, 1),
+                    ("aite", 0, 0, 0, 1),
+                    ("aher", 0, 0, 0, 0),
+                    ("Iint", 0, 1, 2, 30),
+                ],
+            ))
+            continue
         new2 = mapping.get(new, new)
         mods2 = []
         for mid, t, lv, col, val in mods:
@@ -289,7 +318,7 @@ def build(out_w3t, out_w3a, cfg=None):
         out_cust.append((old, new2, mods2))
     write_entries(out_w3a, ver, orig, out_cust)
 
-    print("阿克蒙德之手: 物品 %s, 死亡之指 %s, 光环 %s, 攻速 %s, 暴击 %s"
+    print("魔神之握: 物品 %s, 死亡之指 %s, 光环 %s, 智力 %s, 暴击 %s"
           % (hand["item"], hand["finger"], hand["aura"], hand["speed"], hand["crit"]))
     return mapping
 

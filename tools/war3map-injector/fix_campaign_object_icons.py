@@ -128,12 +128,26 @@ def disabled_base(filename):
 
 def disabled_candidates(path):
     folder, filename = os.path.split(path)
+    upper = filename.upper()
     disabled = disabled_base(filename)
     same_folder = (folder + "\\" + disabled) if folder else disabled
-    return [
+    same_folder_plain = (
+        (folder + "\\DIS" + filename) if folder else "DIS" + filename
+    )
+    same_folder_btn = (
+        same_folder
+        if upper.startswith("BTN")
+        else (folder + "\\DISBTN" + filename if folder else "DISBTN" + filename)
+    )
+    command_folder = "ReplaceableTextures\\CommandButtonsDisabled\\"
+    return list(dict.fromkeys([
+        same_folder_plain,
+        same_folder_btn,
         same_folder,
-        "ReplaceableTextures\\CommandButtonsDisabled\\" + disabled,
-    ]
+        command_folder + "DIS" + filename,
+        command_folder + "DISBTN" + filename,
+        command_folder + disabled,
+    ]))
 
 
 def inspect_disabled_states(files, path):
@@ -221,20 +235,31 @@ def build_patch(campaign):
                 by_icon[original].append((ext, object_id, field, value))
 
         existing = {path: inspect_disabled_states(files, path) for path in by_icon}
-        missing = [path for path, found in existing.items() if not found]
         patches = []
         patch_names = {}
-        for path in sorted(missing):
+        queued = set()
+        for path in sorted(by_icon):
+            aliases = [
+                alias
+                for alias in disabled_candidates(path)
+                if not files.exists(alias)
+                and alias.lower() not in queued
+            ]
+            if not aliases:
+                continue
             original_data = files.read(path)
             if not original_data:
                 raise ValueError("cannot read icon: " + path)
-            disabled_data = darken_icon(original_data)
-            aliases = []
-            for alias in disabled_candidates(path):
-                if files.exists(alias):
-                    continue
-                aliases.append(alias)
+            try:
+                disabled_data = darken_icon(original_data)
+            except Exception:
+                # Some legacy BLP variants cannot be decoded by Pillow.  A
+                # direct copy still prevents the UI from showing a green
+                # missing-icon square, even though it is not darkened.
+                disabled_data = original_data
+            for alias in aliases:
                 patches.append((alias, disabled_data))
+                queued.add(alias.lower())
             patch_names[path] = aliases
         return refs, by_icon, existing, patch_names, patches
     finally:
@@ -253,11 +278,21 @@ def verify_patch(campaign, by_icon, patch_names):
                 bad.append((original, "missing disabled icon"))
                 continue
             data = files.read(found[0])
-            if not data or data[:4] != b"BLP1":
-                bad.append((original, "not BLP1"))
+            if not data or data[:4] not in (b"BLP1", b"BLP2"):
+                bad.append((original, "not BLP1/BLP2"))
                 continue
-            content, alpha, width, height, _mips = struct.unpack_from("<IIIII", data, 4)
-            if content != 1 or alpha != 8 or (width, height) != (64, 64):
+            if data[:4] != b"BLP1":
+                continue
+            content, alpha, width, height, _mips = struct.unpack_from(
+                "<IIIII", data, 4
+            )
+            if content not in (0, 1):
+                bad.append((original, "unsupported BLP1 content=%d" % content))
+                continue
+            # JPEG-content BLPs may be original non-64 px source art used as a
+            # safe fallback when palette conversion is impossible.  Generated
+            # palette icons must remain the standard 64x64 UI size.
+            if content == 1 and (width, height) != (64, 64):
                 bad.append((original, "bad BLP1 header content=%d alpha=%d size=%dx%d"
                             % (content, alpha, width, height)))
         return bad

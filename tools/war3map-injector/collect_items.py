@@ -13,7 +13,7 @@ GAME_SLK = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemdata.slk"
 # 游戏自带的物品名称（本地化中文），用于没有地图 itemfunc.txt 的官方地图
 GAME_ITEMSTRINGS = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemstrings.txt"
 GAME_ITEMFUNC = r"H:\Games\War3\ojzrqpjb\share\mpq\units\units\itemfunc.txt"
-BUNDLED_ITEM_CATALOG = os.path.join(
+BUNDLED_ITEM_CATALOG = os.environ.get("ALAS_ITEM_CATALOG") or os.path.join(
     REPO, "tools", "alas-offline", "assets", "game_item_catalog.tsv"
 )
 
@@ -197,12 +197,18 @@ def main():
                 names[iid] = nm
         print("game itemstrings.txt names:", len(names))
 
-    if map_slk_path and os.path.isfile(map_slk_path):
+    union_catalog = os.environ.get("ALAS_ITEM_UNION_CATALOG") == "1"
+    if map_slk_path and os.path.isfile(map_slk_path) and not union_catalog:
         creatable = parse_slk(map_slk_path)
         print("map itemdata.slk (creatable):", len(creatable))
     elif bundled:
         creatable = [iid for _flag, iid, _nm in bundled]
         print("using bundled offline item catalog:", len(creatable))
+        if map_slk_path and os.path.isfile(map_slk_path):
+            for iid in parse_slk(map_slk_path):
+                if iid not in creatable:
+                    creatable.append(iid)
+            print("after adding map itemdata.slk:", len(creatable))
         for iid, _ in w3t_items:
             if iid not in creatable:
                 creatable.append(iid)

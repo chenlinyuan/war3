@@ -158,6 +158,31 @@ def level_values(
     return {}
 
 
+def function_source(
+    script: str, name: str, lua_data: bool
+) -> str:
+    """Return one top-level function body for Lua or JASS."""
+    if lua_data:
+        start_match = re.search(
+            rf"(?m)^function {re.escape(name)}\(", script
+        )
+        if not start_match:
+            return ""
+        end_match = re.search(
+            r"(?m)^end[ \t]*(?:\r?\n|$)",
+            script[start_match.start():],
+        )
+        if not end_match:
+            return ""
+        return script[
+            start_match.start():start_match.start() + end_match.end()
+        ]
+
+    start = script.find(f"function {name} takes")
+    end = script.find("endfunction", start)
+    return script[start:end] if start >= 0 and end >= 0 else ""
+
+
 def lua_runtime_failures(name: str, script: str) -> list[str]:
     failures = []
     required = (
@@ -175,8 +200,8 @@ def lua_runtime_failures(name: str, script: str) -> list[str]:
         "function WGL_AddChargeStack(",
         "function WGL_StackTick()",
         "function WGL_OnGrowthAttack()",
-        "function WGL_SyncAttackSpeed(",
         "function WGL_SyncUnit(",
+        "function ALAS_GrantArtifact(",
         "function WG_IsFingerSoulTarget(",
         "function WG_FingerSoulChance(",
         "function WG_IsExclusiveArtifact(",
@@ -194,7 +219,6 @@ def lua_runtime_failures(name: str, script: str) -> list[str]:
     required_text = (
         "FR_SOUL_NORMAL_CHANCE = 0.05",
         "FR_SOUL_HERO_CHANCE = 0.50",
-        "FR_CAST_GUARD_SECONDS = 9.5",
         "WGL_CHARGE_BASE_DISTANCE = 100.0",
         "WGL_CHARGE_AGI_MULT = 10.0",
         "WGL_CHARGE_MAX_DISTANCE = 2000.0",
@@ -209,7 +233,6 @@ def lua_runtime_failures(name: str, script: str) -> list[str]:
         "StormfallRed.mdx",
         "war3campImported\\\\DemonBoltImpactSilent.mdx",
         "Abilities\\\\Spells\\\\Human\\\\ThunderClap\\\\ThunderClapCaster.wav",
-        "EVENT_PLAYER_UNIT_SPELL_CAST",
         "EVENT_PLAYER_UNIT_SPELL_EFFECT",
         "EVENT_PLAYER_UNIT_ISSUED_POINT_ORDER",
         "EVENT_PLAYER_HERO_LEVEL",
@@ -260,17 +283,20 @@ def lua_runtime_failures(name: str, script: str) -> list[str]:
     for token in obsolete:
         if token in script:
             failures.append(f"{name}: obsolete Lua token {token!r}")
-    add_start = script.find("function IB_AddGive")
-    add_end = script.find("function IB_AddStep", add_start)
-    if add_start < 0 or add_end < 0:
+    add_path = function_source(script, "IB_AddGive", True)
+    if not add_path:
         failures.append(f"{name}: item browser add path is missing")
-    elif "WGL_SyncUnit(u)" not in script[add_start:add_end]:
+    elif "ALAS_GrantArtifact(u, GetItemTypeId(it))" not in add_path:
         failures.append(
-            f"{name}: item browser add path does not sync the Warglaive"
+            f"{name}: item browser add path does not grant the artifact skill"
         )
-    if script.count("local addedWarglaive = false") != 1:
+    if "TriggerSleepAction(" in add_path:
         failures.append(
-            f"{name}: item browser Warglaive sync local is not unique"
+            f"{name}: item browser add path still uses a blocking delay"
+        )
+    if script.count("function ALAS_GrantArtifact(") != 1:
+        failures.append(
+            f"{name}: artifact grant helper is not unique"
         )
     pickup_start = script.find("function WG_OnArtifactPickup()")
     pickup_end = script.find("function ", pickup_start + 1)
@@ -431,10 +457,16 @@ def audit(
             for entry in menu_maps:
                 for field in ("chapter", "title"):
                     value = str(entry.get(field, "")).strip()
-                    if not value or value.upper().startswith("TRIGSTR_"):
+                    if value.upper().startswith("TRIGSTR_"):
                         failures.append(
                             f"{entry.get('file', '?')}: unresolved {field}"
                         )
+                chapter = str(entry.get("chapter", "")).strip()
+                title = str(entry.get("title", "")).strip()
+                if not chapter and not title:
+                    failures.append(
+                        f"{entry.get('file', '?')}: empty chapter and title"
+                    )
 
         for name in chapters:
             data = outer.read_file(name)
@@ -504,26 +536,48 @@ def audit(
                         "FR_ITEM_ACTIVE",
                         "WGL_ITEM_ACTIVE",
                     ):
-                        expected_mode = (
-                            f"boolean {mode_name} = {mode_value}"
-                        )
+                        if lua_data:
+                            expected_mode = f"{mode_name} = {mode_value}"
+                        else:
+                            expected_mode = (
+                                f"boolean {mode_name} = {mode_value}"
+                            )
                         if script.count(expected_mode) != 1:
                             failures.append(
                                 f"{name}: wrong {mode_name} ownership mode"
                             )
-                    for function_name, ability_id, check_event in (
-                        ("WG_OnHandItemEvent", "WG_FINGER_ABILITY", True),
-                        ("FR_OnItemDrop", "FR_SPELL_ID", False),
-                        ("WGL_OnItemEvent", "'A113'", True),
+                    for (
+                        function_name,
+                        lua_ability_id,
+                        jass_ability_id,
+                        check_event,
+                    ) in (
+                        (
+                            "WG_OnHandItemEvent",
+                            "WG_FINGER_ABILITY",
+                            "WG_FINGER_ABILITY",
+                            True,
+                        ),
+                        (
+                            "FR_OnItemDrop",
+                            "FR_SPELL_ID",
+                            "FR_SPELL_ID",
+                            False,
+                        ),
+                        (
+                            "WGL_OnItemEvent",
+                            "1093742899",
+                            "'A113'",
+                            True,
+                        ),
                     ):
-                        start = script.find(
-                            f"function {function_name} takes"
+                        body = function_source(
+                            script, function_name, bool(lua_data)
                         )
-                        end = script.find("endfunction", start)
-                        body = (
-                            script[start:end]
-                            if start >= 0 and end >= 0
-                            else ""
+                        ability_id = (
+                            lua_ability_id
+                            if lua_data
+                            else jass_ability_id
                         )
                         if (
                             "GetManipulatedItem()" not in body
@@ -812,10 +866,7 @@ def audit(
                             f"{demon_item_fields.get('idrp')!r}, "
                             "expected 0"
                         )
-                    for marker in (
-                        "function WG_OnAvatarSimple takes",
-                        "function WG_AvatarSimpleExpires takes",
-                        "function WG_OnAvatarDropItem takes",
+                    common_avatar_tokens = (
                         "BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)",
                         "BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, "
                         "WG_AVATAR_DIVINE_DEFENSE)",
@@ -830,20 +881,41 @@ def audit(
                         "SaveItemHandle(wg_avatarTable, key, 10, it)",
                         "SetItemDroppable(it, false)",
                         "SetItemDroppable(it, true)",
-                        "TimerStart(t, WG_AVATAR_DURATION, false, "
-                        "function WG_AvatarSimpleExpires)",
-                        "TriggerAddAction(t, function WG_OnAvatarSimple)",
-                        "real WG_AVATAR_ATTACK_SPEED_PCT = 1.0",
-                        "real WG_AVATAR_MOVE_SPEED_PCT = 1.0",
-                        "real WG_AVATAR_MODEL_SCALE_MULT = 3.0",
                         "UNIT_WEAPON_RF_ATTACK_BASE_COOLDOWN",
                         "BlzGetUnitRealField(u, UNIT_RF_SCALING_VALUE)",
                         "SetUnitScale(u, targetScale, targetScale, targetScale)",
-                        "SetUnitMoveSpeed(u, originalSpeed * "
-                        "(1.0 + WG_AVATAR_MOVE_SPEED_PCT))",
                         "LoadReal(wg_avatarTable, key, 50)",
                         "LoadReal(wg_avatarTable, key, 51)",
-                    ):
+                    )
+                    if lua_data:
+                        avatar_tokens = (
+                            "function WG_OnAvatarSimple()",
+                            "function WG_AvatarSimpleExpires()",
+                            "function WG_OnAvatarDropItem()",
+                            "TimerStart(t, WG_AVATAR_DURATION, false, "
+                            "WG_AvatarSimpleExpires)",
+                            "TriggerAddAction(t, WG_OnAvatarSimple)",
+                            "WG_AVATAR_ATTACK_SPEED_PCT = 1.0",
+                            "WG_AVATAR_MOVE_SPEED_PCT = 1.0",
+                            "WG_AVATAR_MODEL_SCALE_MULT = 3.0",
+                            "SetUnitMoveSpeed(u, (originalSpeed * "
+                            "(1.0 + WG_AVATAR_MOVE_SPEED_PCT)))",
+                        ) + common_avatar_tokens
+                    else:
+                        avatar_tokens = (
+                            "function WG_OnAvatarSimple takes",
+                            "function WG_AvatarSimpleExpires takes",
+                            "function WG_OnAvatarDropItem takes",
+                            "TimerStart(t, WG_AVATAR_DURATION, false, "
+                            "function WG_AvatarSimpleExpires)",
+                            "TriggerAddAction(t, function WG_OnAvatarSimple)",
+                            "real WG_AVATAR_ATTACK_SPEED_PCT = 1.0",
+                            "real WG_AVATAR_MOVE_SPEED_PCT = 1.0",
+                            "real WG_AVATAR_MODEL_SCALE_MULT = 3.0",
+                            "SetUnitMoveSpeed(u, originalSpeed * "
+                            "(1.0 + WG_AVATAR_MOVE_SPEED_PCT))",
+                        ) + common_avatar_tokens
+                    for marker in avatar_tokens:
                         if marker not in script:
                             failures.append(
                                 f"{name}: missing Avatar runtime token "
@@ -907,9 +979,8 @@ def audit(
                         "function WGL_AddChargeStack takes",
                         "function WGL_StackTick takes",
                         "function WGL_OnGrowthAttack takes",
-                        "function WGL_SyncAttackSpeed takes",
-                        "EVENT_PLAYER_HERO_LEVEL",
-                        "SetUnitAbilityLevel(u, 'A111'",
+                        "call WGL_ScheduleSync(u)",
+                        "call TimerStart(t, 0.05, false, function WGL_DeferredSync)",
                         "set stat = GetHeroInt(caster, true)",
                         "integer WG_PLUNDER_ENABLE = 1",
                         "BlzGetEventIsAttack()",
@@ -1001,7 +1072,7 @@ def audit(
                         "UnitDamageTarget(caster, target, dmg, true, false, "
                         "ATTACK_TYPE_CHAOS, DAMAGE_TYPE_UNIVERSAL",
                         "SetHeroInt(caster",
-                        "阿克蒙德之手·夺魂：智力 +1",
+                        "魔神之握·夺魂：智力 +1",
                         "UnitAddAbility(u, WG_FINGER_ABILITY)",
                         "UnitRemoveAbility(u, WG_FINGER_ABILITY)",
                         "BlzGetUnitAbilityCooldownRemaining(u, WG_FINGER_ABILITY)",
@@ -1016,12 +1087,9 @@ def audit(
                         "call FR_FreezeUnit(target, freeze_duration)",
                         "if FR_IsInvulnerable(target) then",
                         "BlzIsUnitInvulnerable(u)",
-                        "EVENT_PLAYER_UNIT_SPELL_CAST",
                         "EVENT_PLAYER_UNIT_SPELL_EFFECT",
                         'SetUnitAnimation(caster, "stand")',
                         "function FR_OnStompCast takes",
-                        "fr_cast_guard_table",
-                        "real FR_CAST_GUARD_SECONDS = 9.5",
                         'FR_ShowTimedEffect("war3campImported\\\\IceStompRaised.mdx"',
                         "call TriggerSleepAction(0.05)",
                         "set bonus = 100.0 + ",
@@ -1109,7 +1177,7 @@ def audit(
                     failures.extend(artifact_copy_failures(
                         hand_tooltip,
                         ("重击", "掠夺", "夺魂"),
-                        "阿克蒙德留下",
+                        "魔神留下",
                         f"{name}: {hand_item}",
                     ))
                     if "智力×25" in hand_tooltip or "冷却" in hand_tooltip:
@@ -1259,9 +1327,9 @@ def audit(
                             f"{name}: {frostmourne_item} still owns an item cooldown"
                         )
                     frost_active_fields = all_ability_fields.get("A105", {})
-                    if ability_origins.get("A105") != "ANcl":
+                    if ability_origins.get("A105") != "AOws":
                         failures.append(
-                            f"{name}: A105 must use the instant Channel base"
+                            f"{name}: A105 must use the non-Channel War Stomp base"
                         )
                     if frost_active_fields.get("aite") != "0":
                         failures.append(f"{name}: A105 is not a hero ability")
@@ -1271,18 +1339,36 @@ def audit(
                         failures.append(
                             f"{name}: A105 Profile order is not froststomp"
                         )
-                    if frost_active_fields.get("Ncl6") != "froststomp":
-                        failures.append(
-                            f"{name}: A105 Channel order is not froststomp"
-                        )
-                    if frost_active_fields.get("Ncl2") != "0":
-                        failures.append(
-                            f"{name}: A105 is not an instant no-target skill"
-                        )
-                    if frost_active_fields.get("Ncl3") != "1":
-                        failures.append(
-                            f"{name}: A105 is hidden on the command card"
-                        )
+                    for channel_field in (
+                        "Ncl1",
+                        "Ncl2",
+                        "Ncl3",
+                        "Ncl4",
+                        "Ncl5",
+                        "Ncl6",
+                    ):
+                        if channel_field in frost_active_fields:
+                            failures.append(
+                                f"{name}: A105 still contains "
+                                f"{channel_field}"
+                            )
+                    for native_field, expected in (
+                        ("Wrs1", "0"),
+                        ("adur", "0"),
+                        ("ahdu", "0"),
+                        ("abuf", ""),
+                    ):
+                        actual = frost_active_fields.get(native_field)
+                        if (
+                            expected == "0"
+                            and actual not in ("0", "0.0")
+                        ) or (
+                            expected == "" and actual != ""
+                        ):
+                            failures.append(
+                                f"{name}: A105 {native_field}="
+                                f"{actual!r}, expected {expected!r}"
+                            )
                     if frost_active_fields.get("acat") != "":
                         failures.append(
                             f"{name}: A105 still has a native cast effect"
@@ -1309,22 +1395,43 @@ def audit(
                         failures.append(
                             f"{name}: Frost Stomp does not separate air slows"
                         )
-                    for token in (
-                        "function FR_IsAliveTarget takes",
+                    common_frost_tokens = (
                         "GetWidgetLife(u) <= 0.405",
                         "not IsUnitType(u, UNIT_TYPE_DEAD)",
-                        "function FR_ApplySlow takes",
-                        "call FR_ApplySlow(GetOwningPlayer(caster), target, slowLevel)",
-                        "call FR_FreezeUnit(target, freeze_duration)",
-                        "function FR_OnFrozenDeath takes",
-                        "call PauseUnit(u, false)",
-                        "call SetUnitTimeScale(u, 1.0)",
-                        "real FR_RING_CORE_RADIUS = 300.0",
-                        "real FR_RING_MID_RADIUS = 550.0",
-                        "real FR_FREEZE_CORE = 6.0",
-                        "real FR_FREEZE_MID = 4.0",
-                        "real FR_FREEZE_OUTER = 2.0",
-                    ):
+                    )
+                    if lua_data:
+                        frost_control_tokens = (
+                            "function FR_IsAliveTarget(u)",
+                            "function FR_ApplySlow(owner, target, level)",
+                            "FR_ApplySlow(GetOwningPlayer(caster), target, "
+                            "slowLevel)",
+                            "FR_FreezeUnit(target, freeze_duration)",
+                            "function FR_OnFrozenDeath()",
+                            "PauseUnit(u, false)",
+                            "SetUnitTimeScale(u, 1.0)",
+                            "FR_RING_CORE_RADIUS = 300.0",
+                            "FR_RING_MID_RADIUS = 550.0",
+                            "FR_FREEZE_CORE = 6.0",
+                            "FR_FREEZE_MID = 4.0",
+                            "FR_FREEZE_OUTER = 2.0",
+                        ) + common_frost_tokens
+                    else:
+                        frost_control_tokens = (
+                            "function FR_IsAliveTarget takes",
+                            "function FR_ApplySlow takes",
+                            "call FR_ApplySlow(GetOwningPlayer(caster), "
+                            "target, slowLevel)",
+                            "call FR_FreezeUnit(target, freeze_duration)",
+                            "function FR_OnFrozenDeath takes",
+                            "call PauseUnit(u, false)",
+                            "call SetUnitTimeScale(u, 1.0)",
+                            "real FR_RING_CORE_RADIUS = 300.0",
+                            "real FR_RING_MID_RADIUS = 550.0",
+                            "real FR_FREEZE_CORE = 6.0",
+                            "real FR_FREEZE_MID = 4.0",
+                            "real FR_FREEZE_OUTER = 2.0",
+                        ) + common_frost_tokens
+                    for token in frost_control_tokens:
                         if token not in script:
                             failures.append(
                                 f"{name}: missing Frost control token {token}"
@@ -1510,13 +1617,13 @@ def audit(
                         )
                     tooltip = item_fields.get("utub", "")
                     description = item_fields.get("ides", "")
-                    if "雷霆冲锋" not in description or "提高攻击速度" in description:
+                    if "雷霆冲锋" not in description or "攻击速度 +100%" not in description:
                         failures.append(
                             f"{name}: I106 description is not the managed tooltip"
                         )
                     failures.extend(artifact_copy_failures(
                         tooltip,
-                        ("攻击速度随敏捷提升", "顺劈", "邪魂淬炼"),
+                        ("顺劈", "邪魂淬炼"),
                         "这是卡多雷",
                         f"{name}: I106",
                     ))
@@ -1541,18 +1648,21 @@ def audit(
                         failures.append(f"{name}: I106 still claims main-hand weapon")
                     if "+15 敏捷" not in tooltip:
                         failures.append(f"{name}: I106 agility is not 15")
-                    if "敏捷×0.5%" not in tooltip:
+                    if "攻击速度 +100%" not in tooltip:
                         failures.append(
-                            f"{name}: I106 attack speed is not agility-scaled"
+                            f"{name}: I106 attack speed is not +100%"
                         )
                     for required in (
                         "2% 几率永久提升 1 点敏捷",
-                        "不设上限",
                     ):
                         if required not in tooltip:
                             failures.append(
                                 f"{name}: I106 growth lacks {required!r}"
                             )
+                    if "不设上限" in tooltip:
+                        failures.append(
+                            f"{name}: I106 growth still says no upper limit"
+                        )
                     if "A112" in ability_origins:
                         failures.append(
                             f"{name}: obsolete corruption orb A112 remains"
@@ -1587,28 +1697,25 @@ def audit(
                         speed_levels = level_values(
                             ability_entries, "A111", "Isx1"
                         )
-                        if len(speed_levels) != 38:
+                        if len(speed_levels) != 1:
                             failures.append(
                                 f"{name}: A111 has {len(speed_levels)} "
                                 "attack-speed levels"
                             )
-                        elif (
-                            abs(float(speed_levels[1]) - 0.15) > 0.0001
-                            or abs(float(speed_levels[38]) - 2.0) > 0.0001
-                        ):
+                        elif abs(float(speed_levels[1]) - 1.0) > 0.0001:
                             failures.append(
-                                f"{name}: A111 range is "
-                                f"{speed_levels[1]}..{speed_levels[38]}"
+                                f"{name}: A111 attack speed is "
+                                f"{speed_levels[1]}, expected 1.0"
                             )
-                        if all_ability_fields["A111"].get("alev") != "38":
+                        if all_ability_fields["A111"].get("alev") != "1":
                             failures.append(
-                                f"{name}: A111.alev is not 38"
+                                f"{name}: A111.alev is not 1"
                             )
-                        if "敏捷×0.5%" not in all_ability_fields["A111"].get(
+                        if "攻击速度 +100%" not in all_ability_fields["A111"].get(
                             "aub1", ""
                         ):
                             failures.append(
-                                f"{name}: A111 lacks agility scaling"
+                                f"{name}: A111 lacks +100% attack speed text"
                             )
                     except (KeyError, TypeError, ValueError) as exc:
                         failures.append(

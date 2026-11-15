@@ -20,7 +20,6 @@ hashtable fr_soul_source_table = null
 hashtable fr_soul_timer_table = null
 hashtable fr_cooldown_table = null
 hashtable fr_active_fx_table = null
-hashtable fr_cast_guard_table = null
 integer fr_ground_count = 0
 item array fr_ground_items
 integer array fr_ground_keys
@@ -51,6 +50,5 @@ real FR_NOVA_CHANCE = 0.30
 real FR_ACTIVE_LIFE_COST = 0.20
 real FR_ACTIVE_MANA_COST = 100.0
 real FR_ACTIVE_COOLDOWN = 10.0
-real FR_CAST_GUARD_SECONDS = 9.5
 real FR_SOUL_NORMAL_CHANCE = 0.05
 real FR_SOUL_HERO_CHANCE = 0.50

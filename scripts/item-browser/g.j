@@ -30,6 +30,11 @@ integer ib_searchStdN = 0
 integer ib_searchCusN = 0
 player ib_searchPlayer = null
 timer ib_searchTimer = null
+integer ib_searchPage = 1
+integer ib_searchPages = 1
+integer ib_searchStdPageN = 0
+integer ib_searchCusPageN = 0
+integer ib_searchPageSize = 15
 
 // 添加状态（分帧扫描，避免单次执行超操作数上限）
 integer ib_addIdx = 0

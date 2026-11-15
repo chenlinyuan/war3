@@ -27,8 +27,22 @@ from merge_w3obj import read_all  # noqa: E402
 CFG = __import__(os.environ.get("WINGS_CONFIG", "wings_config"))   # 移植到别的图时可用 WINGS_CONFIG=<别的配置模块名>
 
 CFG_PATH = getattr(CFG, "__file__", os.path.join(HERE, "wings_config.py"))
-SCAN_FILES = ["war3map.w3a", "war3map.w3t", "war3map.w3u", "war3map.w3h",
-              "war3map.w3q", "war3map.w3b", "war3map.w3d"]
+SCAN_FILES = [
+    "war3map.w3a", "war3map.w3t", "war3map.w3u", "war3map.w3h",
+    "war3map.w3q", "war3map.w3b", "war3map.w3d",
+    "war3mapSkin.w3a", "war3mapSkin.w3t", "war3mapSkin.w3u",
+    "war3mapSkin.w3h", "war3mapSkin.w3q", "war3mapSkin.w3b",
+    "war3mapSkin.w3d",
+]
+CAMPAIGN_SCAN_FILES = [
+    "war3campaign.w3a", "war3campaign.w3t", "war3campaign.w3u",
+    "war3campaign.w3h", "war3campaign.w3q", "war3campaign.w3b",
+    "war3campaign.w3d",
+    "war3campaignSkin.w3a", "war3campaignSkin.w3t",
+    "war3campaignSkin.w3u", "war3campaignSkin.w3h",
+    "war3campaignSkin.w3q", "war3campaignSkin.w3b",
+    "war3campaignSkin.w3d",
+]
 # 有些图（W3x2lni "SLK 化"）把自定义物品/单位**内联进 slk/txt**，war3map.w3t 之类是空的。
 #   这些文件里的对象 ID 也必须算进"已占用"，否则会撞车查不出来。
 SLK_FILES = ["units\\itemdata.slk", "units\\unitui.slk", "units\\unitdata.slk",
@@ -111,8 +125,13 @@ def used_ids_in(ar, scan_files, with_slk=True):
     return used, skipped
 
 
-CH_SCAN_FILES = ["war3map." + ext for ext in ("w3a", "w3t", "w3u", "w3h",
-                                              "w3q", "w3b", "w3d")]
+CH_SCAN_FILES = [
+    "war3map." + ext
+    for ext in ("w3a", "w3t", "w3u", "w3h", "w3q", "w3b", "w3d")
+] + [
+    "war3mapSkin." + ext
+    for ext in ("w3a", "w3t", "w3u", "w3h", "w3q", "w3b", "w3d")
+]
 
 
 def map_used_ids(path, chapters=False):
@@ -234,8 +253,7 @@ def main():
     # --campaign: 目标是 .w3n（对象数据在 war3campaign.w3a/.w3t/.w3u/.w3h…）
     if "--campaign" in sys.argv:
         sys.argv.remove("--campaign")
-        SCAN_FILES[:] = ["war3campaign." + ext for ext in
-                         ("w3a", "w3t", "w3u", "w3h", "w3q", "w3b", "w3d")]
+        SCAN_FILES[:] = CAMPAIGN_SCAN_FILES
     path = sys.argv[1]
     mode = sys.argv[2]
     used = map_used_ids(path, chapters=chapters)

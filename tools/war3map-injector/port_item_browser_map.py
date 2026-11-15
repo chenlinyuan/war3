@@ -95,9 +95,12 @@ def build_browser(source: Path, work: Path, browser_dir: Path) -> None:
     run([sys.executable, str(HERE / "gen_slk_tables.py"), str(stage)], env=env)
 
     unit_table = work / "_unitids.txt"
-    bundled_units = HERE / "_unitids.txt"
+    unitids_dir = Path(os.environ.get("ALAS_UNITIDS_DIR", str(HERE)))
+    bundled_units = unitids_dir / "_unitids.txt"
     if not bundled_units.is_file():
-        raise SystemExit("missing bundled unit table: %s" % bundled_units)
+        run([sys.executable, str(HERE / "collect_game_units.py")], env=env)
+    if not bundled_units.is_file():
+        raise SystemExit("missing generated unit table: %s" % bundled_units)
     shutil.copy2(bundled_units, unit_table)
     run([sys.executable, str(HERE / "build_fj.py")], env=env)
 

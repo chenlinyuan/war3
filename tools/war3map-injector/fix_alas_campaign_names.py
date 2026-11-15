@@ -148,7 +148,9 @@ def backup_w3f(path: Path, data: bytes, backup_root: Path) -> None:
 def patch_with_mpq(path: Path, w3f: bytes, backup_root: Path) -> None:
     old = (W.MPQArchive(str(path))).read_file("war3campaign.w3f") or b""
     backup_w3f(path, old, backup_root)
-    fd, temp_name = tempfile.mkstemp(suffix=".w3n")
+    fd, temp_name = tempfile.mkstemp(
+        suffix=".w3n", dir=str(path.parent)
+    )
     os.close(fd)
     temp = Path(temp_name)
     try:

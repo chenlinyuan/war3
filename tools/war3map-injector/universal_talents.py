@@ -29,6 +29,7 @@ class TalentBundle:
     item_object: Path
     buff_object: Path
     breakthrough_buff_id: str
+    melee_hero_talents: bool
     source_script_dir: Path
     chapter_levels: dict[str, int]
     scripts: dict[int, Path]
@@ -49,6 +50,7 @@ def _object_ids(
     archive: W.MPQArchive,
     *,
     campaign_prefix: bool = False,
+    include_ability_buff_refs: bool = False,
 ) -> set[str]:
     prefix = "war3campaign." if campaign_prefix else "war3map."
     ability_data = archive.read_file(prefix + "w3a") or b""
@@ -67,6 +69,16 @@ def _object_ids(
             for _table, _old, new, _mods in entries
             if new.replace("\0", "")
         )
+        if include_ability_buff_refs:
+            found.update(
+                mod[4].decode("latin-1").replace("\0", "")
+                for _table, _old, _new, mods in entries
+                for mod in mods
+                if mod[0] == "abuf"
+                and mod[1] == 3
+                and isinstance(mod[4], (bytes, bytearray))
+                and mod[4]
+            )
     if item_data:
         _version, entries, _consumed = DOBJ.read_objects_bytes(
             item_data,
@@ -94,13 +106,25 @@ def _object_ids(
     return found
 
 
+def _chapter_script_order(chapters: list[str]) -> list[str]:
+    """Keep a playable epilogue/outro after the main campaign chapters."""
+    def key(name: str) -> tuple[int, str]:
+        stem = Path(name).stem.casefold()
+        ending = "epilogue" in stem or "outro" in stem
+        return (1 if ending else 0, name.casefold())
+
+    return sorted(chapters, key=key)
+
+
 def _campaign_chapters(source: Path) -> list[str]:
     archive = W.MPQArchive(str(source))
     try:
-        chapters = sorted(
-            name
-            for name in archive.listfile
-            if name.lower().endswith((".w3x", ".w3m"))
+        chapters = _chapter_script_order(
+            [
+                name
+                for name in archive.listfile
+                if name.lower().endswith((".w3x", ".w3m"))
+            ]
         )
     finally:
         archive.close()
@@ -112,14 +136,24 @@ def _campaign_chapters(source: Path) -> list[str]:
 def _read_chapter(path: Path) -> tuple[set[str], int]:
     archive = W.MPQArchive(str(path))
     try:
-        return _object_ids(archive), WILD_DROPS.hero_level_cap(path)
+        return (
+            _object_ids(
+                archive,
+                include_ability_buff_refs=True,
+            ),
+            WILD_DROPS.hero_level_cap(path),
+        )
     finally:
         archive.close()
 
 
 def _scan_campaign(source: Path) -> tuple[set[str], dict[str, int]]:
     outer = W.MPQArchive(str(source))
-    existing = _object_ids(outer, campaign_prefix=True)
+    existing = _object_ids(
+        outer,
+        campaign_prefix=True,
+        include_ability_buff_refs=True,
+    )
     chapters = sorted(
         name
         for name in outer.listfile
@@ -169,10 +203,14 @@ def _choose_breakthrough_buff_id(existing: set[str]) -> str:
 
 def _generated_ids(
     breakthrough_buff_id: str = TALENT.BREAKTHROUGH_BUFF_ID_BASE,
+    melee_hero_talents: bool = False,
 ) -> tuple[set[str], set[str], set[str]]:
     abilities = {
         str(entry["new"])
-        for entry in TALENT.build_entries(breakthrough_buff_id)
+        for entry in TALENT.build_entries(
+            breakthrough_buff_id,
+            melee_hero_talents,
+        )
     }
     items = {
         str(entry["new"])
@@ -222,6 +260,7 @@ def _render_script(
     work: Path,
     level_cap: int,
     breakthrough_buff_id: str,
+    melee_hero_talents: bool,
 ) -> Path:
     target = work / "scripts" / ("level-%d" % level_cap)
     if target.is_dir():
@@ -237,6 +276,16 @@ def _render_script(
     )
     if count != 1:
         raise ValueError("talent global TT_MAX_LEVEL anchor is not unique")
+    updated, count = re.subn(
+        r"(?m)^boolean TT_MELEE_HERO_TALENTS = (?:true|false)$",
+        "boolean TT_MELEE_HERO_TALENTS = "
+        + ("true" if melee_hero_talents else "false"),
+        updated,
+    )
+    if count != 1:
+        raise ValueError(
+            "talent global TT_MELEE_HERO_TALENTS anchor is not unique"
+        )
     globals_path.write_text(updated, encoding="utf-8", newline="\n")
     return target
 
@@ -246,12 +295,18 @@ def _render_chapter_script(
     level_cap: int,
     chapter_index: int,
     breakthrough_buff_id: str,
+    melee_hero_talents: bool,
 ) -> Path:
     target = work / "scripts" / ("chapter-%02d" % chapter_index)
     if target.is_dir():
         return target
     shutil.copytree(
-        _render_script(work, level_cap, breakthrough_buff_id),
+        _render_script(
+            work,
+            level_cap,
+            breakthrough_buff_id,
+            melee_hero_talents,
+        ),
         target,
     )
     globals_path = target / "g.j"
@@ -273,11 +328,13 @@ def prepare_bundle(
     source: Path,
     work: Path,
     chapters: list[str] | None = None,
+    melee_hero_talents: bool = False,
 ) -> TalentBundle:
     work.mkdir(parents=True, exist_ok=True)
     if source.suffix.lower() == ".w3n":
         expected_chapters = (
-            sorted(chapters) if chapters is not None
+            _chapter_script_order(list(chapters))
+            if chapters is not None
             else _campaign_chapters(source)
         )
         existing, levels = _scan_campaign(source)
@@ -303,7 +360,10 @@ def prepare_bundle(
 
     breakthrough_buff_id = _choose_breakthrough_buff_id(existing)
     generated_abilities, generated_items, generated_buffs = (
-        _generated_ids(breakthrough_buff_id)
+        _generated_ids(
+            breakthrough_buff_id,
+            melee_hero_talents,
+        )
     )
     collisions = sorted(
         (
@@ -325,6 +385,7 @@ def prepare_bundle(
         item_object,
         buff_object,
         breakthrough_buff_id,
+        melee_hero_talents,
     )
     unique_levels = sorted(set(levels.values()))
     scripts = {
@@ -332,6 +393,7 @@ def prepare_bundle(
             work,
             level_cap,
             breakthrough_buff_id,
+            melee_hero_talents,
         )
         for level_cap in unique_levels
     }
@@ -343,6 +405,7 @@ def prepare_bundle(
                 levels[chapter],
                 index,
                 breakthrough_buff_id,
+                melee_hero_talents,
             )
             for index, chapter in enumerate(expected_chapters, 1)
         }
@@ -351,6 +414,7 @@ def prepare_bundle(
         item_object=item_object,
         buff_object=buff_object,
         breakthrough_buff_id=breakthrough_buff_id,
+        melee_hero_talents=melee_hero_talents,
         source_script_dir=TALENT.TALENT_SCRIPT,
         chapter_levels=levels,
         scripts=scripts,
@@ -374,6 +438,27 @@ def _entries(data: bytes, with_levels: bool) -> dict[str, tuple[str, object]]:
     }
 
 
+def _duplicate_object_ids(data: bytes, with_levels: bool) -> dict[str, int]:
+    _version, entries, consumed = DOBJ.read_objects_bytes(
+        data,
+        with_levels,
+        fname="talent objects",
+        with_end=True,
+    )
+    if consumed != len(data):
+        raise ValueError("talent object data has trailing bytes")
+    counts: dict[str, int] = {}
+    for _table, _old, new, _mods in entries:
+        ident = new.replace("\0", "")
+        if ident:
+            counts[ident] = counts.get(ident, 0) + 1
+    return {
+        ident: count
+        for ident, count in counts.items()
+        if count > 1
+    }
+
+
 def _field_map(mods: object) -> dict[object, object]:
     fields: dict[object, object] = {}
     for mod in mods:
@@ -392,6 +477,7 @@ def _verify_script(
     level_cap: int,
     label: str,
     script_type: str,
+    melee_hero_talents: bool,
 ) -> None:
     text = script.decode("utf-8", "replace")
     if not re.search(
@@ -404,12 +490,11 @@ def _verify_script(
     for marker in (
         "TT_SavedBackpackIndex",
         "TT_IsTalentHero",
-        "function TT_EnsureBackpack",
+        "TT_EnsureBackpack",
         "TT_GrantEarnedPoints",
         "TT_ClearTalentMilestones",
         "TT_ResetTalents",
         "TT_RegisterHeroCore",
-        "TT_IsCampaignRestoreQueued",
         "TT_EnsureHeroNow",
         "TT_EligiblePointCount",
         "TT_TrimMilestonesToCount",
@@ -421,14 +506,12 @@ def _verify_script(
         "TT_CaptureTalentState",
         "TT_ActualSelectionText",
         "TT_RestoreTalentState",
-        "function TT_TierSlot takes integer tier returns integer",
-        "function TT_TierNodeCode takes integer tier, integer choice returns integer",
-        "return 100 + TT_TierSlot(tier) * 3 + choice",
+        "TT_PreserveTalentNodes",
+        "TT_TierSlot",
+        "TT_TierNodeCode",
         "TT_AttributeTalentLevel",
         "TT_SyncAttributeTalents",
-        "call TT_SyncAttributeTalent(u, 'T106'",
-        "call TT_SyncAttributeTalent(u, 'T107'",
-        "call TT_SyncAttributeTalent(u, 'T108'",
+        "TT_SyncAttributeTalent",
         "GetHeroStr(u, true)",
         "GetHeroAgi(u, true)",
         "GetHeroInt(u, true)",
@@ -437,8 +520,7 @@ def _verify_script(
         "TT_ApplyIncinerateTalent",
         "TT_ExplodeIncinerateTalent",
         "TT_OnAnyUnitDeath",
-        "call TriggerAddAction(TT_DEATH_TRIGGER, function TT_OnAnyUnitDeath)",
-        "set TT_FX_TABLE = InitHashtable()",
+        "InitHashtable",
         '"talentstats"',
         "event=TALENT_ATTACK",
         "event=BREAKTHROUGH_STOMP",
@@ -447,36 +529,40 @@ def _verify_script(
         "event=INCINERATE_EXPLODE_HIT",
         "event=TALENT_STATS",
         "event=TALENT_DAMAGE_EVENT",
-        "call TT_SyncAttributeTalents(u)",
         "TT_EarnedTalentPoints",
         "TT_TALENT_MASTER_LEVEL",
         "TT_AWARDED_MASK",
-        "TT_CAMPAIGN_STATE_PENDING",
-        "TT_CAMPAIGN_VERIFY_PENDING",
-        "TT_RESTORE_TABLE",
-        "TT_ScheduleCampaignVerify",
-        "TT_OnCampaignVerifyTimer",
-        "CAMPAIGN_REAPPLY",
         "TT_IsAwarded",
-        "TT_CampaignStore",
-        "TT_CampaignRestore",
-        "TT_TryCampaignCacheRestore",
-        "TT_QuickSaveCampaignState",
-        "TT_OpenCampaignCache",
-        "CAMPAIGN_CACHE_OPEN",
-        "CAMPAIGN_FALLBACK_RESTORE",
-        "CAMPAIGN_SAVE",
-        "CAMPAIGN_STORE_SAVED",
-        "TT_QueueCampaignRestore",
-        "TT_ConsumeCampaignRestore",
+        "TT_CampaignNormalizeUnitForStore",
+        "TT_CampaignStoreTalentSnapshot",
+        "TT_CampaignRestoreTalentSnapshot",
+        "TT_OnTalentSelectionStep",
+        "TT_FinishTalentUiRebuild",
+        "TT_ScheduleTalentUiRebuild",
+        "TT_CampaignAuditStore",
+        "TT_CampaignAuditAbilities",
+        "TT_CampaignAuditRestoreProbe",
+        "TT_CampaignAuditSave",
+        "TT_CAMPAIGN_STORE_RESULT",
+        "TT_CAMPAIGN_SAVE_RESULT",
+        "CAMPAIGN_STORE_AUDIT",
+        "CAMPAIGN_STORE_ABILITY",
+        "CAMPAIGN_RESTORE_PROBE",
+        "CAMPAIGN_CACHE_SAVE",
+        "CAMPAIGN_SAVE_RECHECK",
+        "CAMPAIGN_EXPECTED_CHECK",
+        "CAMPAIGN_STORE_ITEM",
+        "CAMPAIGN_NATIVE_NORMALIZE",
+        "CAMPAIGN_TALENT_SNAPSHOT_STORE",
+        "CAMPAIGN_TALENT_SNAPSHOT_RESTORE",
+        "CAMPAIGN_TALENT_SNAPSHOT_MISSING",
+        "TALENT_UI_REBUILD",
+        "TALENT_UI_PREPARE",
+        "TALENT_UI_SELECT",
         "TT_RegisteredHeroIndex",
         "TT_MarkStartReady",
         "TT_OnPointTimer",
         "TT_CAMPAIGN_CHAPTER",
-        "CAMPAIGN_FRESH",
-        "HaveStoredInteger",
-        "CAMPAIGN_LEGACY_RECOVER",
-        "CAMPAIGN_RESTORE_DEFERRED",
         "START_READY",
         "POINT_ITEM_ISSUED",
         "POINT_GRANT_COMMITTED",
@@ -497,7 +583,7 @@ def _verify_script(
         "talentreset",
         "EVENT_PLAYER_HERO_REVIVE_FINISH",
         "EVENT_PLAYER_HERO_SKILL",
-        'TriggerRegisterPlayerChatEvent(chatTrigger, Player(i), "", false)',
+        "TriggerRegisterPlayerChatEvent",
     ):
         if marker not in text:
             raise ValueError(
@@ -508,22 +594,75 @@ def _verify_script(
         "set highest = master",
         "set target = master",
         "TT_TalentAbilityId(100 + tier * 3 +",
+        "call TT_CampaignStore(",
+        "call TT_CampaignRestore(",
+        "function TT_CampaignStore takes",
+        "function TT_CampaignRestore takes",
+        "TT_CAMPAIGN_STATE_PENDING",
+        "TT_CAMPAIGN_RESTORE_UNITS",
+        "TT_RESTORE_TABLE",
+        '"ALAS_TALENT",',
+        "CAMPAIGN_FALLBACK_RESTORE",
     ):
         if forbidden in text:
             raise ValueError(
-                "%s still uses Q master level as a talent-point count"
-                % label
+                "%s still contains forbidden legacy marker %s"
+                % (label, forbidden)
             )
+    if melee_hero_talents:
+        for marker in (
+            "TT_IsDemonHunter",
+            "TT_DemonHunterNodeCode",
+            "TT_UnitTalentId",
+            "TT_DemonHunterOnManaBurnCast",
+            "TT_DemonHunterOnManaBurnEffect",
+            "DH_IMMOLATION_SYNC",
+            "GetUnitAbilityLevel(u, 'BEim')",
+            "TT_DemonHunterSync",
+            "TT_DemonHunterOnOrder",
+            "TT_PreserveTalentNodes",
+            "TALENT_MASTER_RAISE",
+        ):
+            if marker not in text:
+                raise ValueError(
+                    "%s is missing demon hunter marker %s"
+                    % (label, marker)
+                )
+    flag_true = (
+        "TT_MELEE_HERO_TALENTS = true"
+        if script_type == "lua"
+        else "boolean TT_MELEE_HERO_TALENTS = true"
+    )
+    flag_false = (
+        "TT_MELEE_HERO_TALENTS = false"
+        if script_type == "lua"
+        else "boolean TT_MELEE_HERO_TALENTS = false"
+    )
+    if melee_hero_talents and flag_true not in text:
+        raise ValueError(
+            "%s did not enable melee hero talents" % label
+        )
+    if not melee_hero_talents and flag_false not in text:
+        raise ValueError(
+            "%s did not disable melee hero talents" % label
+        )
+    if "damage * 0.85" not in text:
+        raise ValueError(
+            "%s is missing the exact 15%% talent damage reduction" % label
+        )
+    if "damage * 0.60" in text:
+        raise ValueError(
+            "%s still contains the obsolete 40%% talent damage reduction"
+            % label
+        )
     if script_type == "lua":
         markers = (
             "TT_RegisterHeroCore(u, false)",
             "TT_RegisterHeroCore(u, true)",
             "if (not TT_EnsureBackpack(u, heroIndex)) then",
             "GetPlayerController(p) == MAP_CONTROL_USER",
-            "TT_IsCampaignRestoreQueued(u)",
             "TT_EnsureHeroNow(u)",
             "TT_StartPointTimer()",
-            "TT_ConsumeCampaignRestore(u, heroIndex)",
             "UnitRemoveAbility(u, talentId)",
             "GroupEnumUnitsSelected(g, p, nil)",
         )
@@ -533,10 +672,8 @@ def _verify_script(
             "TT_RegisterHeroCore(u, true)",
             "if not TT_EnsureBackpack(u, heroIndex) then",
             "GetPlayerController(p) == MAP_CONTROL_USER",
-            "if TT_IsCampaignRestoreQueued(u) then",
             "call TT_EnsureHeroNow(u)",
             "call TT_StartPointTimer()",
-            "call TT_ConsumeCampaignRestore(u, heroIndex)",
             "call UnitRemoveAbility(u, talentId)",
             "call GroupEnumUnitsSelected(g, p, null)",
         )
@@ -553,6 +690,7 @@ def _verify_archive(
     level_cap: int,
     display_name: str,
     breakthrough_buff_id: str,
+    melee_hero_talents: bool,
 ) -> None:
     archive = W.MPQArchive(str(path))
     try:
@@ -596,6 +734,59 @@ def _verify_archive(
                 display_name + ": " + ident
                 + " is missing or is not based on " + base
             )
+    if melee_hero_talents:
+        for index in range(TALENT.HERO_POOL_SIZE):
+            talent = TALENT.demon_hunter_talent_id(index)
+            if talent not in abilities:
+                raise ValueError(
+                    display_name
+                    + " is missing demon hunter talent "
+                    + talent
+                )
+            master = _field_map(abilities[talent][1])
+            if master.get("alev") != TALENT.TIER_COUNT:
+                raise ValueError(
+                    display_name + ": " + talent
+                    + " has the wrong tier count"
+                )
+            for tier in range(TALENT.TIER_COUNT):
+                if tier < TALENT.DEMON_HUNTER_TIER_COUNT:
+                    expected = ",".join(
+                        TALENT.demon_hunter_node_id(tier, choice)
+                        for choice in range(
+                            TALENT.CHOICES_PER_TIER
+                        )
+                    )
+                else:
+                    expected = ",".join(
+                        TALENT.tier_node_id(tier, choice)
+                        for choice in range(
+                            TALENT.CHOICES_PER_TIER
+                        )
+                    )
+                if master.get(("aabi", tier + 1)) != expected:
+                    raise ValueError(
+                        display_name + ": " + talent
+                        + " has an invalid tier mapping"
+                    )
+        for index in range(
+            TALENT.DEMON_HUNTER_TIER_COUNT
+            * TALENT.CHOICES_PER_TIER
+        ):
+            ident = "DH%02X" % index
+            if ident not in abilities or abilities[ident][0] != "AIst":
+                raise ValueError(
+                    display_name
+                    + " is missing demon hunter node "
+                    + ident
+                )
+        if (
+            TALENT.DEMON_HUNTER_SPEED_ID not in abilities
+            or abilities[TALENT.DEMON_HUNTER_SPEED_ID][0] != "AIsx"
+        ):
+            raise ValueError(
+                display_name + " is missing demon hunter attack speed"
+            )
     breakthrough_buff = breakthrough_buff_id
     if (
         breakthrough_buff not in buffs
@@ -605,12 +796,15 @@ def _verify_archive(
             display_name + ": " + breakthrough_buff
             + " is missing or is not based on BOae"
         )
-    for ident in ("B64E", "B64F", "B64G", "B64H"):
-        if ident != breakthrough_buff and ident in buffs:
-            raise ValueError(
-                display_name + " still contains duplicate status buff "
-                + ident
+    duplicate_buffs = _duplicate_object_ids(buff_data, False)
+    if duplicate_buffs:
+        raise ValueError(
+            display_name + " contains duplicate status buff "
+            + ", ".join(
+                "%s x%d" % item
+                for item in sorted(duplicate_buffs.items())
             )
+        )
     speed_fields = _field_map(
         abilities[TALENT.BREAKTHROUGH_SPEED_ID][1]
     )
@@ -657,6 +851,57 @@ def _verify_archive(
             display_name + ": " + breakthrough_buff
             + " has incomplete status text or icon"
         )
+    tier5_contracts = {
+        "T112": (
+            "AHss",
+            {"Ssk1": 0.0, "Ssk2": 0.0, "Ssk3": 0.0},
+            "\u91d1\u521a\u4e0d\u574f",
+            "\u53d7\u5230\u7684\u6240\u6709\u4f24\u5bb3 -15%\u3002",
+        ),
+        "T113": (
+            "AOcr",
+            {"Ocr1": 25.0, "Ocr2": 2.0},
+            "\u81f4\u547d\u950b\u8292",
+            "\u666e\u901a\u653b\u51fb\u6709 25% \u6982\u7387"
+            "\u9020\u6210 2 \u500d\u4f24\u5bb3\u3002",
+        ),
+        "T114": (
+            "AEev",
+            {"Eev1": 0.25},
+            "\u9b3c\u5f71\u8ff7\u8e2a",
+            "\u666e\u901a\u653b\u51fb\u6709 25% \u6982\u7387"
+            "\u88ab\u95ea\u907f\u3002",
+        ),
+    }
+    for ident, (base, numbers, name, description) in (
+        tier5_contracts.items()
+    ):
+        if ident not in abilities or abilities[ident][0] != base:
+            raise ValueError(
+                display_name + ": " + ident
+                + " is missing or is not based on " + base
+            )
+        fields = _field_map(abilities[ident][1])
+        for field, expected in numbers.items():
+            actual = fields.get((field, 1))
+            if (
+                actual is None
+                or abs(float(actual) - expected) > 0.000001
+            ):
+                raise ValueError(
+                    display_name + ": " + ident + "." + field
+                    + " is not " + str(expected)
+                )
+        if fields.get("atp1") != name:
+            raise ValueError(
+                display_name + ": " + ident
+                + " has the wrong talent name"
+            )
+        if fields.get("aub1") != description:
+            raise ValueError(
+                display_name + ": " + ident
+                + " has a mismatched description"
+            )
     for ident in ("I103", "I105", "I106"):
         if ident not in items:
             raise ValueError(
@@ -692,7 +937,13 @@ def _verify_archive(
                     display_name + ": " + backpack
                     + " is linked to the wrong talent tree"
                 )
-    _verify_script(script, level_cap, display_name, script_type)
+    _verify_script(
+        script,
+        level_cap,
+        display_name,
+        script_type,
+        melee_hero_talents,
+    )
 
 
 def verify_bundle(output: Path, bundle: TalentBundle) -> None:
@@ -726,6 +977,7 @@ def verify_bundle(output: Path, bundle: TalentBundle) -> None:
                         level_cap,
                         name,
                         bundle.breakthrough_buff_id,
+                        bundle.melee_hero_talents,
                     )
                 finally:
                     temp.unlink(missing_ok=True)
@@ -738,4 +990,5 @@ def verify_bundle(output: Path, bundle: TalentBundle) -> None:
         level_cap,
         output.name,
         bundle.breakthrough_buff_id,
+        bundle.melee_hero_talents,
     )

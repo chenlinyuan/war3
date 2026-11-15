@@ -1,5 +1,6 @@
 globals
 
+    boolean WGL_ITEM_ACTIVE = false
     boolean WGL_INITED = false
     trigger WGL_CAST_TRIGGER = null
     trigger WGL_ORDER_TRIGGER = null
@@ -11,13 +12,10 @@ globals
     hashtable WGL_STACK_TIMER_HT = null
     hashtable WGL_COOLDOWN_HT = null
     hashtable WGL_GROWTH_HT = null
+    hashtable WGL_DEFERRED_HT = null
     trigger WGL_ATTACK_SPEED_TRIGGER = null
     timer WGL_COOLDOWN_CLOCK = null
-    real WGL_ATTACK_SPEED_AGI_MULT = 0.005
-    real WGL_ATTACK_SPEED_MIN = 0.15
-    real WGL_ATTACK_SPEED_MAX = 2.0
-    real WGL_ATTACK_SPEED_STEP = 0.05
-    integer WGL_ATTACK_SPEED_LEVELS = 38
+    integer WGL_ATTACK_SPEED_MAX_LEVEL = 201
     integer WGL_GROWTH_CHANCE_PERCENT = 2
     real WGL_GROWTH_ATTACK_GUARD = 0.12
     real WGL_CHARGE_BASE_DISTANCE = 100.0
@@ -36,40 +34,65 @@ endglobals
 // WARGLAIVE OF AZZINOTH - SCRIPTED BARBARIC CHARGE
 //============================================================================
 function WGL_HasWarglaive takes unit u returns boolean
+    local integer slot = 0
+    local item it
+    if u == null or GetUnitTypeId(u) == 0 then
+        return false
+    endif
+    if WGL_ITEM_ACTIVE then
+        loop
+            exitwhen slot >= 9
+            set it = BlzUnitItemInEquipmentSlot(u, ConvertLoadoutSlot(slot))
+            if it != null and GetItemTypeId(it) == 'I106' then
+                set it = null
+                return true
+            endif
+            set slot = slot + 1
+        endloop
+    endif
+    set it = null
     return UnitHasItemOfTypeBJ(u, 'I106')
 endfunction
 
 function WGL_CooldownClockTick takes nothing returns nothing
 endfunction
 
-function WGL_SyncAttackSpeed takes unit u returns nothing
-    local integer level
-    local real bonus
+function WGL_ClearAttackSpeedAbility takes unit u returns nothing
     if u == null or GetUnitTypeId(u) == 0 then
         return
     endif
-    if not IsUnitType(u, UNIT_TYPE_HERO) or not WGL_HasWarglaive(u) then
+    if GetUnitAbilityLevel(u, 'A111') > 0 then
+        call UnitMakeAbilityPermanent(u, false, 'A111')
+        call UnitRemoveAbility(u, 'A111')
+    endif
+endfunction
+
+function WGL_SyncAttackSpeed takes unit u returns nothing
+    local integer level
+    if u == null or GetUnitTypeId(u) == 0 then
         return
     endif
-    if GetUnitAbilityLevel(u, 'A111') <= 0 then
+    if not IsUnitType(u, UNIT_TYPE_HERO) then
         return
     endif
-    set bonus = I2R(GetHeroAgi(u, true)) * WGL_ATTACK_SPEED_AGI_MULT
-    if bonus < WGL_ATTACK_SPEED_MIN then
-        set bonus = WGL_ATTACK_SPEED_MIN
-    elseif bonus > WGL_ATTACK_SPEED_MAX then
-        set bonus = WGL_ATTACK_SPEED_MAX
+    if not WGL_HasWarglaive(u) then
+        call WGL_ClearAttackSpeedAbility(u)
+        return
     endif
-    set level = R2I(bonus / WGL_ATTACK_SPEED_STEP + 0.5)
-    set level = level - R2I(WGL_ATTACK_SPEED_MIN / WGL_ATTACK_SPEED_STEP) + 1
+    set level = GetHeroAgi(u, true) + 1
     if level < 1 then
         set level = 1
-    elseif level > WGL_ATTACK_SPEED_LEVELS then
-        set level = WGL_ATTACK_SPEED_LEVELS
+    elseif level > WGL_ATTACK_SPEED_MAX_LEVEL then
+        set level = WGL_ATTACK_SPEED_MAX_LEVEL
+    endif
+    if GetUnitAbilityLevel(u, 'A111') == 0 then
+        call UnitAddAbility(u, 'A111')
+        call UnitMakeAbilityPermanent(u, true, 'A111')
     endif
     if GetUnitAbilityLevel(u, 'A111') != level then
         call SetUnitAbilityLevel(u, 'A111', level)
     endif
+    call BlzUnitHideAbility(u, 'A111', true)
 endfunction
 
 function WGL_SyncUnit takes unit u returns nothing
@@ -95,16 +118,39 @@ function WGL_SyncUnit takes unit u returns nothing
             endif
             call FlushChildHashtable(WGL_COOLDOWN_HT, unitId)
         endif
-    elseif GetUnitAbilityLevel(u, 'A113') > 0 then
-        set unitId = GetHandleId(u)
-        set cooldownRemaining = BlzGetUnitAbilityCooldownRemaining(u, 'A113')
-        if cooldownRemaining > 0.0 then
-            call SaveReal(WGL_COOLDOWN_HT, unitId, 0, TimerGetElapsed(WGL_COOLDOWN_CLOCK) + cooldownRemaining)
-        else
-            call FlushChildHashtable(WGL_COOLDOWN_HT, unitId)
+    else
+        call WGL_ClearAttackSpeedAbility(u)
+        if GetUnitAbilityLevel(u, 'A113') > 0 then
+            set unitId = GetHandleId(u)
+            set cooldownRemaining = BlzGetUnitAbilityCooldownRemaining(u, 'A113')
+            if cooldownRemaining > 0.0 then
+                call SaveReal(WGL_COOLDOWN_HT, unitId, 0, TimerGetElapsed(WGL_COOLDOWN_CLOCK) + cooldownRemaining)
+            else
+                call FlushChildHashtable(WGL_COOLDOWN_HT, unitId)
+            endif
+            call UnitRemoveAbility(u, 'A113')
         endif
-        call UnitRemoveAbility(u, 'A113')
     endif
+endfunction
+
+function WGL_DeferredSync takes nothing returns nothing
+    local timer t = GetExpiredTimer()
+    local integer timerId = GetHandleId(t)
+    local unit u = LoadUnitHandle(WGL_DEFERRED_HT, timerId, 0)
+    if u != null and GetUnitTypeId(u) != 0 then
+        call WGL_SyncUnit(u)
+    endif
+    call FlushChildHashtable(WGL_DEFERRED_HT, timerId)
+    call DestroyTimer(t)
+    set u = null
+    set t = null
+endfunction
+
+function WGL_ScheduleSync takes unit u returns nothing
+    local timer t = CreateTimer()
+    call SaveUnitHandle(WGL_DEFERRED_HT, GetHandleId(t), 0, u)
+    call TimerStart(t, 0.05, false, function WGL_DeferredSync)
+    set t = null
 endfunction
 
 function WGL_DestroyTimedEffect takes nothing returns nothing
@@ -493,6 +539,7 @@ function WGL_OnItemEvent takes nothing returns nothing
         return
     endif
     if GetTriggerEventId() == EVENT_PLAYER_UNIT_DROP_ITEM and it != null and GetItemTypeId(it) == 'I106' then
+        call WGL_ClearAttackSpeedAbility(u)
         if GetUnitAbilityLevel(u, 'A113') > 0 then
             set unitId = GetHandleId(u)
             set cooldownRemaining = BlzGetUnitAbilityCooldownRemaining(u, 'A113')
@@ -508,6 +555,7 @@ function WGL_OnItemEvent takes nothing returns nothing
         return
     endif
     call WGL_SyncUnit(u)
+    call WGL_ScheduleSync(u)
     set it = null
     set u = null
 endfunction
@@ -532,6 +580,7 @@ function WGL_Init takes nothing returns nothing
     set WGL_STACK_TIMER_HT = InitHashtable()
     set WGL_COOLDOWN_HT = InitHashtable()
     set WGL_GROWTH_HT = InitHashtable()
+    set WGL_DEFERRED_HT = InitHashtable()
     set WGL_COOLDOWN_CLOCK = CreateTimer()
     call TimerStart(WGL_COOLDOWN_CLOCK, 8640000.0, false, function WGL_CooldownClockTick)
     set itemTrigger = CreateTrigger()

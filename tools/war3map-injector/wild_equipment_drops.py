@@ -20,6 +20,7 @@ sys.path.insert(0, str(DOCTOR))
 
 import war3mpq as W  # noqa: E402
 import campaign_paths as CAMP  # noqa: E402
+import campaign_object_catalog as CAMP_OBJECTS  # noqa: E402
 from doctor.data import objects as DOBJ  # noqa: E402
 from doctor.fix import inflated_counts as INFLATED  # noqa: E402
 
@@ -66,6 +67,15 @@ class CampaignDropBundle:
     manifest: Path
     campaign_level_cap: int
     profiles: tuple[CampaignDropProfile, ...]
+    object_sources: dict[str, Path]
+    assets: tuple[tuple[Path, str], ...]
+    object_ids: dict[str, tuple[str, ...]]
+    object_fingerprints: dict[str, dict[str, str]]
+    object_catalog: Path
+    object_warnings: tuple[str, ...]
+    object_chapter_count: int
+    object_definition_count: int
+    object_duplicate_variant_count: int
 
     def profile_for(self, chapter: str) -> CampaignDropProfile | None:
         requested = CAMP.normalize_chapter_name(chapter)
@@ -108,15 +118,10 @@ def _read_catalog() -> dict[str, dict[str, object]]:
     return rows
 
 
-def _overlay_map_items(
+def _overlay_item_data(
     rows: dict[str, dict[str, object]],
-    source: Path,
+    item_data: bytes,
 ) -> None:
-    archive = W.MPQArchive(str(source))
-    try:
-        item_data = archive.read_file("war3map.w3t") or b""
-    finally:
-        archive.close()
     if not item_data:
         return
     _version, entries, _consumed = DOBJ.read_objects_bytes(
@@ -144,6 +149,22 @@ def _overlay_map_items(
             elif field == "iabi":
                 row["abilities"] = value
         rows[new_id] = row
+
+
+def _overlay_map_items(
+    rows: dict[str, dict[str, object]],
+    source: Path,
+) -> None:
+    archive = W.MPQArchive(str(source))
+    try:
+        item_data = [
+            archive.read_file("war3map.w3t") or b"",
+            archive.read_file("war3mapSkin.w3t") or b"",
+        ]
+    finally:
+        archive.close()
+    for data in item_data:
+        _overlay_item_data(rows, data)
 
 
 def _read_unit_catalog() -> dict[str, dict[str, object]]:
@@ -328,8 +349,13 @@ def hero_level_cap(source: Path) -> int:
     return _hero_level_cap(source)
 
 
-def collect_pools(source: Path) -> dict[str, list[str]]:
+def collect_pools(
+    source: Path,
+    inherited_item_data: tuple[bytes, ...] = (),
+) -> dict[str, list[str]]:
     rows = _read_catalog()
+    for data in inherited_item_data:
+        _overlay_item_data(rows, data)
     _overlay_map_items(rows, source)
     pools = {name: [] for name in POOL_NAMES}
     for ident, row in rows.items():
@@ -469,7 +495,7 @@ function WED_ValidKiller takes unit killer returns boolean
         return false
     endif
     set owner = GetOwningPlayer(killer)
-    return GetPlayerController(owner) == MAP_CONTROL_USER and GetPlayerSlotState(owner) == PLAYER_SLOT_STATE_PLAYING
+    return GetPlayerController(owner) == MAP_CONTROL_USER
 endfunction
 
 function WED_CreateDrop takes integer tier, real x, real y returns nothing
@@ -666,6 +692,7 @@ function WED_OnDeath takes nothing returns nothing
 endfunction
 
 function WED_Init takes nothing returns nothing
+    local integer index = 0
     if WED_INITED then
         return
     endif
@@ -673,7 +700,12 @@ function WED_Init takes nothing returns nothing
     call WED_InitPools()
     set WED_HERO_DROPS = InitHashtable()
     set WED_DROP_TRIGGER = CreateTrigger()
-    call TriggerRegisterAnyUnitEventBJ(WED_DROP_TRIGGER, EVENT_PLAYER_UNIT_DEATH)
+    loop
+        call TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, Player(index), EVENT_PLAYER_UNIT_DEATH, null)
+        set index = index + 1
+        exitwhen index == 16
+    endloop
+    call TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, Player(PLAYER_NEUTRAL_AGGRESSIVE), EVENT_PLAYER_UNIT_DEATH, null)
     call TriggerAddAction(WED_DROP_TRIGGER, function WED_OnDeath)
     call DisplayTextToPlayer(GetLocalPlayer(), 0, 0, "|cff32cd32[战役掉落]|r 已启用：野怪最高 " + I2S(WED_LEVEL_CAP) + " 级，敌英雄最高 " + I2S(WED_HERO_LEVEL_CAP) + " 级，章节进度 " + I2S(WED_CHAPTER_PROGRESS) + "%。")
     set WED_DROP_TRIGGER = null
@@ -717,12 +749,19 @@ def prepare_campaign_bundle(
     root.mkdir(parents=True, exist_ok=True)
     archive = W.MPQArchive(str(source))
     profiles: list[CampaignDropProfile] = []
+    object_bundle = None
     try:
+        campaign_item_data = (
+            archive.read_file("war3campaign.w3t") or b"",
+            archive.read_file("war3campaignSkin.w3t") or b"",
+        )
         with tempfile.TemporaryDirectory() as temp_name:
             temp_root = Path(temp_name)
             chapter_inputs: list[
                 tuple[int, str, dict[str, list[str]], int, int]
             ] = []
+            chapter_files: dict[str, Path] = {}
+            pools_by_chapter: dict[str, dict[str, list[str]]] = {}
             for index, chapter in enumerate(chapters):
                 data = archive.read_file(chapter)
                 if not data:
@@ -733,7 +772,12 @@ def prepare_campaign_bundle(
                     "%02d-%s" % (index + 1, Path(chapter).name)
                 )
                 chapter_path.write_bytes(data)
-                pools = collect_pools(chapter_path)
+                chapter_files[chapter] = chapter_path
+                pools = collect_pools(
+                    chapter_path,
+                    inherited_item_data=campaign_item_data,
+                )
+                pools_by_chapter[chapter] = pools
                 native_level_cap = _neutral_level_cap(chapter_path)
                 native_hero_level_cap = _hero_level_cap(chapter_path)
                 chapter_inputs.append(
@@ -745,6 +789,12 @@ def prepare_campaign_bundle(
                         native_hero_level_cap,
                     )
                 )
+            object_bundle = CAMP_OBJECTS.prepare_drop_object_bundle(
+                source,
+                chapter_files,
+                pools_by_chapter,
+                root / "drop-object-bundle",
+            )
             campaign_level_cap = max(
                 item[4] for item in chapter_inputs
             )
@@ -802,12 +852,43 @@ def prepare_campaign_bundle(
                 profiles.append(profile)
     finally:
         archive.close()
+    if object_bundle is None:
+        raise ValueError("campaign drops: object bundle was not prepared")
     manifest = root / "manifest.json"
     manifest.write_text(
         json.dumps(
             {
                 "source": str(source),
                 "campaign_level_cap": campaign_level_cap,
+                "object_bundle": {
+                    "catalog": str(object_bundle.catalog_path),
+                    "objects": {
+                        extension: str(path)
+                        for extension, path in sorted(
+                            object_bundle.object_sources.items()
+                        )
+                    },
+                    "assets": [
+                        {
+                            "local": str(local),
+                            "internal": internal,
+                        }
+                        for local, internal in object_bundle.assets
+                    ],
+                    "object_ids": {
+                        extension: list(ids)
+                        for extension, ids in sorted(
+                            object_bundle.object_ids.items()
+                        )
+                    },
+                    "fingerprints": object_bundle.fingerprints,
+                    "warnings": list(object_bundle.warnings),
+                    "chapter_count": object_bundle.chapter_count,
+                    "definition_count": object_bundle.definition_count,
+                    "duplicate_variant_count": (
+                        object_bundle.duplicate_variant_count
+                    ),
+                },
                 "chapters": [
                     {
                         "chapter": profile.chapter,
@@ -837,11 +918,23 @@ def prepare_campaign_bundle(
         manifest=manifest,
         campaign_level_cap=campaign_level_cap,
         profiles=tuple(profiles),
+        object_sources=object_bundle.object_sources,
+        assets=object_bundle.assets,
+        object_ids=object_bundle.object_ids,
+        object_fingerprints=object_bundle.fingerprints,
+        object_catalog=object_bundle.catalog_path,
+        object_warnings=object_bundle.warnings,
+        object_chapter_count=object_bundle.chapter_count,
+        object_definition_count=object_bundle.definition_count,
+        object_duplicate_variant_count=(
+            object_bundle.duplicate_variant_count
+        ),
     )
 
 
 def load_campaign_manifest(manifest: Path) -> CampaignDropBundle:
     data = json.loads(manifest.read_text(encoding="utf-8"))
+    root = manifest.resolve().parent
     profiles = tuple(
         CampaignDropProfile(
             chapter=str(item["chapter"]),
@@ -869,8 +962,33 @@ def load_campaign_manifest(manifest: Path) -> CampaignDropBundle:
     )
     if not profiles:
         raise ValueError("campaign drops: loot manifest is empty")
+    object_data = data.get("object_bundle", {})
+    object_sources = {
+        str(extension): Path(path).resolve()
+        for extension, path in object_data.get("objects", {}).items()
+    }
+    assets = tuple(
+        (Path(item["local"]).resolve(), str(item["internal"]))
+        for item in object_data.get("assets", ())
+    )
+    object_ids = {
+        str(extension): tuple(str(ident) for ident in ids)
+        for extension, ids in object_data.get("object_ids", {}).items()
+    }
+    object_fingerprints = {
+        str(extension): {
+            str(ident): str(fingerprint)
+            for ident, fingerprint in values.items()
+        }
+        for extension, values in object_data.get(
+            "fingerprints", {}
+        ).items()
+    }
+    object_catalog = Path(
+        object_data.get("catalog", root / "object-catalog.json")
+    ).resolve()
     return CampaignDropBundle(
-        root=manifest.resolve().parent,
+        root=root,
         manifest=manifest.resolve(),
         campaign_level_cap=int(
             data.get(
@@ -879,6 +997,21 @@ def load_campaign_manifest(manifest: Path) -> CampaignDropBundle:
             )
         ),
         profiles=profiles,
+        object_sources=object_sources,
+        assets=assets,
+        object_ids=object_ids,
+        object_fingerprints=object_fingerprints,
+        object_catalog=object_catalog,
+        object_warnings=tuple(
+            str(item) for item in object_data.get("warnings", ())
+        ),
+        object_chapter_count=int(object_data.get("chapter_count", 0)),
+        object_definition_count=int(
+            object_data.get("definition_count", 0)
+        ),
+        object_duplicate_variant_count=int(
+            object_data.get("duplicate_variant_count", 0)
+        ),
     )
 
 
@@ -1075,6 +1208,57 @@ def _campaign_script_from_chapter(
     return data.decode("utf-8", "replace")
 
 
+def _verify_chapter_drop_objects(
+    chapter_data: bytes,
+    chapter: str,
+    bundle: CampaignDropBundle,
+) -> None:
+    if not bundle.object_ids and not bundle.assets:
+        return
+    with tempfile.TemporaryDirectory() as temp_name:
+        chapter_path = Path(temp_name) / "chapter.w3x"
+        chapter_path.write_bytes(chapter_data)
+        found = CAMP_OBJECTS.archive_object_fingerprints(chapter_path)
+        for extension, ids in bundle.object_ids.items():
+            expected_by_id = bundle.object_fingerprints.get(
+                extension, {}
+            )
+            for ident in ids:
+                expected = expected_by_id.get(ident)
+                actual = found.get((extension, ident), set())
+                if expected is None or expected not in actual:
+                    raise ValueError(
+                        "campaign drops: %s lacks %s.%s from object bundle"
+                        % (chapter, extension, ident)
+                    )
+                unexpected = actual - {expected}
+                if unexpected:
+                    raise ValueError(
+                        "campaign drops: %s has conflicting %s.%s "
+                        "definition: %s"
+                        % (
+                            chapter,
+                            extension,
+                            ident,
+                            ", ".join(sorted(unexpected)),
+                        )
+                    )
+        archive = W.MPQArchive(str(chapter_path))
+        try:
+            missing_assets = [
+                internal
+                for _local, internal in bundle.assets
+                if not archive.read_file(internal)
+            ]
+        finally:
+            archive.close()
+        if missing_assets:
+            raise ValueError(
+                "campaign drops: %s is missing object assets: %s"
+                % (chapter, ", ".join(missing_assets))
+            )
+
+
 def verify_campaign_bundle(
     output: Path,
     bundle: CampaignDropBundle,
@@ -1089,12 +1273,18 @@ def verify_campaign_bundle(
                     "campaign drops: output chapter missing: "
                     + profile.chapter
                 )
+            _verify_chapter_drop_objects(
+                data,
+                profile.chapter,
+                bundle,
+            )
             script = _campaign_script_from_chapter(data, script_type)
             required = (
                 "function WED_Init",
                 "WED_CAMPAIGN_MODE = true",
                 "function WED_IsEnemyHeroTarget",
-                "TriggerRegisterAnyUnitEventBJ",
+                "exitwhen index == 16",
+                "TriggerRegisterPlayerUnitEvent",
                 "WED_HERO_DROPS",
                 "HaveSavedInteger",
                 "SaveInteger",
@@ -1105,6 +1295,21 @@ def verify_campaign_bundle(
                         "campaign drops: %s missing %s"
                         % (profile.chapter, marker)
                     )
+            neutral_registration = (
+                "TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, "
+                "Player(PLAYER_NEUTRAL_AGGRESSIVE), "
+                "EVENT_PLAYER_UNIT_DEATH, nil)"
+                if script_type == "lua"
+                else "call TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, "
+                "Player(PLAYER_NEUTRAL_AGGRESSIVE), "
+                "EVENT_PLAYER_UNIT_DEATH, null)"
+            )
+            if script.count(neutral_registration) != 1:
+                raise ValueError(
+                    "campaign drops: %s must register "
+                    "the neutral-hostile death event exactly once"
+                    % profile.chapter
+                )
             if script_type == "lua":
                 level_cap = re.search(
                     r"WED_LEVEL_CAP = %d\b" % profile.level_cap,

@@ -34,6 +34,10 @@ CHOICES_PER_TIER = 3
 # Displayed tier -> semantic node group. Combat stays T106-T108 and
 # mobility stays T103-T105; only their unlock positions are exchanged.
 TIER_SLOT_ORDER = (0, 2, 1, 3, 4, 5)
+DEMON_HUNTER_TIER_COUNT = 4
+DEMON_HUNTER_NODE_BASE = "DH00"
+DEMON_HUNTER_TALENT_PREFIX = "QD"
+DEMON_HUNTER_SPEED_ID = "DHS0"
 CHOICE_START = 100
 CHILD_START = 200
 ATTRIBUTE_TALENT_LEVELS = 10
@@ -83,6 +87,18 @@ ICON_BREAKTHROUGH = (
 ICON_INCINERATE = (
     r"ReplaceableTextures\CommandButtons\BTNIncinerate.blp"
 )
+ICON_MANA_BURN = (
+    r"ReplaceableTextures\CommandButtons\BTNManaBurn.dds"
+)
+ICON_IMMOLATION = (
+    r"ReplaceableTextures\CommandButtons\BTNImmolationOn.dds"
+)
+ICON_EVASION = (
+    r"ReplaceableTextures\CommandButtons\BTNEvasion.dds"
+)
+ICON_METAMORPHOSIS = (
+    r"ReplaceableTextures\CommandButtons\BTNMetamorphosis.dds"
+)
 ICON_HAND = (
     r"ReplaceableTextures\CommandButtons"
     r"\BTNArchimondeHand_30HD.blp"
@@ -127,6 +143,14 @@ def node_id(tier: int, choice: int) -> str:
 
 def tier_node_id(tier: int, choice: int) -> str:
     return node_id(TIER_SLOT_ORDER[tier], choice)
+
+
+def demon_hunter_node_id(tier: int, choice: int) -> str:
+    return "DH%02X" % (tier * CHOICES_PER_TIER + choice)
+
+
+def demon_hunter_talent_id(index: int) -> str:
+    return "QD%02d" % index
 
 
 def child_id(index: int) -> str:
@@ -299,6 +323,84 @@ def talent_entry(ident: str) -> dict[str, object]:
     return {"old": OPENER_ID, "new": ident, "mods": mods}
 
 
+def demon_hunter_talent_entry(ident: str) -> dict[str, object]:
+    mods = [
+        mod("anam", "恶魔猎手天赋"),
+        mod("aart", ICON_METAMORPHOSIS),
+        mod("arar", ICON_METAMORPHOSIS),
+        mod("atp1", "恶魔猎手天赋", level=1),
+        mod("aub1", "前四层为恶魔猎手专属天赋，第五、六层沿用通用天赋。", level=1),
+        mod("alev", TIER_COUNT),
+        mod("aite", 0),
+        mod("aher", 0),
+        mod("abpx", 0),
+        mod("abpy", -11),
+    ]
+    for tier in range(DEMON_HUNTER_TIER_COUNT):
+        mods.append(mod(
+            "aabi",
+            ",".join(
+                demon_hunter_node_id(tier, choice)
+                for choice in range(CHOICES_PER_TIER)
+            ),
+            level=tier + 1,
+        ))
+    for tier in range(DEMON_HUNTER_TIER_COUNT, TIER_COUNT):
+        mods.append(mod(
+            "aabi",
+            ",".join(tier_node_id(tier, choice) for choice in range(3)),
+            level=tier + 1,
+        ))
+    return {"old": OPENER_ID, "new": ident, "mods": mods}
+
+
+def demon_hunter_node_entries() -> list[dict[str, object]]:
+    specs = (
+        ("邪能灼烧", ICON_MANA_BURN, "法力燃烧额外造成等同实际燃烧法力值的伤害。"),
+        ("不熄余烬", ICON_IMMOLATION, "献祭启动耗魔和每秒耗魔减半。"),
+        ("猎手直觉", ICON_EVASION, "闪避率额外提高 10%。"),
+        ("法力涡流", ICON_MANA_BURN, "法力燃烧的实际燃魔量转化为自身法力与生命。"),
+        ("烈焰扩张", ICON_IMMOLATION, "献祭伤害范围由 160 提高到 320。"),
+        ("刃返", ICON_EVASION, "闪避后 3 秒内下一次普通攻击额外造成 50% 伤害。"),
+        ("魔能封锁", ICON_MANA_BURN, "法力燃烧使命中目标移速和攻速降低 30%，持续 2 秒。"),
+        ("焦土之躯", ICON_IMMOLATION, "献祭开启期间攻击速度提高 50%。"),
+        ("残影", ICON_EVASION, "闪避后移动速度提高 100%，持续 3 秒。"),
+        ("恶魔暴君", ICON_METAMORPHOSIS, "变身额外生命由 500 提高到 1000。"),
+        ("无尽猎杀", ICON_METAMORPHOSIS, "变身持续时间由 45 秒提高到 60 秒。"),
+        ("猎杀降临", ICON_METAMORPHOSIS, "变身冷却降至 120 秒、耗魔降至 100，持续降至 35 秒。"),
+    )
+    entries: list[dict[str, object]] = []
+    for index, (name, icon, tip) in enumerate(specs):
+        entries.append(ability_entry(
+            "DH%02X" % index,
+            "AIst",
+            name,
+            tip,
+            icon=icon,
+            extra=[
+                mod("Istr", 0, O.T_INT, level=1, column=3),
+                mod("Iagi", 0, O.T_INT, level=1, column=1),
+                mod("Iint", 0, O.T_INT, level=1, column=2),
+            ],
+        ))
+    return entries
+
+
+def demon_hunter_speed_entry() -> dict[str, object]:
+    return ability_entry(
+        DEMON_HUNTER_SPEED_ID,
+        "AIsx",
+        "焦土之躯·攻速",
+        "献祭开启期间攻击速度提高 50%。",
+        icon=ICON_IMMOLATION,
+        extra=[
+            mod("Isx1", 0.50, O.T_UNREAL, level=1, column=1),
+            mod("abpx", 0, level=1),
+            mod("abpy", -11, level=1),
+        ],
+    )
+
+
 def backpack_entry(ident: str, talent: str) -> dict[str, object]:
     return {
         "old": "ratc",
@@ -436,6 +538,7 @@ def breakthrough_buff_entries(
 
 def build_entries(
     breakthrough_buff_id: str = BREAKTHROUGH_BUFF_ID_BASE,
+    melee_hero_talents: bool = False,
 ) -> list[dict[str, object]]:
     entries = [
         *[
@@ -560,9 +663,9 @@ def build_entries(
             node_id(4, 0),
             "AHss",
             "金刚不坏",
-            "受到的所有伤害 -20%。",
+            "受到的所有伤害 -15%。",
             extra=[
-                mod("Ssk1", 0.20, O.T_UNREAL, level=1, column=1),
+                mod("Ssk1", 0.0, O.T_UNREAL, level=1, column=1),
                 mod("Ssk2", 0.0, O.T_UNREAL, level=1, column=2),
                 mod("Ssk3", 0.0, O.T_UNREAL, level=1, column=3),
                 mod("Ssk4", 0, level=1, column=4),
@@ -573,9 +676,9 @@ def build_entries(
             node_id(4, 1),
             "AOcr",
             "致命锋芒",
-            "普通攻击有 20% 概率造成 2 倍伤害。",
+            "普通攻击有 25% 概率造成 2 倍伤害。",
             extra=[
-                mod("Ocr1", 20.0, O.T_UNREAL, level=1, column=1),
+                mod("Ocr1", 25.0, O.T_UNREAL, level=1, column=1),
                 mod("Ocr2", 2.0, O.T_UNREAL, level=1, column=2),
             ],
         ),
@@ -583,15 +686,15 @@ def build_entries(
             node_id(4, 2),
             "AEev",
             "鬼影迷踪",
-            "普通攻击有 20% 概率被闪避。",
-            extra=[mod("Eev1", 0.20, O.T_UNREAL, level=1, column=1)],
+            "普通攻击有 25% 概率被闪避。",
+            extra=[mod("Eev1", 0.25, O.T_UNREAL, level=1, column=1)],
         ),
         attribute_entry(
             node_id(5, 0),
             "魔神之握",
             ICON_HAND,
             (0, 0, 0),
-            tip="获得神器：阿克蒙德之手。",
+            tip="获得神器：魔神之握。",
         ),
         attribute_entry(
             node_id(5, 1),
@@ -648,6 +751,17 @@ def build_entries(
             extra=[mod("Imvb", 20, level=1, column=1)],
         ),
     ]
+    if melee_hero_talents:
+        entries.extend([
+            *[
+                demon_hunter_talent_entry(
+                    demon_hunter_talent_id(index)
+                )
+                for index in range(HERO_POOL_SIZE)
+            ],
+            *demon_hunter_node_entries(),
+            demon_hunter_speed_entry(),
+        ])
     return entries
 
 
@@ -675,12 +789,16 @@ def write_talent_objects(
     item_path: Path,
     buff_path: Path,
     breakthrough_buff_id: str = BREAKTHROUGH_BUFF_ID_BASE,
+    melee_hero_talents: bool = False,
 ) -> None:
     data = DOBJ.write_objects_bytes(
         3,
         [
             doctor_object(entry)
-            for entry in build_entries(breakthrough_buff_id)
+            for entry in build_entries(
+                breakthrough_buff_id,
+                melee_hero_talents,
+            )
         ],
         True,
     )
@@ -961,24 +1079,24 @@ def verify(output: Path) -> None:
             "aub1": "主动技能伤害 +20%。",
         },
         "T112": {
-            ("Ssk1", 1): 0.2,
+            ("Ssk1", 1): 0.0,
             "atp1": "金刚不坏",
-            "aub1": "受到的所有伤害 -20%。",
+            "aub1": "受到的所有伤害 -15%。",
         },
         "T113": {
-            ("Ocr1", 1): 20.0,
+            ("Ocr1", 1): 25.0,
             ("Ocr2", 1): 2.0,
             "atp1": "致命锋芒",
-            "aub1": "普通攻击有 20% 概率造成 2 倍伤害。",
+            "aub1": "普通攻击有 25% 概率造成 2 倍伤害。",
         },
         "T114": {
-            ("Eev1", 1): 0.2,
+            ("Eev1", 1): 0.25,
             "atp1": "鬼影迷踪",
-            "aub1": "普通攻击有 20% 概率被闪避。",
+            "aub1": "普通攻击有 25% 概率被闪避。",
         },
         "T115": {
             "atp1": "魔神之握",
-            "aub1": "获得神器：阿克蒙德之手。",
+            "aub1": "获得神器：魔神之握。",
         },
         "T116": {
             "atp1": "邪刃契约",
@@ -1191,12 +1309,10 @@ def verify(output: Path) -> None:
         b"call TT_GrantEarnedPoints(u)",
         b"integer TT_MAX_LEVEL = 10",
         b"integer TT_CAMPAIGN_CHAPTER = 1",
-        b"event=CAMPAIGN_FRESH",
         b"function TT_ClearTalentArtifact takes unit u returns nothing",
         b'"talentreset"',
         b"set it = UnitAddItemByIdSwapped(desiredId, u)",
         b"function TT_RegisterHeroCore takes unit u, boolean allowNew",
-        b"function TT_IsCampaignRestoreQueued takes unit u",
         b"function TT_EnsureHeroNow takes unit u",
         b"boolean TT_START_READY = false",
         b"function TT_MarkStartReady takes nothing returns nothing",
@@ -1210,7 +1326,6 @@ def verify(output: Path) -> None:
         b"return TT_RegisterHeroCore(u, false)",
         b"TT_RegisterHeroCore(u, true)",
         b"if heroIndex < 0 or GetUnitAbilityLevel(u, 'T405') == 0 then",
-        b"if TT_IsCampaignRestoreQueued(u) then",
         b"call TT_EnsureHeroNow(u)",
         b"if not TT_START_READY then",
         b"HERO_WAIT_BACKPACK",
@@ -1224,10 +1339,23 @@ def verify(output: Path) -> None:
         b"function TT_EarnedTalentPoints takes unit u returns integer",
         b"function TT_SyncAwardedFromMarkers takes unit u returns integer",
         b"function TT_IsAwarded takes integer heroIndex, integer index returns boolean",
-        b"function TT_CampaignStore takes unit u, gamecache cache returns nothing",
-        b"function TT_CampaignRestore takes unit u, gamecache cache returns nothing",
-        b"function TT_QueueCampaignRestore takes unit u, gamecache cache returns nothing",
-        b"function TT_ConsumeCampaignRestore takes unit u, integer heroIndex returns boolean",
+        b"function TT_CampaignNormalizeUnitForStore takes unit u returns nothing",
+        b"function TT_CampaignStoreTalentSnapshot takes unit u, gamecache cache",
+        b"function TT_CampaignRestoreTalentSnapshot takes unit u, gamecache cache",
+        b"function TT_OnTalentSelectionStep takes nothing returns nothing",
+        b"function TT_FinishTalentUiRebuild takes unit u, integer heroIndex, timer t",
+        b"function TT_ScheduleTalentUiRebuild takes unit u, integer heroIndex",
+        b"CAMPAIGN_NATIVE_NORMALIZE",
+        b"CAMPAIGN_TALENT_SNAPSHOT_STORE",
+        b"CAMPAIGN_TALENT_SNAPSHOT_RESTORE",
+        b"CAMPAIGN_TALENT_SNAPSHOT_MISSING",
+        b"TALENT_UI_REBUILD",
+        b"TALENT_UI_PREPARE",
+        b"TALENT_UI_SELECT",
+        b"function TT_CampaignAuditAbilities takes unit u, string phase returns nothing",
+        b"function TT_CampaignAuditStore takes unit u, gamecache cache",
+        b"function TT_CampaignAuditRestoreProbe takes gamecache cache",
+        b"function TT_CampaignAuditSave takes gamecache cache",
         b"function TT_RegisteredHeroIndex takes unit u returns integer",
         b"function TT_OnPointTimer takes nothing returns nothing",
         b"integer array TT_PENDING_POINTS",
@@ -1236,24 +1364,20 @@ def verify(output: Path) -> None:
         b"boolean array TT_POINT_USE_ACCEPTED",
         b"boolean array TT_POINT_GRANT_FAILED",
         b"integer array TT_POINT_GRANT_FAILED_LEVEL",
-        b"boolean array TT_CAMPAIGN_STATE_PENDING",
-        b"boolean array TT_CAMPAIGN_VERIFY_PENDING",
-        b"hashtable TT_RESTORE_TABLE = null",
-        b"function TT_ScheduleCampaignVerify takes unit u, integer heroIndex returns nothing",
-        b"CAMPAIGN_REAPPLY",
-        b"event=CAMPAIGN_STORE_SAVED",
+        b"CAMPAIGN_STORE_AUDIT",
+        b"CAMPAIGN_STORE_ABILITY",
+        b"CAMPAIGN_RESTORE_PROBE",
+        b"CAMPAIGN_CACHE_SAVE",
+        b"CAMPAIGN_SAVE_RECHECK",
+        b"CAMPAIGN_EXPECTED_CHECK",
+        b"CAMPAIGN_STORE_ITEM",
         b"string TT_LOG_FILE = \"ALAS-TalentLog.txt\"",
-        b"gamecache array TT_CAMPAIGN_RESTORE_CACHES",
-        b'call StoreInteger(cache, "ALAS_TALENT", key + "a"',
-        b"CAMPAIGN_LEGACY_RECOVER",
-        b"CAMPAIGN_RESTORE_DEFERRED",
         b"START_READY",
         b"POINT_ITEM_ISSUED",
         b"POINT_GRANT_COMMITTED",
         b"event=POINT_GRANT_BLOCKED",
         b"UnitUseItem(u, it)",
         b"call TT_StartPointTimer()",
-        b"call TT_ConsumeCampaignRestore(u, heroIndex)",
         b"call UnitRemoveAbility(u, talentId)",
         b"call GroupEnumUnitsSelected(g, p, null)",
         b"function TT_LogFlush takes nothing returns nothing",
@@ -1262,12 +1386,14 @@ def verify(output: Path) -> None:
         b"call UnitMakeAbilityPermanent(u, true, talentId)",
         b"EVENT_PLAYER_HERO_REVIVE_FINISH",
         b"EVENT_PLAYER_HERO_SKILL",
-        b"damage * 0.60",
+        b"damage * 0.85",
         b"EVENT_PLAYER_UNIT_DAMAGED",
         b"TT_SyncArtifacts",
     ):
         if marker not in script:
             raise SystemExit("script marker missing: %r" % marker)
+    if b"damage * 0.60" in script:
+        raise SystemExit("legacy 40% talent damage reduction remains")
     if b'"talentpoints"' in script:
         raise SystemExit("legacy talent point command still registered")
     if b"call UnitAddItemByIdSwapped('B30B', u)" in script:
@@ -1276,6 +1402,19 @@ def verify(output: Path) -> None:
         raise SystemExit("talent backpack still uses detached item creation")
     if b"TT_TalentAbilityId(100 + tier * 3 +" in script:
         raise SystemExit("talent tier mapping still assumes physical order")
+    for forbidden in (
+        b"function TT_CampaignStore takes",
+        b"function TT_CampaignRestore takes",
+        b"TT_CAMPAIGN_STATE_PENDING",
+        b"TT_CAMPAIGN_RESTORE_UNITS",
+        b"TT_RESTORE_TABLE",
+        b'"ALAS_TALENT",',
+        b"CAMPAIGN_FALLBACK_RESTORE",
+    ):
+        if forbidden in script:
+            raise SystemExit(
+                "legacy campaign state marker remains: %r" % forbidden
+            )
     print(
         "verified 64 six-tier talent trees, "
         "per-hero backpack owners, and ALAS artifacts"

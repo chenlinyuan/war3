@@ -212,6 +212,7 @@ class CampaignInfo:
 @dataclass
 class BuildResult:
     app_version: str
+    target_client: str
     source: str
     source_kind: str
     output: str
@@ -222,6 +223,7 @@ class BuildResult:
     new_backpack: bool
     new_backpack_panels: tuple[str, ...]
     universal_talents: bool
+    melee_hero_talents: bool
     wild_equipment_drops: bool
     campaign_equipment_drops: bool
     follow_game_graphics: bool
@@ -324,6 +326,10 @@ def default_output_dir(source: Path) -> Path:
 def default_cache_dir() -> Path:
     local = Path(os.environ.get("LOCALAPPDATA", profile_cache_fallback()))
     return local / "ALASOffline"
+
+
+def generated_config_dir() -> Path:
+    return default_cache_dir() / "config"
 
 
 def _path_size(path: Path) -> tuple[int, int]:
@@ -659,11 +665,6 @@ def analyze_source(path: Path) -> CampaignInfo:
             title = chapter_titles.get(folded) or chapter_titles.get(
                 folded.rsplit("/", 1)[-1], ""
             )
-            reason = CAMP.cinematic_chapter_reason(key, title)
-            if reason:
-                cinematic_chapters[key] = reason
-                continue
-            injectable_chapters.append(key)
             data = outer.read_file(name)
             if not data:
                 raise OfflineToolError("章节无法读取：" + name)
@@ -672,6 +673,17 @@ def analyze_source(path: Path) -> CampaignInfo:
             temp = Path(temp_name)
             try:
                 temp.write_bytes(data)
+                reason = CAMP.cinematic_chapter_reason(
+                    key,
+                    title,
+                    playable_epilogue=(
+                        CAMP.has_playable_hero_restore(temp)
+                    ),
+                )
+                if reason:
+                    cinematic_chapters[key] = reason
+                    continue
+                injectable_chapters.append(key)
                 chapter = W.MPQArchive(str(temp))
                 try:
                     map_info_versions[name] = _read_map_info_version(
@@ -839,6 +851,7 @@ class OfflineBuilder:
         self,
         log: Log | None = None,
         *,
+        target_client: str = "reforged",
         compact_archive: bool = True,
         ft_data: bool = False,
         reforged_migrate: bool = False,
@@ -846,6 +859,7 @@ class OfflineBuilder:
         new_backpack: bool = False,
         new_backpack_panels: tuple[str, ...] | None = None,
         universal_talents: bool = False,
+        melee_hero_talents: bool = False,
         wild_equipment_drops: bool = False,
         campaign_equipment_drops: bool = False,
         follow_game_graphics: bool = False,
@@ -854,6 +868,32 @@ class OfflineBuilder:
         repair_save_dir: Path | None = None,
     ) -> None:
         self.log = log or print
+        self.target_client = target_client.strip().lower()
+        if self.target_client not in ("reforged", "classic"):
+            raise OfflineToolError(
+                "target_client must be reforged or classic"
+            )
+        if self.target_client == "classic":
+            incompatible = []
+            if reforged_migrate:
+                incompatible.append("Reforged migration")
+            if new_backpack:
+                incompatible.append("new backpack")
+            if universal_talents:
+                incompatible.append("universal talents")
+            if melee_hero_talents:
+                incompatible.append("hero talents")
+            if wild_equipment_drops:
+                incompatible.append("wild equipment drops")
+            if campaign_equipment_drops:
+                incompatible.append("campaign equipment drops")
+            if follow_game_graphics:
+                incompatible.append("follow game graphics")
+            if incompatible:
+                raise OfflineToolError(
+                    "classic target does not support: "
+                    + ", ".join(incompatible)
+                )
         self.compact_archive = compact_archive
         self.ft_data = ft_data
         self.reforged_migrate = reforged_migrate
@@ -867,6 +907,9 @@ class OfflineBuilder:
             )
         self.equipment_mode = equipment_mode
         self.universal_talents = bool(universal_talents)
+        self.melee_hero_talents = bool(
+            melee_hero_talents
+        )
         self.wild_equipment_drops = bool(wild_equipment_drops)
         self.campaign_equipment_drops = bool(
             campaign_equipment_drops
@@ -878,6 +921,10 @@ class OfflineBuilder:
         if self.universal_talents and not self.new_backpack:
             raise OfflineToolError(
                 "通用天赋树必须与新背包系统一起启用"
+            )
+        if self.melee_hero_talents and not self.universal_talents:
+            raise OfflineToolError(
+                "英雄独立天赋必须与通用天赋树一起启用"
             )
         if self.wild_equipment_drops and not self.new_backpack:
             raise OfflineToolError(
@@ -940,9 +987,13 @@ class OfflineBuilder:
 
     def _env(self) -> dict[str, str]:
         env = dict(os.environ)
+        config_dir = generated_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
         env["PYTHONUTF8"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
         env["ALAS_WORKSPACE"] = str(ROOT)
+        env["ALAS_UNITIDS_DIR"] = str(config_dir)
+        env["ALAS_TARGET_CLIENT"] = self.target_client
         env["ALAS_COMPACT_ARCHIVE"] = (
             "1" if self.compact_archive else "0"
         )
@@ -958,6 +1009,9 @@ class OfflineBuilder:
         env["ALAS_UNIVERSAL_TALENTS"] = (
             "1" if self.universal_talents else "0"
         )
+        env["ALAS_MELEE_HERO_TALENTS"] = (
+            "1" if self.melee_hero_talents else "0"
+        )
         env["ALAS_WILD_EQUIPMENT_DROPS"] = (
             "1" if self.wild_equipment_drops else "0"
         )
@@ -968,7 +1022,12 @@ class OfflineBuilder:
             "1" if self.follow_game_graphics else "0"
         )
         env["PYTHONPATH"] = os.pathsep.join(
-            [str(INJECTOR), str(DOCTOR), env.get("PYTHONPATH", "")]
+            [
+                str(config_dir),
+                str(INJECTOR),
+                str(DOCTOR),
+                env.get("PYTHONPATH", ""),
+            ]
         ).rstrip(os.pathsep)
         return env
 
@@ -1010,8 +1069,12 @@ class OfflineBuilder:
             f"{source.resolve()}|{output.resolve()}|{time.time_ns()}".encode("utf-8")
         ).hexdigest()[:12]
         config_name = "wings_config_offline_" + token
-        target = INJECTOR / (config_name + ".py")
+        config_dir = generated_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        target = config_dir / (config_name + ".py")
         shutil.copy2(TEMPLATE_CONFIG, target)
+        if str(config_dir) not in sys.path:
+            sys.path.insert(0, str(config_dir))
         pick_args: list[object] = [
             self.python_executable, INJECTOR / "pick_ids.py", source,
         ]
@@ -1515,7 +1578,7 @@ class OfflineBuilder:
                             > 0.0001
                         ):
                             raise OfflineToolError(
-                                "%s: 阿克蒙德之手重击概率不是 20%%"
+                                "%s: 魔神之握重击概率不是 20%%"
                                 % name
                             )
                         require_frost_control(
@@ -1882,7 +1945,7 @@ class OfflineBuilder:
             require_wing_copy(item_fields, config, output.name)
             bash_fields = ability_fields.get(config.HAND["bash"], {})
             if abs(float(bash_fields.get("Hbh1", "nan")) - 20.0) > 0.0001:
-                raise OfflineToolError("单图阿克蒙德之手重击概率不是 20%。")
+                raise OfflineToolError("单图魔神之握重击概率不是 20%。")
             require_frost_control(
                 ability_fields,
                 ability_origins,
@@ -2385,7 +2448,7 @@ class OfflineBuilder:
         self._audit_new_backpack(
             output, source_kind, injected_chapters, script_type
         )
-        terms = ["阿克蒙德", "霜之哀伤", "埃辛诺斯战刃"]
+        terms = ["魔神之握", "霜之哀伤", "埃辛诺斯战刃"]
         args: list[object] = [
             self.python_executable, INJECTOR / "audit_item_catalog.py",
             "--campaign" if source_kind == "campaign" else "--map",
@@ -2436,7 +2499,11 @@ class OfflineBuilder:
         if self.run(audit_args):
             raise OfflineToolError("ALAS 战役结构审计失败。")
 
-    def _run_doctor(self, targets: list[Path]) -> list[dict[str, object]]:
+    def _run_doctor(
+        self,
+        targets: list[Path],
+        game_version: str = "",
+    ) -> list[dict[str, object]]:
         results: list[dict[str, object]] = []
         doctor = DOCTOR / "DevosMapDoctor.py"
         if not doctor.is_file():
@@ -2446,9 +2513,18 @@ class OfflineBuilder:
         env["PJASS"] = find_pjass()
         for index, chapter in enumerate(targets, 1):
             self.log("[Doctor %d/%d] %s" % (index, len(targets), chapter.name))
+            command = [
+                self.python_executable,
+                str(doctor),
+                "check",
+                str(chapter),
+                "--quiet",
+                "--json",
+            ]
+            if game_version:
+                command.append("--game=" + game_version)
             run = subprocess.run(
-                [self.python_executable, str(doctor), "check", str(chapter),
-                 "--quiet", "--json"],
+                command,
                 cwd=str(ROOT),
                 env=env,
                 capture_output=True,
@@ -2607,6 +2683,158 @@ class OfflineBuilder:
         self.log("自动修复存档: " + result.message)
         return result
 
+    def _build_classic_item_browser(
+        self,
+        source: Path,
+        output: Path,
+        info: CampaignInfo,
+        *,
+        overwrite: bool,
+        doctor: bool,
+    ) -> BuildResult:
+        if info.source_kind != "map":
+            raise OfflineToolError(
+                "classic item browser currently supports single maps only"
+            )
+        if info.script_type != "jass":
+            raise OfflineToolError(
+                "classic item browser currently supports JASS maps only"
+            )
+        if info.already_injected:
+            raise OfflineToolError(
+                "source map already contains the ALAS runtime"
+            )
+        if output == source:
+            raise OfflineToolError("output must not overwrite source map")
+        if output.suffix.lower() != source.suffix.lower():
+            raise OfflineToolError(
+                "output extension must match the source map"
+            )
+        if output.exists():
+            if not overwrite:
+                raise OfflineToolError(
+                    "output already exists; choose another name or allow replacement"
+                )
+            trash = default_cache_dir() / "replaced"
+            trash.mkdir(parents=True, exist_ok=True)
+            archived = trash / (
+                output.stem + "-" + time.strftime("%Y%m%d-%H%M%S")
+                + output.suffix.lower()
+            )
+            shutil.move(str(output), str(archived))
+            self.log("old output moved to: " + str(archived))
+        output.parent.mkdir(parents=True, exist_ok=True)
+
+        started = time.strftime("%Y-%m-%d %H:%M:%S")
+        cache = default_cache_dir()
+        slug = re.sub(
+            r"[^0-9A-Za-z_-]+", "_", output.stem
+        )[:60] or "map"
+        work = cache / "work" / (
+            slug + "-classic-" + time.strftime("%Y%m%d-%H%M%S")
+        )
+        work.mkdir(parents=True, exist_ok=False)
+        log_path = work / "build.log"
+        target_log = self.log
+
+        def tee_log(text: str) -> None:
+            target_log(text)
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(text + "\n")
+
+        self.log = tee_log
+        self.log("工作目录: " + str(work))
+        self.log("目标客户端: 经典版 1.27（物品浏览器）")
+        self.log("源地图: " + str(source))
+        self.log("工具版本: " + APP_VERSION)
+        self.log("脚本类型: JASS")
+        running = running_war3_processes()
+        if running:
+            self.log(
+                "警告: 检测到 "
+                + "、".join(running)
+                + " 正在运行；测试前必须完全退出游戏。"
+            )
+
+        code = self.run([
+            self.python_executable,
+            INJECTOR / "port_classic_item_browser_map.py",
+            "--map",
+            source,
+            "--work",
+            work / "build",
+            "--output",
+            output,
+        ])
+        if code:
+            raise OfflineToolError("classic item browser build failed")
+
+        doctor_results: list[dict[str, object]] = []
+        if doctor:
+            doctor_results = self._run_doctor(
+                [output],
+                game_version="1.27",
+            )
+        save_repair = self._repair_saves(output, "map", info.title)
+        finished = time.strftime("%Y-%m-%d %H:%M:%S")
+        result = BuildResult(
+            app_version=APP_VERSION,
+            target_client="classic",
+            source=str(source),
+            source_kind="map",
+            output=str(output),
+            compact_archive=False,
+            ft_data=False,
+            reforged_migrate=False,
+            equipment_mode="item-browser",
+            new_backpack=False,
+            new_backpack_panels=(),
+            universal_talents=False,
+            melee_hero_talents=False,
+            wild_equipment_drops=False,
+            campaign_equipment_drops=False,
+            follow_game_graphics=False,
+            include_cinematic_chapters=False,
+            script_type="jass",
+            chapters=1,
+            injected_chapters=1,
+            skipped_cinematic_chapters=0,
+            output_bytes=output.stat().st_size,
+            output_sha256=sha256_file(output),
+            doctor_blockers=sum(
+                int(item.get("blockers", 0))
+                for item in doctor_results
+            ),
+            save_repair_enabled=self.repair_saves,
+            save_repair=save_repair,
+            work_dir=str(work),
+            report=str(work / "build-report.json"),
+            started_at=started,
+            finished_at=finished,
+        )
+        report = {
+            "result": asdict(result),
+            "campaign": asdict(info),
+            "config": {
+                "target_client": "classic",
+                "mode": "item_browser",
+            },
+            "doctor": doctor_results,
+            "save_repair": asdict(save_repair),
+            "commands": {"last": self._last_command},
+        }
+        Path(result.report).write_text(
+            json.dumps(report, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        self.log("")
+        self.log("构建完成")
+        self.log("成品: " + result.output)
+        self.log("大小: %d 字节" % result.output_bytes)
+        self.log("SHA-256: " + result.output_sha256)
+        self.log("报告: " + result.report)
+        return result
+
     def build(
         self,
         source: Path,
@@ -2619,6 +2847,14 @@ class OfflineBuilder:
         source = source.resolve()
         output = output.resolve()
         info = analyze_source(source)
+        if self.target_client == "classic":
+            return self._build_classic_item_browser(
+                source,
+                output,
+                info,
+                overwrite=overwrite,
+                doctor=doctor,
+            )
         if self.universal_talents:
             if not info.universal_talents_supported:
                 raise OfflineToolError(
@@ -2918,6 +3154,7 @@ class OfflineBuilder:
                 build_source,
                 work / "universal-talents",
                 injected_chapters,
+                self.melee_hero_talents,
             )
             self._talent_bundle = talent_bundle
             self.log(
@@ -2983,6 +3220,32 @@ class OfflineBuilder:
                     for profile in campaign_drop_bundle.profiles
                 )
             )
+            self.log(
+                "campaign object catalog: chapters=%d definitions=%d "
+                "duplicate-variants=%d"
+                % (
+                    campaign_drop_bundle.object_chapter_count,
+                    campaign_drop_bundle.object_definition_count,
+                    campaign_drop_bundle.object_duplicate_variant_count,
+                )
+            )
+            self.log(
+                "drop object bundle: w3t=%d w3a=%d w3h=%d w3u=%d "
+                "assets=%d"
+                % (
+                    len(campaign_drop_bundle.object_ids.get("w3t", ())),
+                    len(campaign_drop_bundle.object_ids.get("w3a", ())),
+                    len(campaign_drop_bundle.object_ids.get("w3h", ())),
+                    len(campaign_drop_bundle.object_ids.get("w3u", ())),
+                    len(campaign_drop_bundle.assets),
+                )
+            )
+            self.log(
+                "campaign object catalog file: "
+                + str(campaign_drop_bundle.object_catalog)
+            )
+            for warning in campaign_drop_bundle.object_warnings:
+                self.log("drop object warning: " + warning)
         if self.cancelled:
             raise OfflineToolError("用户取消。")
 
@@ -3145,6 +3408,7 @@ class OfflineBuilder:
         finished = time.strftime("%Y-%m-%d %H:%M:%S")
         result = BuildResult(
             app_version=APP_VERSION,
+            target_client="reforged",
             source=str(source),
             source_kind=info.source_kind,
             output=str(output),
@@ -3155,6 +3419,7 @@ class OfflineBuilder:
             new_backpack=self.new_backpack,
             new_backpack_panels=self.new_backpack_panels,
             universal_talents=self.universal_talents,
+            melee_hero_talents=self.melee_hero_talents,
             wild_equipment_drops=self.wild_equipment_drops,
             campaign_equipment_drops=self.campaign_equipment_drops,
             follow_game_graphics=self.follow_game_graphics,
@@ -3185,6 +3450,28 @@ class OfflineBuilder:
             "result": asdict(result),
             "campaign": asdict(info),
             "config": config,
+            "campaign_drop_bundle": (
+                {
+                    "catalog": str(campaign_drop_bundle.object_catalog),
+                    "chapters": campaign_drop_bundle.object_chapter_count,
+                    "definitions": (
+                        campaign_drop_bundle.object_definition_count
+                    ),
+                    "duplicate_variants": (
+                        campaign_drop_bundle.object_duplicate_variant_count
+                    ),
+                    "object_ids": campaign_drop_bundle.object_ids,
+                    "assets": [
+                        {"local": str(local), "internal": internal}
+                        for local, internal in campaign_drop_bundle.assets
+                    ],
+                    "warnings": list(
+                        campaign_drop_bundle.object_warnings
+                    ),
+                }
+                if campaign_drop_bundle is not None
+                else None
+            ),
             "doctor": doctor_results,
             "save_repair": asdict(save_repair),
             "compatibility": compatibility,

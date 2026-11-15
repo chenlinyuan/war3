@@ -55,7 +55,7 @@ def our_item_ids(cfg):
     别名列表 = 配置里的名字（`wing 炽天使` 那种叫法）+ 物品数据里的名字（unam）。
     两个都可能被玩家敲（`additem 炽天使之翼` / `additem 天使之翼`），所以都收进表里。
     """
-    out = [(cfg.HAND["item"], ["阿克蒙德之手"])]
+    out = [(cfg.HAND["item"], ["魔神之握"])]
     for w in cfg.WINGS:
         out.append((w["item"], [w["name"]]))
     for m in cfg.MOUNTS:

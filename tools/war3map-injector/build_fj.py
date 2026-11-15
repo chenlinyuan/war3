@@ -22,6 +22,7 @@ EXTRA_DIR = os.environ.get("IB_EXTRA_DIR") or HERE
 #   移植到别的图时用 IB_BASE_DIR 指到"该图的工作目录"，避免把某张图的表写回仓库。
 BASE_DIR = os.environ.get("IB_BASE_DIR") or HERE
 FJ = os.path.join(OUT_DIR, "f.j")
+ITEMS_ONLY = os.environ.get("IB_ITEMS_ONLY") == "1"
 
 
 def clean_name(s):
@@ -240,7 +241,9 @@ init_body = ["function IB_Init takes nothing returns nothing",
              "    set ib_itemCount = 0",
              "    set ib_skillCount = 0",
              "    set ib_unitCount = 0",
-             "    call IB_RegisterChat()",
+             "    call %s()" % (
+                 "IB_RegisterItemChat" if ITEMS_ONLY else "IB_RegisterChat"
+             ),
              "    set ib_fillIdx = 0",
              "    set ib_fillTotal = %d" % len(chunks),
              "    set ib_fillTimer = CreateTimer()",
@@ -381,6 +384,56 @@ if (
         "IB_AddGive must cap item creation by requested count, not by "
         "successfully-added count"
     )
+
+# Replace the fixed 15-result search with page-aware search. The browser
+# template contains generated GBK bytes, so the paging code lives in a clean
+# UTF-8 fragment and is injected by the generator.
+paged_search_path = os.path.join(HERE, "paged_item_search.j")
+paged_search = open(paged_search_path, encoding="utf-8").read().rstrip()
+# The fragment starts with paging helpers, while search_pattern below only
+# matches the two search functions. Remove old helper copies first so repeated
+# builds cannot inject them again and fail pjass with multiply-defined symbols.
+for paged_helper in (
+    "IB_PageDigit takes string c returns integer",
+    "IB_IsPageDigits takes string s returns boolean",
+    "IB_PageNumber takes string s returns integer",
+):
+    txt = re.sub(
+        r"function " + paged_helper + r"\n.*?\nendfunction\n\n?",
+        "",
+        txt,
+        flags=re.S,
+    )
+search_pattern = re.compile(
+    r"function IB_SearchStep takes nothing returns nothing\n.*?\nendfunction\n\n"
+    r"function IB_Search takes player p, string keyword returns nothing\n.*?\nendfunction",
+    re.S,
+)
+if not search_pattern.search(txt):
+    raise SystemExit("IB search blocks not found in f.j")
+txt = search_pattern.sub(lambda m: paged_search, txt, count=1)
+search_help_pattern = re.compile(
+    r'(?m)^[ \t]*call IB_Message\(p, "search <[^\r\n]*\r?\n'
+)
+search_help = (
+    '        call IB_Message(p, "search <关键词> [页码]  '
+    '搜索装备，每页每类最多 15 条")\n'
+    '        call IB_Message(p, "示例: search 影之玉 2  '
+    '查看第 2 页")\n'
+)
+if not search_help_pattern.search(txt):
+    raise SystemExit("IB search help line not found in f.j")
+txt = search_help_pattern.sub(lambda m: search_help, txt, count=1)
+if os.environ.get("IB_ITEMS_ONLY") == "1":
+    chat_path = os.path.join(HERE, "classic_item_chat.j")
+    chat_block = open(chat_path, encoding="utf-8").read().rstrip()
+    chat_pattern = re.compile(
+        r"function IB_OnChat takes nothing returns nothing\n.*?\nendfunction",
+        re.S,
+    )
+    if not chat_pattern.search(txt):
+        raise SystemExit("IB_OnChat block not found in f.j")
+    txt = chat_pattern.sub(lambda m: chat_block, txt, count=1)
 
 # 1) Remove any previously generated IB_Fill* / IB_FillStep / IB_SkillFill* / IB_UnitFill* functions (idempotent rebuild)
 txt = re.sub(r"function IB_FillStep takes nothing returns nothing\n.*?\nendfunction\n\n?", "", txt, flags=re.S)

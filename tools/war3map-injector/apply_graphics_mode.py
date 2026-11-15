@@ -76,7 +76,7 @@ def _object_key(entry: tuple) -> tuple[int, str, str]:
 
 def _read_unit_object_data(
     data: bytes | None, label: str
-) -> tuple[int, list[tuple]] | None:
+) -> tuple[int, list[tuple], bytes] | None:
     if not data:
         return None
     version, entries, consumed = OBJ.read_objects_bytes(
@@ -85,12 +85,14 @@ def _read_unit_object_data(
         fname=label,
         with_end=True,
     )
-    if consumed != len(data):
+    trailing = data[consumed:]
+    if trailing.strip(b"\0"):
         raise RuntimeError(
-            "%s: object parser consumed %d of %d bytes"
-            % (label, consumed, len(data))
+            "%s: object parser found %d non-zero trailing bytes after "
+            "consuming %d of %d bytes"
+            % (label, len(trailing), consumed, len(data))
         )
-    return version, entries
+    return version, entries, trailing
 
 
 def _hero_keys(
@@ -103,7 +105,7 @@ def _hero_keys(
         parsed = _read_unit_object_data(data, label + ":" + suffix)
         if parsed is None:
             continue
-        _version, entries = parsed
+        _version, entries, _trailing = parsed
         for entry in entries:
             key = _object_key(entry)
             if key[1] in BASE_HERO_IDS:
@@ -158,7 +160,7 @@ def patch_hero_models(
             continue
         parsed = _read_unit_object_data(data, label + ":" + suffix)
         assert parsed is not None
-        version, entries = parsed
+        version, entries, trailing = parsed
         changed = 0
         for entry in entries:
             key = _object_key(entry)
@@ -171,7 +173,7 @@ def patch_hero_models(
         if not changed:
             outputs.append(data)
             continue
-        updated = OBJ.write_objects_bytes(version, entries, False)
+        updated = OBJ.write_objects_bytes(version, entries, False) + trailing
         check_version, check_entries, consumed = (
             OBJ.read_objects_bytes(
                 updated,
@@ -183,7 +185,8 @@ def patch_hero_models(
         if (
             check_version != version
             or len(check_entries) != len(entries)
-            or consumed != len(updated)
+            or consumed + len(trailing) != len(updated)
+            or updated[consumed:] != trailing
         ):
             raise RuntimeError(
                 "%s hero-model write-back failed" % (label + ":" + suffix)
@@ -411,7 +414,7 @@ def _audit_map_bytes(
         parsed = _read_unit_object_data(data, label + ":" + suffix)
         if parsed is None:
             continue
-        _version, entries = parsed
+        _version, entries, _trailing = parsed
         for entry in entries:
             key = _object_key(entry)
             if key not in heroes:

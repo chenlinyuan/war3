@@ -124,10 +124,10 @@ def audit_archive(
         for entry in ability_entries
     }
     for ident, lore_marker, passives in (
-        (hand_id, "阿克蒙德留下的", ("重击", "掠夺", "夺魂")),
+        (hand_id, "魔神留下的", ("重击", "掠夺", "夺魂")),
         (frostmourne_id, "巫妖王的低语", ("霜冻新星", "噬魂")),
         (warglaive_id, "这是卡多雷", (
-            "攻击速度随敏捷提升", "顺劈", "邪魂淬炼",
+            "顺劈", "邪魂淬炼",
         )),
     ):
         require(ident in items, "deployed map is missing " + ident)
@@ -142,6 +142,11 @@ def audit_archive(
         check_effect_layout(
             tooltip, passives, "deployed " + ident + ".utub", lore_marker
         )
+        if ident == warglaive_id:
+            require(
+                "攻击速度 +100%" in tooltip,
+                "deployed I106 lacks fixed +100% attack speed",
+            )
         require(
             any(token in tooltip for token in MANA_AND_COOLDOWN) is False,
             "deployed " + ident + " tooltip repeats mana or cooldown",
@@ -163,8 +168,8 @@ def audit_archive(
             description_ident + " tooltip repeats mana or cooldown",
         )
     frost_base = abilities["A105"][1].replace("\0", "")
-    require(frost_base == "ANcl",
-            "A105 must use the instant Channel base")
+    require(frost_base == "AOws",
+            "A105 must use the non-Channel War Stomp shell")
     frost_fields = {
         field[0]: ITEM.field_values(abilities["A105"][3], field[0])
         for field in abilities["A105"][3]
@@ -191,14 +196,20 @@ def audit_archive(
     )
     require(frost_fields.get("aord") == ["froststomp"],
             "A105 must use froststomp for its Profile order")
-    require(frost_fields.get("Ncl6") == ["froststomp"],
-            "A105 must use froststomp for its Channel order")
-    require(frost_fields.get("Ncl2") == ["0"],
-            "A105 must remain an instant no-target ability")
-    require(frost_fields.get("Ncl3") == ["1"],
-            "A105 must remain visible on the command card")
-    require(frost_fields.get("Ncl5") == ["0"],
-            "A105 must not disable other abilities")
+    for field_id in ("Ncl1", "Ncl2", "Ncl3", "Ncl4", "Ncl5", "Ncl6"):
+        require(field_id not in frost_fields,
+                "A105 must not retain Channel field " + field_id)
+    require(frost_fields.get("Wrs1") == ["0.0"]
+            or frost_fields.get("Wrs1") == ["0"],
+            "A105 native War Stomp damage must remain zero")
+    require(frost_fields.get("adur") == ["0.0"]
+            or frost_fields.get("adur") == ["0"],
+            "A105 native normal stun must remain zero")
+    require(frost_fields.get("ahdu") == ["0.0"]
+            or frost_fields.get("ahdu") == ["0"],
+            "A105 native hero stun must remain zero")
+    require(frost_fields.get("abuf", [""]) == [""],
+            "A105 must clear the native War Stomp buff")
     require(frost_fields.get("aani") == ["stand"],
             "A105 must suppress the Channel cast animation")
     require(frost_fields.get("acat") == [""],
@@ -294,18 +305,16 @@ def audit_archive(
             "deployed Frostmourne functions are missing")
     require(b"EVENT_PLAYER_UNIT_ISSUED_ORDER" not in frostmourne_functions,
             "deployed Frostmourne spell still double-processes its issued order")
-    require(b"EVENT_PLAYER_UNIT_SPELL_CAST" in script,
-            "deployed spell is missing its cast event")
     require(b"EVENT_PLAYER_UNIT_SPELL_EFFECT" in script,
-            "deployed spell is missing its effect-event fallback")
+            "deployed spell is missing its effect event")
     require(b'SetUnitAnimation(caster, "stand")' in script,
             "deployed spell still plays a cast animation")
     require(b"function FR_OnStompCast takes" in script,
             "deployed spell is missing its cast-event fallback")
-    require(b"fr_cast_guard_table" in script,
-            "deployed spell is missing its duplicate-cast guard")
-    require(b"real FR_CAST_GUARD_SECONDS = 9.5" in script,
-            "deployed cast guard does not cover the full cast cycle")
+    require(b"fr_cast_guard_table" not in script,
+            "deployed spell still contains the cooldown-blocking cast guard")
+    require(b"FR_CAST_GUARD_SECONDS" not in script,
+            "deployed spell still contains the 9.5-second cast restriction")
     require(b'FR_ShowTimedEffect("war3campImported\\\\IceStompRaised.mdx"' in script,
             "deployed spell is missing its single scripted cast effect")
     require(b"function FR_OnHeroRevive takes" in script,
@@ -370,7 +379,7 @@ def main() -> None:
         require("对英雄造成" not in text, name + ": active damage remains")
     check_effect_layout(
         hand_tooltip, ("重击", "掠夺", "夺魂"),
-        "Archimonde Hand.utub", "阿克蒙德留下的",
+        "Archimonde Hand.utub", "魔神留下的",
     )
     with tempfile.TemporaryDirectory() as temp_dir:
         item_path = Path(temp_dir) / "hand.w3t"
@@ -391,7 +400,7 @@ def main() -> None:
                 "generated I103 tooltip soul passive count is not 1")
         check_effect_layout(
             generated, ("重击", "掠夺", "夺魂"),
-            "generated I103.utub", "阿克蒙德留下的",
+            "generated I103.utub", "魔神留下的",
         )
     for config_name in config_names:
         candidate = importlib.import_module(config_name)
@@ -404,15 +413,26 @@ def main() -> None:
                 config_name + ": soul passive count is not 1")
         require(tooltip.rfind(soul_marker) < tooltip.rfind(SKILL_ENTRY),
                 config_name + ": soul passive is not before skill entry")
+        lore_marker = (
+            "魔神" if "魔神" in candidate.HAND_ITEM_TOOLTIP else "阿克蒙德"
+        )
         check_effect_layout(
             tooltip, ("重击", "掠夺", "夺魂"),
-            config_name, "阿克蒙德",
+            config_name, lore_marker,
         )
 
     check_effect_layout(
         ITEM.WARGLAIVE_ITEM_TOOLTIP,
-        ("攻击速度随敏捷提升", "顺劈", "邪魂淬炼"),
+        ("顺劈", "邪魂淬炼"),
         "Warglaive.utub", "这是卡多雷",
+    )
+    require(
+        "攻击速度 +100%" in ITEM.WARGLAIVE_ITEM_TOOLTIP,
+        "I106 tooltip lacks fixed +100% attack speed",
+    )
+    require(
+        "不设上限" not in ITEM.WARGLAIVE_ITEM_TOOLTIP,
+        "I106 tooltip still says the removed stat bonus has no upper limit",
     )
     require(
         any(token in ITEM.WARGLAIVE_ITEM_TOOLTIP
@@ -524,19 +544,16 @@ def main() -> None:
             "invulnerable targets are not excluded")
     require("EVENT_PLAYER_UNIT_ISSUED_ORDER" not in frost_script,
             "spell still double-processes its issued order")
-    require("EVENT_PLAYER_UNIT_SPELL_CAST" in frost_script,
-            "spell is missing its cast event")
     require("EVENT_PLAYER_UNIT_SPELL_EFFECT" in frost_script,
-            "spell is missing its effect-event fallback")
+            "spell is missing its effect event")
     require('SetUnitAnimation(caster, "stand")' in frost_script,
             "spell still plays a cast animation")
     require("function FR_OnStompCast takes" in frost_script,
             "spell is missing its cast-event fallback")
-    require("fr_cast_guard_table" in frost_script,
-            "spell is missing its duplicate-cast guard")
-    require("TimerGetElapsed(fr_clock) + FR_CAST_GUARD_SECONDS"
-            in frost_script,
-            "cast guard does not cover the full cast cycle")
+    require("fr_cast_guard_table" not in frost_script,
+            "spell still contains the cooldown-blocking cast guard")
+    require("FR_CAST_GUARD_SECONDS" not in frost_script,
+            "spell still contains the 9.5-second cast restriction")
     require(
         'FR_ShowTimedEffect("war3campImported\\\\IceStompRaised.mdx"'
         in frost_script,

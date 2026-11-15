@@ -109,7 +109,7 @@ def main():
         rows = collect(items, "itemid")
         n = merge(os.path.join(base, "_itemids.txt"), rows, "C\t")
         print("  图内 units\\itemdata.slk: %d 条，新增 %d 条物品" % (len(rows), n))
-    if os.path.exists(skills):
+    if os.path.exists(skills) and os.environ.get("IB_ITEMS_ONLY") != "1":
         rows = collect(skills, "alias")
         n = merge(os.path.join(base, "_skillids.txt"), rows, "")
         print("  图内 units\\abilitydata.slk: %d 条，新增 %d 条技能" % (len(rows), n))

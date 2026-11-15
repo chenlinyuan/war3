@@ -69,6 +69,12 @@ def run_cli(argv: list[str]) -> int:
         action="version",
         version=f"ALAS 离线改图工具 {APP_VERSION} ({BUILD_DATE})",
     )
+    parser.add_argument(
+        "--target-client",
+        choices=("reforged", "classic"),
+        default="reforged",
+        help="reforged: full Reforged 3.0 runtime; classic: 1.27 item browser only",
+    )
     parser.add_argument("--source", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--overwrite", action="store_true")
@@ -119,6 +125,11 @@ def run_cli(argv: list[str]) -> int:
         "--universal-talents",
         action="store_true",
         help="启用六层通用天赋树（Reforged JASS/Lua 地图与战役）",
+    )
+    parser.add_argument(
+        "--melee-hero-talents",
+        action="store_true",
+        help="为对战英雄启用专属天赋树（当前支持恶魔猎手前四层）",
     )
     parser.add_argument(
         "--wild-equipment-drops",
@@ -179,6 +190,7 @@ def run_cli(argv: list[str]) -> int:
     try:
         OfflineBuilder(
             safe_console_log,
+            target_client=args.target_client,
             compact_archive=not args.no_compact,
             reforged_migrate=args.reforged_migrate,
             equipment_mode=args.equipment_mode,
@@ -189,6 +201,7 @@ def run_cli(argv: list[str]) -> int:
                 if item.strip()
             ),
             universal_talents=args.universal_talents,
+            melee_hero_talents=args.melee_hero_talents,
             wild_equipment_drops=args.wild_equipment_drops,
             campaign_equipment_drops=args.campaign_equipment_drops,
             follow_game_graphics=args.follow_graphics,
@@ -259,7 +272,7 @@ class OfflineApp:
         ).grid(row=0, column=3, sticky="e")
         ttk.Label(
             frame,
-            text="完整装备系统 · 全本地资源 · 不调用联网功能 · Reforged 3.0",
+            text="重制版完整功能 / 经典版物品浏览器 · 全本地资源 · 不联网",
             foreground="#355b32",
         ).grid(row=1, column=0, columnspan=4, sticky="w", pady=(4, 16))
 
@@ -293,6 +306,12 @@ class OfflineApp:
 
         options = ttk.Frame(frame)
         options.grid(row=5, column=0, columnspan=4, sticky="ew", pady=(0, 10))
+        self.target_client_var = tk.StringVar(
+            value="reforged（重制版 3.0：完整功能）"
+        )
+        self.target_hint_var = tk.StringVar(
+            value="重制版模式：注入完整 ALAS 装备系统，并使用 3.0 物品目录。"
+        )
         self.overwrite_var = tk.BooleanVar(value=False)
         self.doctor_var = tk.BooleanVar(value=True)
         self.compact_var = tk.BooleanVar(value=True)
@@ -313,6 +332,7 @@ class OfflineApp:
             value="新背包系统：请先预检查源文件。"
         )
         self.universal_talents_var = tk.BooleanVar(value=False)
+        self.melee_hero_talents_var = tk.BooleanVar(value=False)
         self.universal_talents_hint_var = tk.StringVar(
             value="通用天赋树：请先预检 JASS/Lua 地图或战役。"
         )
@@ -328,6 +348,8 @@ class OfflineApp:
         self.include_cinematic_chapters_var = tk.BooleanVar(
             value=False
         )
+        target_row = ttk.Frame(options)
+        target_row.pack(fill="x")
         row1 = ttk.Frame(options)
         row1.pack(fill="x")
         row2 = ttk.Frame(options)
@@ -344,6 +366,27 @@ class OfflineApp:
         loot_row.pack(fill="x", pady=(4, 0))
         campaign_loot_row = ttk.Frame(options)
         campaign_loot_row.pack(fill="x", pady=(4, 0))
+        ttk.Label(target_row, text="目标客户端：").pack(side="left")
+        self.target_client_combo = ttk.Combobox(
+            target_row,
+            textvariable=self.target_client_var,
+            values=(
+                "reforged（重制版 3.0：完整功能）",
+                "classic（经典版 1.27：物品浏览器）",
+            ),
+            state="readonly",
+            width=34,
+        )
+        self.target_client_combo.pack(side="left")
+        self.target_client_combo.bind(
+            "<<ComboboxSelected>>",
+            self.on_target_client_change,
+        )
+        ttk.Label(
+            target_row,
+            textvariable=self.target_hint_var,
+            foreground="#666666",
+        ).pack(side="left", padx=(14, 0))
         ttk.Checkbutton(
             row1,
             text="允许归档替换同名成品",
@@ -447,6 +490,15 @@ class OfflineApp:
             foreground="#666666",
         )
         self.universal_talents_hint_label.pack(
+            side="left", padx=(14, 0)
+        )
+        self.melee_hero_talents_check = ttk.Checkbutton(
+            talent_row,
+            text="英雄独立天赋（对战图）",
+            variable=self.melee_hero_talents_var,
+            state="disabled",
+        )
+        self.melee_hero_talents_check.pack(
             side="left", padx=(14, 0)
         )
         self.wild_equipment_drops_check = ttk.Checkbutton(
@@ -581,6 +633,50 @@ class OfflineApp:
         if path:
             self.output_var.set(path)
 
+    def on_target_client_change(self, *_args: object) -> None:
+        classic = self.target_client_var.get().startswith("classic")
+        if classic:
+            self.reforged_migrate_var.set(False)
+            self.new_backpack_var.set(False)
+            self.universal_talents_var.set(False)
+            self.melee_hero_talents_var.set(False)
+            self.wild_equipment_drops_var.set(False)
+            self.campaign_equipment_drops_var.set(False)
+            self.follow_graphics_var.set(False)
+            self.compact_var.set(False)
+            self.include_cinematic_chapters_var.set(False)
+            self.target_hint_var.set(
+                "经典版模式：仅支持单张 JASS 地图，注入 1.27 物品/技能浏览器。"
+            )
+            for widget in (
+                self.reforged_migrate_check,
+                self.new_backpack_check,
+                self.universal_talents_check,
+                self.melee_hero_talents_check,
+                self.wild_equipment_drops_check,
+                self.campaign_equipment_drops_check,
+            ):
+                widget.configure(state="disabled")
+            for widget in self.new_backpack_panel_checks:
+                widget.configure(state="disabled")
+            self.new_backpack_hint_var.set(
+                "经典版不启用新背包、装备栏、四翼或神器运行时。"
+            )
+            self.universal_talents_hint_var.set(
+                "经典版不启用通用天赋树。"
+            )
+            self.wild_equipment_drops_hint_var.set(
+                "经典版不启用野怪装备掉落。"
+            )
+            self.campaign_equipment_drops_hint_var.set(
+                "经典版不支持战役装备掉落。"
+            )
+            return
+        self.target_hint_var.set(
+            "重制版模式：注入完整 ALAS 装备系统，并使用 3.0 物品目录。"
+        )
+        self.update_new_backpack_capability(self.preflight_info)
+
     def on_new_backpack_toggle(self) -> None:
         info = self.preflight_info
         direct = bool(
@@ -611,6 +707,8 @@ class OfflineApp:
             self.new_backpack_stats_var.set(True)
             self.new_backpack_equipment_var.set(True)
             self.new_backpack_talents_var.set(True)
+        else:
+            self.melee_hero_talents_var.set(False)
         if (
             self.universal_talents_var.get()
             and info is not None
@@ -644,6 +742,9 @@ class OfflineApp:
 
     def update_new_backpack_capability(self, info: object | None) -> None:
         self.preflight_info = info
+        if self.target_client_var.get().startswith("classic"):
+            self.on_target_client_change()
+            return
         migration_required = bool(
             info is not None
             and getattr(info, "reforged_migration_required", False)
@@ -747,6 +848,12 @@ class OfflineApp:
             self.universal_talents_var.set(False)
         self.universal_talents_check.configure(
             state="normal" if supported else "disabled"
+        )
+        melee_supported = supported and self.universal_talents_var.get()
+        if not melee_supported:
+            self.melee_hero_talents_var.set(False)
+        self.melee_hero_talents_check.configure(
+            state="normal" if melee_supported else "disabled"
         )
         if info is None:
             self.universal_talents_hint_var.set(
@@ -942,6 +1049,9 @@ class OfflineApp:
                 return
             self.overwrite_var.set(True)
         new_backpack = self.new_backpack_var.get()
+        target_client = self.target_client_var.get().split(
+            "（", 1
+        )[0].strip().lower()
         new_backpack_panels = []
         if new_backpack:
             if (
@@ -972,6 +1082,7 @@ class OfflineApp:
         def work() -> None:
             builder = OfflineBuilder(
                 self.put_log,
+                target_client=target_client,
                 compact_archive=self.compact_var.get(),
                 reforged_migrate=self.reforged_migrate_var.get(),
                 equipment_mode=self.equipment_mode_var.get().split(
@@ -980,6 +1091,9 @@ class OfflineApp:
                 new_backpack=new_backpack,
                 new_backpack_panels=tuple(new_backpack_panels),
                 universal_talents=self.universal_talents_var.get(),
+                melee_hero_talents=(
+                    self.melee_hero_talents_var.get()
+                ),
                 wild_equipment_drops=self.wild_equipment_drops_var.get(),
                 campaign_equipment_drops=(
                     self.campaign_equipment_drops_var.get()

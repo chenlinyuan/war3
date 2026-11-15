@@ -95,6 +95,15 @@ _yingling_files.txt
 # ---- 大型本地源地图（会忽略，不入库）----
 maps/*.w3x
 maps/英雄传说*.w3x
+/maps/仙之侠道/
+
+# ---- 本地构建与候选资源 ----
+/dist-next/
+/heroes/_test/
+/icons/frostmourne_hand_candidates/
+/图标候选/
+/作业清单_*.html
+/$null
 
 # 校验临时文件
 scripts/item-browser/_validate.j

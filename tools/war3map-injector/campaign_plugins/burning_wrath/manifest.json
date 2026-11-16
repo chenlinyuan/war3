@@ -125,6 +125,23 @@
       "UnitMakeAbilityPermanent"
     ]
   },
+  "legacy_patch_overrides": {
+    "critical_props": false
+  },
+  "clean_source_findings": {
+    "ransao03.w3m": [
+      "gg_unit_npgr_0732 is not invulnerable after CreateUnit in the clean source.",
+      "Its death events intentionally defeat the player and wipe player units.",
+      "JDOLS5 grants A7BD to all enemy units; JDOLS5 is explicitly disabled by this profile."
+    ],
+    "ransao07.w3x": [
+      "gg_unit_O61A_0034 has an authored death-defeat trigger and no scripted self-kill."
+    ],
+    "ransao08.w3m": [
+      "gg_unit_u640_0075 is killed by story script only after setting udg_guoguanpanduan666 = 20.",
+      "The death-defeat trigger already checks udg_guoguanpanduan666 != 20."
+    ]
+  },
   "intentional_failure_paths_preserved": [
     "Protected objective and escort failures authored by the campaign",
     "Defeat when the campaign main hero dies",

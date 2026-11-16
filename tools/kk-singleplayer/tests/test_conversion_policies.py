@@ -264,6 +264,18 @@ class CampaignProfileTest(unittest.TestCase):
             CAMPAIGN_PATCHES.backpack_switch_ids("burning-wrath"),
             {"A63G"},
         )
+        self.assertFalse(
+            CAMPAIGN_PATCHES.legacy_patch_enabled(
+                "burning-wrath",
+                "critical_props",
+            )
+        )
+        self.assertTrue(
+            CAMPAIGN_PATCHES.legacy_patch_enabled(
+                "naga-wrath",
+                "critical_props",
+            )
+        )
 
 
 class WarsongPhantomPatchTest(unittest.TestCase):

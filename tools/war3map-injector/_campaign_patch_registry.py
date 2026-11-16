@@ -87,6 +87,21 @@ def backpack_switch_ids(profile_name: str | None) -> set[str]:
     return {str(value) for value in values if str(value)}
 
 
+def legacy_patch_enabled(
+    profile_name: str | None,
+    rule: str,
+    default: bool = True,
+) -> bool:
+    """Return whether a shared legacy repair is enabled for one campaign."""
+    plugin = CAMPAIGN_PLUGINS.for_name(profile_name)
+    if plugin is None:
+        return default
+    config = plugin.manifest.get("legacy_patch_overrides")
+    if not isinstance(config, dict):
+        return default
+    return bool(config.get(rule, default))
+
+
 def patch_objects(
     profile_name: str | None,
     data: bytes,

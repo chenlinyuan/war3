@@ -463,7 +463,14 @@ def patch_chapter_script(
     patched, mall_cleanup_records = MC.patch(patched)
     patched, mall_wipe_count = MW.patch(patched)
     patched, chat_guards, quest_guards = CG.patch(patched)
-    patched, critical_prop_count = CP.patch(patched)
+    critical_props_enabled = CAMPAIGN_PATCHES.legacy_patch_enabled(
+        profile_name,
+        "critical_props",
+    )
+    if critical_props_enabled:
+        patched, critical_prop_count = CP.patch(patched)
+    else:
+        critical_prop_count = 0
     patched, region_drain_count = RD.patch(patched)
     patched, unlock_count = UK.patch(patched)
     patched, platform_ends = NE.neutralize(patched)
@@ -597,6 +604,7 @@ def patch_chapter_script(
         "mall_welfare_wipes": mall_wipe_count,
         "go_quest_null_guards": quest_guards,
         "critical_props": critical_prop_count,
+        "critical_props_enabled": critical_props_enabled,
         "region_drains_scoped": region_drain_count,
         "quest_unlock_helpers": unlock_count,
         "platform_end_calls": len(platform_ends),

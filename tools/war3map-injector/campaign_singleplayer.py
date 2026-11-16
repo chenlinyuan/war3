@@ -67,6 +67,7 @@ import merge_w3obj as MO  # noqa: E402
 import apply_reforged_migration as RM  # noqa: E402
 import _patch_backpack_switch as BACKPACK  # noqa: E402
 import fix_campaign_object_icons as DISABLED_ICONS  # noqa: E402
+import fix_campaign_loading_art as LOADING_ART  # noqa: E402
 import _patch_anticheat_markers as AC  # noqa: E402
 import _campaign_profiles as PROFILES  # noqa: E402
 import _campaign_patch_registry as CAMPAIGN_PATCHES  # noqa: E402
@@ -1024,6 +1025,7 @@ def build_campaign(
     limit: int = 0,
     target: str = TARGET_REFORGED,
     clean_rederive: bool = False,
+    add_widescreen_loading_art: bool = True,
 ) -> BuildResult:
     if target not in TARGET_CHOICES:
         raise BuildError("unsupported export target: " + target)
@@ -1155,12 +1157,18 @@ def build_campaign(
                 remove_ability_ids,
                 target,
             )
+            if target == TARGET_REFORGED and add_widescreen_loading_art:
+                loading_patches, loading_record = (
+                    LOADING_ART.chapter_loading_patches(raw_path)
+                )
+            else:
+                loading_patches, loading_record = [], None
             inject_script(
                 raw_path,
                 script_name,
                 patched_script,
                 fixed_path,
-                object_patches,
+                object_patches + loading_patches,
             )
             if container_outer is not None and container_adapter is not None:
                 donor_map = container_outer.read_file(chapter_name)
@@ -1208,6 +1216,7 @@ def build_campaign(
                 "pjass_note": pjass_note,
                 "platform_hash": platform,
                 "materialized_campaign_objects": object_records,
+                "widescreen_loading_art": loading_record,
                 "patch_stats": stats,
                 "doctor": checks,
             }
@@ -1272,6 +1281,13 @@ def build_campaign(
                     ),
                     "generated_icon_files": len(icon_asset_patches),
                 }
+            if target == TARGET_REFORGED and add_widescreen_loading_art:
+                background_patches, background_record = (
+                    LOADING_ART.campaign_background_patches(source)
+                )
+            else:
+                background_patches, background_record = [], None
+            patches.extend(background_patches)
             add_attributes_patch(patches, source)
             source_archive = W.MPQArchive(str(source))
             try:
@@ -1334,6 +1350,7 @@ def build_campaign(
                 "outer_platform": outer_platform,
                 "attributes_disabled": attributes is None or struct.unpack_from("<I", attributes, 4)[0] == 0,
                 "campaign_title": title,
+                "widescreen_loading_art": background_record,
                 "output_sha256": sha256_file(partial),
                 "output_bytes": partial.stat().st_size,
             }
@@ -1437,6 +1454,11 @@ def main(argv: list[str] | None = None) -> int:
         help="do not synthesize missing DIS/DISBTN command-button icons",
     )
     parser.add_argument(
+        "--skip-loading-art",
+        action="store_true",
+        help="keep the original loading-screen and campaign background artwork",
+    )
+    parser.add_argument(
         "--inspect-json",
         action="store_true",
         help="print campaign identity metadata as one JSON object and exit",
@@ -1522,6 +1544,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.limit,
                 args.target,
                 args.clean_rederive,
+                not args.skip_loading_art,
             )
             if not result.ok and result.error:
                 raise BuildError(result.error)

@@ -135,8 +135,8 @@ class App(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("KK 地图单机化工具")
-        self.geometry("960x760")
-        self.minsize(820, 620)
+        self.geometry("960x800")
+        self.minsize(820, 640)
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.process: subprocess.Popen[str] | None = None
         self.worker: threading.Thread | None = None
@@ -152,6 +152,9 @@ class App(tk.Tk):
         self.target_var = tk.StringVar(value=initial_target())
         self.clean_rederive_var = tk.BooleanVar(
             value=bool(load_settings().get("clean_rederive", False))
+        )
+        self.fix_loading_art_var = tk.BooleanVar(
+            value=bool(load_settings().get("fix_loading_art", True))
         )
         self.status_var = tk.StringVar(value="就绪")
         self.chapter_var = tk.StringVar(value="")
@@ -245,6 +248,11 @@ class App(tk.Tk):
             text="清源推导模式（忽略历史战役插件）",
             variable=self.clean_rederive_var,
         ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(9, 0))
+        ttk.Checkbutton(
+            options,
+            text="修复重制版加载画面和结算背景",
+            variable=self.fix_loading_art_var,
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(9, 0))
 
         actions = ttk.Frame(outer)
         actions.grid(row=8, column=0, columnspan=4, sticky="ew", pady=(14, 0))
@@ -415,6 +423,8 @@ class App(tk.Tk):
         arguments.extend(["--target", target])
         if self.clean_rederive_var.get():
             arguments.append("--clean-rederive")
+        if not self.fix_loading_art_var.get():
+            arguments.append("--skip-loading-art")
 
         save_settings(
             {
@@ -422,6 +432,7 @@ class App(tk.Tk):
                 "output": output,
                 "target": target,
                 "clean_rederive": self.clean_rederive_var.get(),
+                "fix_loading_art": self.fix_loading_art_var.get(),
                 "remove_backpack_switch": self.remove_backpack_switch_var.get(),
             }
         )

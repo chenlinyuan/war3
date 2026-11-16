@@ -29,8 +29,15 @@ class WidescreenCompositionTest(unittest.TestCase):
 
         output = ART.compose_widescreen(source)
         self.assertEqual(output.size, ART.TARGET_SIZE)
+        restored = source.resize(
+            (
+                round(source.width * ART.SOURCE_HORIZONTAL_EXPANSION),
+                source.height,
+            ),
+            Image.Resampling.LANCZOS,
+        )
         expected = ImageOps.contain(
-            source,
+            restored,
             ART.TARGET_SIZE,
             method=Image.Resampling.LANCZOS,
         )

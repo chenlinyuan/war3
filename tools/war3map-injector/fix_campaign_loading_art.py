@@ -23,14 +23,22 @@ from doctor.viewers import map_card  # noqa: E402
 
 TARGET_SIZE = (1024, 576)
 TARGET_ASPECT = TARGET_SIZE[0] / TARGET_SIZE[1]
+SOURCE_HORIZONTAL_EXPANSION = 4 / 3
 WIDE_LOADING_WIDTH = 0.8 * (TARGET_ASPECT / (0.8 / 0.6))
 SCORE_SCREEN_WIDTH = TARGET_ASPECT
 SCORE_SCREEN_HEIGHT = 1.0
 
 
 def compose_widescreen(image: Image.Image) -> Image.Image:
-    """Keep the source artwork intact and fill the sides with blurred artwork."""
+    """Restore the author's square-to-4:3 compression without cropping art."""
     image = image.convert("RGB")
+    image = image.resize(
+        (
+            max(1, round(image.width * SOURCE_HORIZONTAL_EXPANSION)),
+            image.height,
+        ),
+        Image.Resampling.LANCZOS,
+    )
     background = ImageOps.fit(
         image,
         TARGET_SIZE,

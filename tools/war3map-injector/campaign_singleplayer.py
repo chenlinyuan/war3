@@ -66,6 +66,7 @@ import mpq_patch as MP  # noqa: E402
 import merge_w3obj as MO  # noqa: E402
 import apply_reforged_migration as RM  # noqa: E402
 import _patch_backpack_switch as BACKPACK  # noqa: E402
+import _patch_permanent_item_charges as ITEM_CHARGES  # noqa: E402
 import fix_campaign_object_icons as DISABLED_ICONS  # noqa: E402
 import fix_campaign_loading_art as LOADING_ART  # noqa: E402
 import _patch_anticheat_markers as AC  # noqa: E402
@@ -85,6 +86,7 @@ import _patch_final_cinematic_cleanup as FC  # noqa: E402
 import _patch_hero_death as HD  # noqa: E402
 import _patch_mall_wipe as MW  # noqa: E402
 import _patch_clean_mall_wipes as CMW  # noqa: E402
+import _clean_campaign_patches as CLEAN_PATCHES  # noqa: E402
 import _patch_mall_cleanup as MC  # noqa: E402
 import _patch_pet_delete as PP  # noqa: E402
 import _patch_region_drain as RD  # noqa: E402
@@ -415,6 +417,7 @@ def patch_chapter_script(
     remove_ability_ids: set[str] | None = None,
     critical_props_enabled: bool | None = None,
     clean_rederive_mode: bool = False,
+    campaign_sha256: str = "",
 ) -> tuple[str, dict[str, Any]]:
     gates = [gate for gate in GS.analyze_text(text) if gate["keys"]]
     mall_false: set[str] = set()
@@ -481,8 +484,14 @@ def patch_chapter_script(
     patched, mall_wipe_count = MW.patch(patched)
     if clean_rederive_mode:
         patched, clean_mall_wipe_records = CMW.patch(patched)
+        patched, clean_campaign_patch_records = CLEAN_PATCHES.patch(
+            campaign_sha256,
+            patched,
+            chapter,
+        )
     else:
         clean_mall_wipe_records = []
+        clean_campaign_patch_records = []
     patched, chat_guards, quest_guards = CG.patch(patched)
     if critical_props_enabled is None:
         critical_props_enabled = CAMPAIGN_PATCHES.legacy_patch_enabled(
@@ -553,6 +562,17 @@ def patch_chapter_script(
             raise BuildError(
                 "%s: mall-gated player wipes remain active: %s"
                 % (chapter, remaining_clean_mall_wipes[:5])
+            )
+        remaining_clean_campaign_patches = CLEAN_PATCHES.verify(
+            campaign_sha256,
+            patched,
+            chapter,
+            clean_campaign_patch_records,
+        )
+        if remaining_clean_campaign_patches:
+            raise BuildError(
+                "%s: clean-source campaign repairs missing: %s"
+                % (chapter, remaining_clean_campaign_patches[:5])
             )
     remaining_cache_handoffs = CH.verify(patched, cache_handoff_records)
     if remaining_cache_handoffs:
@@ -633,6 +653,8 @@ def patch_chapter_script(
         "mall_welfare_wipes": mall_wipe_count,
         "clean_mall_player_wipes": len(clean_mall_wipe_records),
         "clean_mall_player_wipe_records": clean_mall_wipe_records,
+        "clean_campaign_patch_count": len(clean_campaign_patch_records),
+        "clean_campaign_patch_records": clean_campaign_patch_records,
         "go_quest_null_guards": quest_guards,
         "critical_props": critical_prop_count,
         "critical_props_enabled": critical_props_enabled,
@@ -743,6 +765,10 @@ def materialized_campaign_objects(
                 raise BuildError(
                     "cannot resolve strings in %s: %s" % (map_name, exc)
                 ) from exc
+            data, item_charge_records = ITEM_CHARGES.patch(
+                data,
+                map_name.rsplit(".", 1)[-1],
+            )
             ability_ids = set(remove_ability_ids or ())
             object_switch_stats: dict[str, object] | None = None
             if ability_ids:
@@ -779,6 +805,16 @@ def materialized_campaign_objects(
                     "%s: campaign object repair missing: %s"
                     % (map_name, remaining_campaign_objects[:5])
                 )
+            remaining_item_charges = ITEM_CHARGES.verify(
+                data,
+                map_name.rsplit(".", 1)[-1],
+                item_charge_records,
+            )
+            if remaining_item_charges:
+                raise BuildError(
+                    "%s: permanent item charge repair missing: %s"
+                    % (map_name, remaining_item_charges[:5])
+                )
             patches.append((map_name, data))
             records.append(
                 {
@@ -791,6 +827,7 @@ def materialized_campaign_objects(
                     "trigstr_before": unresolved_before,
                     "trigstr_after": data.count(b"TRIGSTR_"),
                     "backpack_switch": object_switch_stats,
+                    "permanent_item_charges": item_charge_records,
                     "campaign_object_repairs": campaign_object_records,
                 }
             )
@@ -1138,6 +1175,7 @@ def build_campaign(
                 remove_ability_ids,
                 False if clean_rederive else None,
                 clean_rederive,
+                identity.source_sha256,
             )
             patched_script = patched_text.encode("utf-8", "surrogateescape")
             script_path = script_dir / (Path(chapter_name).stem + ".j")

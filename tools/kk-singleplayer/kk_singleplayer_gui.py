@@ -150,6 +150,9 @@ class App(tk.Tk):
         self.extract_only_var = tk.BooleanVar(value=False)
         self.remove_backpack_switch_var = tk.BooleanVar(value=False)
         self.target_var = tk.StringVar(value=initial_target())
+        self.clean_rederive_var = tk.BooleanVar(
+            value=bool(load_settings().get("clean_rederive", False))
+        )
         self.status_var = tk.StringVar(value="就绪")
         self.chapter_var = tk.StringVar(value="")
         self.campaign_name_var = tk.StringVar(value="尚未选择战役")
@@ -237,6 +240,11 @@ class App(tk.Tk):
             text="移除地图自带的切换背包能力",
             variable=self.remove_backpack_switch_var,
         ).grid(row=1, column=2, sticky="w", padx=(24, 0), pady=(9, 0))
+        ttk.Checkbutton(
+            options,
+            text="清源推导模式（忽略历史战役插件）",
+            variable=self.clean_rederive_var,
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(9, 0))
 
         actions = ttk.Frame(outer)
         actions.grid(row=8, column=0, columnspan=4, sticky="ew", pady=(14, 0))
@@ -383,6 +391,13 @@ class App(tk.Tk):
         if not PYTHON.is_file() or not CONVERTER.is_file():
             messagebox.showerror("工具不完整", "Python 环境或底层转换器不存在。", parent=self)
             return
+        if self.clean_rederive_var.get() and self.remove_backpack_switch_var.get():
+            messagebox.showerror(
+                "选项冲突",
+                "清源推导模式不读取历史战役插件，因此不能同时使用需要插件声明的能力移除选项。",
+                parent=self,
+            )
+            return
 
         arguments = [str(PYTHON), "-u", str(CONVERTER), str(source)]
         output = self.output_var.get().strip()
@@ -398,12 +413,15 @@ class App(tk.Tk):
         if target not in TARGET_LABELS:
             target = TARGET_REFORGED
         arguments.extend(["--target", target])
+        if self.clean_rederive_var.get():
+            arguments.append("--clean-rederive")
 
         save_settings(
             {
                 "source": str(source),
                 "output": output,
                 "target": target,
+                "clean_rederive": self.clean_rederive_var.get(),
                 "remove_backpack_switch": self.remove_backpack_switch_var.get(),
             }
         )

@@ -46,6 +46,20 @@ H:\Games\War3\Campaigns\<战役标题>（单机修复版）.w3n
 `<战役标题>（单机修复版·经典版）.w3n`，因此两种版本不会互相覆盖。该选择会保存在
 工具设置中。
 
+## 清源推导模式
+
+勾选“清源推导模式（忽略历史战役插件）”后，工具不会按源 SHA 加载任何已保存的战役
+插件，也不会套用旧 key 白名单、旧 sentinel、旧剧情单位修复或重制版兼容容器。
+转换器仍会执行通用平台 native 替换、静态门禁和原图扫描，并输出：
+
+```text
+<战役标题>（清源推导版）.w3n
+<战役标题>（清源推导版·经典版）.w3n
+```
+
+该模式用于从干净 KK 原图重新验证问题。报告中的 `clean_rederive` 字段会记录本次
+是否绕过了历史战役插件。清源模式不能同时使用依赖插件声明的“移除切换背包”选项。
+
 ## 中断点审计
 
 对已还原脚本运行只读审计器，可以按章节列出判胜、判负、退出、切章和读档事件，
@@ -96,7 +110,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```powershell
 .\.venv\Scripts\python.exe tools\war3map-injector\campaign_singleplayer.py `
   "H:\Games\War3\Campaigns\dz\209521.w3n" --overwrite `
-  --remove-backpack-switch --target classic
+  --clean-rederive --target classic
 ```
 
 运行游戏验证前，请按工作区规则停止并交给用户手动测试。

@@ -58,12 +58,53 @@ class ExportTargetTest(unittest.TestCase):
             CONVERTER.campaign_output_title("娜迦之怒", TARGET_CLASSIC),
             "娜迦之怒（单机修复版·经典版）",
         )
+        self.assertEqual(
+            CONVERTER.campaign_output_title(
+                "燃烧之怒",
+                TARGET_REFORGED,
+                clean_rederive=True,
+            ),
+            "燃烧之怒（清源推导版）",
+        )
+        self.assertEqual(
+            CONVERTER.campaign_output_title(
+                "燃烧之怒",
+                TARGET_CLASSIC,
+                clean_rederive=True,
+            ),
+            "燃烧之怒（清源推导版·经典版）",
+        )
 
     def test_unknown_target_is_rejected(self) -> None:
         with self.assertRaises(CONVERTER.BuildError):
             CONVERTER.prepare_campaign_map_info(b"data", "chapter.w3x", "unknown")
         with self.assertRaises(CONVERTER.BuildError):
             CONVERTER.campaign_output_title("campaign", "unknown")
+
+    def test_clean_rederive_disables_legacy_critical_prop_rewrite(self) -> None:
+        text = """function CreateAllUnits takes nothing returns nothing
+    set gg_unit_npgr_0732 = CreateUnit(Player(1), 'npgr', 0.0, 0.0, 0.0)
+endfunction
+function FailActions takes nothing returns nothing
+    call CustomDefeatBJ(Player(0), "失败!")
+endfunction
+function InitFail takes nothing returns nothing
+    set gg_trg_Fail = CreateTrigger()
+    call TriggerRegisterUnitEvent(gg_trg_Fail, gg_unit_npgr_0732, EVENT_UNIT_DEATH)
+    call TriggerAddAction(gg_trg_Fail, function FailActions)
+endfunction
+"""
+        output, stats = CONVERTER.patch_chapter_script(
+            text,
+            "ransao03.w3m",
+            critical_props_enabled=False,
+        )
+
+        self.assertEqual(stats["critical_props"], 0)
+        self.assertFalse(stats["critical_props_enabled"])
+        self.assertNotIn("IB: critical prop must not die", output)
+        self.assertNotIn("IB: critical prop death is no longer fatal", output)
+        self.assertIn("call CustomDefeatBJ(Player(0)", output)
 
 
 if __name__ == "__main__":

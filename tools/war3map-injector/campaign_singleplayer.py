@@ -109,6 +109,8 @@ CAMPAIGN_OBJECT_FILES = (
 )
 TITLE_SUFFIX = "（单机修复版）"
 CLASSIC_TITLE_SUFFIX = "（单机修复版·经典版）"
+CLEAN_REDERIVE_SUFFIX = "（清源推导版）"
+CLEAN_REDERIVE_CLASSIC_SUFFIX = "（清源推导版·经典版）"
 TARGET_CLASSIC = "classic"
 TARGET_REFORGED = "reforged"
 TARGET_CHOICES = (TARGET_CLASSIC, TARGET_REFORGED)
@@ -137,6 +139,7 @@ class BuildResult:
     output: Path | None = None
     work: Path | None = None
     target: str = TARGET_REFORGED
+    clean_rederive: bool = False
     ok: bool = False
     error: str = ""
     chapters: list[dict[str, Any]] = field(default_factory=list)
@@ -158,7 +161,17 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def campaign_output_title(title: str, target: str) -> str:
+def campaign_output_title(
+    title: str,
+    target: str,
+    clean_rederive: bool = False,
+) -> str:
+    if clean_rederive:
+        if target == TARGET_CLASSIC:
+            return title + CLEAN_REDERIVE_CLASSIC_SUFFIX
+        if target == TARGET_REFORGED:
+            return title + CLEAN_REDERIVE_SUFFIX
+        raise BuildError("unsupported export target: " + target)
     if target == TARGET_CLASSIC:
         return title + CLASSIC_TITLE_SUFFIX
     if target == TARGET_REFORGED:
@@ -398,6 +411,7 @@ def patch_chapter_script(
     profile_mall_default_true: bool = True,
     profile_name: str | None = None,
     remove_ability_ids: set[str] | None = None,
+    critical_props_enabled: bool | None = None,
 ) -> tuple[str, dict[str, Any]]:
     gates = [gate for gate in GS.analyze_text(text) if gate["keys"]]
     mall_false: set[str] = set()
@@ -463,10 +477,11 @@ def patch_chapter_script(
     patched, mall_cleanup_records = MC.patch(patched)
     patched, mall_wipe_count = MW.patch(patched)
     patched, chat_guards, quest_guards = CG.patch(patched)
-    critical_props_enabled = CAMPAIGN_PATCHES.legacy_patch_enabled(
-        profile_name,
-        "critical_props",
-    )
+    if critical_props_enabled is None:
+        critical_props_enabled = CAMPAIGN_PATCHES.legacy_patch_enabled(
+            profile_name,
+            "critical_props",
+        )
     if critical_props_enabled:
         patched, critical_prop_count = CP.patch(patched)
     else:
@@ -888,16 +903,17 @@ def write_json(path: Path, data: Any) -> None:
 
 def aggregate_manifests(work_root: Path) -> list[dict[str, Any]]:
     """Return the newest completed manifest for each source and export target."""
-    newest: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+    newest: dict[tuple[str, str, bool], tuple[float, dict[str, Any]]] = {}
     for manifest_path in work_root.glob("*/reports/manifest.json"):
         try:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
             source = str(Path(data["source"]).resolve())
             target = str(data.get("target") or TARGET_REFORGED)
+            clean_rederive = bool(data.get("clean_rederive", False))
         except Exception:
             continue
         modified = manifest_path.stat().st_mtime
-        key = (source, target)
+        key = (source, target, clean_rederive)
         if key not in newest or modified > newest[key][0]:
             validation = data.get("validation") or {}
             newest[key] = (
@@ -905,6 +921,7 @@ def aggregate_manifests(work_root: Path) -> list[dict[str, Any]]:
                 {
                     "source": source,
                     "target": target,
+                    "clean_rederive": clean_rederive,
                     "output": data.get("output"),
                     "work": data.get("work"),
                     "status": data.get("status", "fail"),
@@ -925,6 +942,9 @@ def write_report(path: Path, result: BuildResult, identity: CampaignIdentity) ->
         "# " + identity.title,
         "",
         "- Export target: **%s**" % result.target,
+        "- Clean-source re-derivation: **%s**" % (
+            "yes" if result.clean_rederive else "no"
+        ),
         "- Source: `%s`" % result.source,
         "- Source SHA-256: `%s`" % identity.source_sha256,
         "- Author: %s" % (identity.author or "unknown"),
@@ -988,12 +1008,17 @@ def build_campaign(
     chapter_filter: set[str] | None = None,
     limit: int = 0,
     target: str = TARGET_REFORGED,
+    clean_rederive: bool = False,
 ) -> BuildResult:
     if target not in TARGET_CHOICES:
         raise BuildError("unsupported export target: " + target)
     source = source.resolve()
     identity = campaign_identity(source)
-    profile = PROFILES.for_source(identity.source_sha256)
+    profile = (
+        None
+        if clean_rederive
+        else PROFILES.for_source(identity.source_sha256)
+    )
     profile_mall_false = set(profile.mall_false) if profile else set()
     profile_mall_true = set(profile.mall_true) if profile else set()
     profile_mall_default_true = profile.mall_default_true if profile else True
@@ -1001,7 +1026,7 @@ def build_campaign(
         CAMPAIGN_PATCHES.container_pipeline(
             profile.name if profile else None
         )
-        if target == TARGET_REFORGED
+        if target == TARGET_REFORGED and not clean_rederive
         else None
     )
     remove_ability_ids = (
@@ -1025,12 +1050,17 @@ def build_campaign(
             raise BuildError("none of the requested chapters exist")
     if limit:
         chapters = chapters[:limit]
-    output_name = campaign_output_title(identity.title, target) + ".w3n"
+    output_name = campaign_output_title(
+        identity.title,
+        target,
+        clean_rederive,
+    ) + ".w3n"
     final_output = output_dir / output_name
     result = BuildResult(
         source=source,
         output=None if extract_only else final_output,
         target=target,
+        clean_rederive=clean_rederive,
     )
     if final_output.exists() and not overwrite and not extract_only:
         result.error = "output already exists; use --overwrite: %s" % final_output
@@ -1048,6 +1078,7 @@ def build_campaign(
     write_json(report_dir / "manifest.partial.json", {
         "source": str(source),
         "target": target,
+        "clean_rederive": clean_rederive,
         "identity": identity.__dict__,
         "status": "building",
     })
@@ -1088,6 +1119,7 @@ def build_campaign(
                 profile_mall_default_true,
                 profile.name if profile else None,
                 remove_ability_ids,
+                False if clean_rederive else None,
             )
             patched_script = patched_text.encode("utf-8", "surrogateescape")
             script_path = script_dir / (Path(chapter_name).stem + ".j")
@@ -1181,6 +1213,7 @@ def build_campaign(
         result.validation = {
             "extract_only": True,
             "target": target,
+            "clean_rederive": clean_rederive,
             "chapters": len(fixed_chapters),
             "fixed_directory": str(fixed_dir),
         }
@@ -1192,7 +1225,11 @@ def build_campaign(
         os.close(handle)
         partial = Path(temp_name)
         try:
-            title = campaign_output_title(identity.title, target)
+            title = campaign_output_title(
+                identity.title,
+                target,
+                clean_rederive,
+            )
             patches = [(name, fixed_chapters[name]) for name in chapters]
             disabled_icon_validation = None
             if disabled_icon_info is not None:
@@ -1276,6 +1313,7 @@ def build_campaign(
 
             validation: dict[str, Any] = {
                 "target": target,
+                "clean_rederive": clean_rederive,
                 "chapters": len(chapters),
                 "outer_platform": outer_platform,
                 "attributes_disabled": attributes is None or struct.unpack_from("<I", attributes, 4)[0] == 0,
@@ -1319,6 +1357,7 @@ def build_campaign(
     manifest = {
         "source": str(source),
         "target": target,
+        "clean_rederive": clean_rederive,
         "identity": identity.__dict__,
         "profile": {
             "name": profile.name if profile else None,
@@ -1370,6 +1409,11 @@ def main(argv: list[str] | None = None) -> int:
         choices=TARGET_CHOICES,
         default=TARGET_REFORGED,
         help="export for classic 1.27 or Reforged (default: reforged)",
+    )
+    parser.add_argument(
+        "--clean-rederive",
+        action="store_true",
+        help="ignore the stored campaign patch bundle and derive from the clean source",
     )
     parser.add_argument(
         "--skip-disabled-icons",
@@ -1430,6 +1474,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print("Campaigns: %d" % len(selected))
     print("Export target: %s" % args.target)
+    print("Clean-source re-derivation: %s" % ("yes" if args.clean_rederive else "no"))
     for campaign, identity in selected:
         print("  %-16s %-32s %d chapters" % (campaign.name, identity.title, len(identity.chapters)))
     if args.dry_run:
@@ -1460,12 +1505,14 @@ def main(argv: list[str] | None = None) -> int:
                 chapter_filter,
                 args.limit,
                 args.target,
+                args.clean_rederive,
             )
             if not result.ok and result.error:
                 raise BuildError(result.error)
             summary.append({
                 "source": str(result.source),
                 "target": result.target,
+                "clean_rederive": result.clean_rederive,
                 "output": str(result.output) if result.output else None,
                 "work": str(result.work) if result.work else None,
                 "status": "pass",
@@ -1477,6 +1524,7 @@ def main(argv: list[str] | None = None) -> int:
             summary.append({
                 "source": str(campaign),
                 "target": args.target,
+                "clean_rederive": args.clean_rederive,
                 "status": "fail",
                 "error": "%s: %s" % (type(exc).__name__, exc),
             })
@@ -1485,11 +1533,19 @@ def main(argv: list[str] | None = None) -> int:
     summary_path = work_root / "summary.json"
     combined = aggregate_manifests(work_root)
     current_by_target = {
-        (entry["source"], entry.get("target", TARGET_REFORGED)): entry
+        (
+            entry["source"],
+            entry.get("target", TARGET_REFORGED),
+            bool(entry.get("clean_rederive", False)),
+        ): entry
         for entry in summary
     }
     combined_by_target = {
-        (entry["source"], entry.get("target", TARGET_REFORGED)): entry
+        (
+            entry["source"],
+            entry.get("target", TARGET_REFORGED),
+            bool(entry.get("clean_rederive", False)),
+        ): entry
         for entry in combined
     }
     combined_by_target.update(current_by_target)

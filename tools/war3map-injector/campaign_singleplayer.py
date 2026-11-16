@@ -83,6 +83,7 @@ import _patch_drops as PD  # noqa: E402
 import _patch_final_cinematic_cleanup as FC  # noqa: E402
 import _patch_hero_death as HD  # noqa: E402
 import _patch_mall_wipe as MW  # noqa: E402
+import _patch_clean_mall_wipes as CMW  # noqa: E402
 import _patch_mall_cleanup as MC  # noqa: E402
 import _patch_pet_delete as PP  # noqa: E402
 import _patch_region_drain as RD  # noqa: E402
@@ -412,6 +413,7 @@ def patch_chapter_script(
     profile_name: str | None = None,
     remove_ability_ids: set[str] | None = None,
     critical_props_enabled: bool | None = None,
+    clean_rederive_mode: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     gates = [gate for gate in GS.analyze_text(text) if gate["keys"]]
     mall_false: set[str] = set()
@@ -476,6 +478,10 @@ def patch_chapter_script(
     patched, hero_death_count = HD.patch(patched)
     patched, mall_cleanup_records = MC.patch(patched)
     patched, mall_wipe_count = MW.patch(patched)
+    if clean_rederive_mode:
+        patched, clean_mall_wipe_records = CMW.patch(patched)
+    else:
+        clean_mall_wipe_records = []
     patched, chat_guards, quest_guards = CG.patch(patched)
     if critical_props_enabled is None:
         critical_props_enabled = CAMPAIGN_PATCHES.legacy_patch_enabled(
@@ -540,6 +546,13 @@ def patch_chapter_script(
             "%s: mall entitlement cleanup still active: %s"
             % (chapter, remaining_mall_cleanup)
         )
+    if clean_rederive_mode:
+        remaining_clean_mall_wipes = CMW.verify(patched)
+        if remaining_clean_mall_wipes:
+            raise BuildError(
+                "%s: mall-gated player wipes remain active: %s"
+                % (chapter, remaining_clean_mall_wipes[:5])
+            )
     remaining_cache_handoffs = CH.verify(patched, cache_handoff_records)
     if remaining_cache_handoffs:
         raise BuildError(
@@ -617,6 +630,8 @@ def patch_chapter_script(
         "cache_name_typos_fixed": cache_typo,
         "pet_death_false_defeats": hero_death_count,
         "mall_welfare_wipes": mall_wipe_count,
+        "clean_mall_player_wipes": len(clean_mall_wipe_records),
+        "clean_mall_player_wipe_records": clean_mall_wipe_records,
         "go_quest_null_guards": quest_guards,
         "critical_props": critical_prop_count,
         "critical_props_enabled": critical_props_enabled,
@@ -1120,6 +1135,7 @@ def build_campaign(
                 profile.name if profile else None,
                 remove_ability_ids,
                 False if clean_rederive else None,
+                clean_rederive,
             )
             patched_script = patched_text.encode("utf-8", "surrogateescape")
             script_path = script_dir / (Path(chapter_name).stem + ".j")

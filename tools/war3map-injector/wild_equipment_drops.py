@@ -33,6 +33,15 @@ POOL_NAMES = {
     "orange": ("WED_POOL_ORANGE", 8, 8),
 }
 
+HERO_DROP_CHANCES = (40, 50, 60, 70)
+HERO_DROP_WEIGHTS = (
+    (35, 44, 15, 5, 1),
+    (20, 40, 28, 10, 2),
+    (10, 32, 39, 16, 3),
+    (5, 24, 45, 22, 4),
+)
+HERO_DROP_LIMIT = 2
+
 # The candle is an orange-coloured joke item with no gameplay ability.
 # ALAS artifacts and wings are talent rewards and must never enter this pool.
 EXCLUDED_IDS = {
@@ -48,6 +57,14 @@ class WildDropBundle:
 
 
 @dataclass(frozen=True)
+class HeroDropTuning:
+    stage: int
+    chance: int
+    weights: tuple[int, int, int, int, int]
+    boss_weights: tuple[int, int, int, int, int]
+
+
+@dataclass(frozen=True)
 class CampaignDropProfile:
     chapter: str
     chapter_index: int
@@ -57,6 +74,12 @@ class CampaignDropProfile:
     chapter_level_cap: int
     chapter_hero_level_cap: int
     chapter_progress: int
+    drop_stage: int
+    hero_drop_chance: int
+    hero_drop_limit: int
+    hero_boss_level: int
+    hero_weights: tuple[int, int, int, int, int]
+    hero_boss_weights: tuple[int, int, int, int, int]
     counts: dict[str, int]
     script_dir: Path
 
@@ -88,6 +111,76 @@ class CampaignDropBundle:
             ),
             None,
         )
+
+
+def hero_drop_stage(progress: int) -> int:
+    """Return one of four campaign phases from zero-to-one-hundred progress."""
+    if progress < 32:
+        return 0
+    if progress < 58:
+        return 1
+    if progress < 85:
+        return 2
+    return 3
+
+
+def hero_drop_tuning(progress: int) -> HeroDropTuning:
+    """Return normal and boss weight tables for one campaign chapter."""
+    stage = hero_drop_stage(progress)
+    boss_stage = min(stage + 1, len(HERO_DROP_WEIGHTS) - 1)
+    weights = HERO_DROP_WEIGHTS[stage]
+    boss_weights = HERO_DROP_WEIGHTS[boss_stage]
+    if sum(weights) != 100 or sum(boss_weights) != 100:
+        raise ValueError("campaign drops: hero weights must total 100")
+    return HeroDropTuning(
+        stage=stage,
+        chance=HERO_DROP_CHANCES[stage],
+        weights=weights,
+        boss_weights=boss_weights,
+    )
+
+
+def hero_boss_level(level_cap: int) -> int:
+    """Use the upper quartile of the campaign hero-level range as elite."""
+    return max(1, (max(1, level_cap) * 3 + 3) // 4)
+
+
+def _weighted_thresholds(
+    weights: tuple[int, int, int, int, int],
+) -> tuple[int, int, int, int]:
+    if len(weights) != 5 or any(weight <= 0 for weight in weights):
+        raise ValueError("campaign drops: all five hero weights are required")
+    if sum(weights) != 100:
+        raise ValueError("campaign drops: hero weights must total 100")
+    return tuple(
+        sum(weights[:index])
+        for index in range(1, len(weights))
+    )
+
+
+def _weighted_roll_function(
+    name: str,
+    weights: tuple[int, int, int, int, int],
+) -> str:
+    thresholds = _weighted_thresholds(weights)
+    lines = [
+        "function %s takes nothing returns integer" % name,
+        "    local integer roll = GetRandomInt(1, 100)",
+        "    if roll <= %d then" % thresholds[0],
+        "        return 1",
+    ]
+    for tier, threshold in enumerate(thresholds[1:], 2):
+        lines.extend([
+            "    elseif roll <= %d then" % threshold,
+            "        return %d" % tier,
+        ])
+    lines.extend([
+        "    endif",
+        "    return 5",
+        "endfunction",
+        "",
+    ])
+    return "\n".join(lines)
 
 
 def _text(value: object) -> str:
@@ -429,6 +522,20 @@ def _pool_globals(
             "integer WED_HERO_LEVEL_CAP = %d" % campaign.hero_level_cap,
             "integer WED_CHAPTER_PROGRESS = %d"
             % campaign.chapter_progress,
+            "integer WED_HERO_DROP_STAGE = %d" % campaign.drop_stage,
+            "integer WED_HERO_DROP_CHANCE = %d"
+            % campaign.hero_drop_chance,
+            "integer WED_HERO_DROP_LIMIT = %d"
+            % campaign.hero_drop_limit,
+            "integer WED_HERO_DROP_COUNT = 0",
+            "integer WED_HERO_BOSS_LEVEL = %d"
+            % campaign.hero_boss_level,
+            'string WED_HERO_WEIGHTS = "%s"'
+            % "/".join(str(value) for value in campaign.hero_weights),
+            'string WED_HERO_BOSS_WEIGHTS = "%s"'
+            % "/".join(
+                str(value) for value in campaign.hero_boss_weights
+            ),
             "hashtable WED_HERO_DROPS = null",
         ])
     return "\n".join(lines) + "\n"
@@ -576,37 +683,14 @@ def _campaign_script_functions(
         "function WED_OnDeath",
         1,
     )[0]
-    return common + r"""function WED_HeroTier takes unit victim returns integer
-    local integer level = IMaxBJ(GetUnitLevel(victim), 1)
-    local integer band
-    local integer floorTier
-    if WED_HERO_LEVEL_CAP <= 1 then
-        return 4
-    endif
-    set band = ((level - 1) * 5) / WED_HERO_LEVEL_CAP
-    if band < 0 then
-        set band = 0
-    elseif band > 4 then
-        set band = 4
-    endif
-    set floorTier = 2 + (WED_CHAPTER_PROGRESS * 3) / 100
-    if floorTier > 4 then
-        set floorTier = 4
-    endif
-    if band + 1 < floorTier then
-        return floorTier
-    endif
-    if band + 1 > 4 then
-        return 4
-    endif
-    return band + 1
-endfunction
-
-function WED_HeroOrangeChance takes nothing returns integer
-    return IMinBJ(20, 5 + (WED_CHAPTER_PROGRESS * 15 + 50) / 100)
-endfunction
-
-function WED_IsEnemyHeroTarget takes unit victim, unit killer returns boolean
+    return (
+        common
+        + _weighted_roll_function("WED_HeroTier", profile.hero_weights)
+        + _weighted_roll_function(
+            "WED_HeroBossTier",
+            profile.hero_boss_weights,
+        )
+        + r"""function WED_IsEnemyHeroTarget takes unit victim, unit killer returns boolean
     local player victimOwner
     local player killerOwner
     if victim == null or killer == null then
@@ -639,6 +723,7 @@ function WED_OnDeath takes nothing returns nothing
     local integer heroId
     local integer tier
     local integer chance
+    local boolean boss
     local real x
     local real y
     if victim == null or GetUnitTypeId(victim) == 0 then
@@ -652,12 +737,20 @@ function WED_OnDeath takes nothing returns nothing
             set heroId = GetUnitTypeId(victim)
             if not HaveSavedInteger(WED_HERO_DROPS, 0, heroId) then
                 call SaveInteger(WED_HERO_DROPS, 0, heroId, 1)
-                set tier = WED_HeroTier(victim)
-                set x = GetUnitX(victim) + GetRandomReal(32.0, 64.0) * Cos(GetRandomReal(0.0, 360.0) * bj_DEGTORAD)
-                set y = GetUnitY(victim) + GetRandomReal(32.0, 64.0) * Sin(GetRandomReal(0.0, 360.0) * bj_DEGTORAD)
-                call WED_CreateDrop(tier, x, y)
-                if GetRandomInt(1, 100) <= WED_HeroOrangeChance() then
-                    call WED_CreateDrop(5, x + 48.0, y)
+                set boss = GetUnitLevel(victim) >= WED_HERO_BOSS_LEVEL
+                if boss then
+                    set tier = WED_HeroBossTier()
+                    set x = GetUnitX(victim) + GetRandomReal(32.0, 64.0) * Cos(GetRandomReal(0.0, 360.0) * bj_DEGTORAD)
+                    set y = GetUnitY(victim) + GetRandomReal(32.0, 64.0) * Sin(GetRandomReal(0.0, 360.0) * bj_DEGTORAD)
+                    call WED_CreateDrop(tier, x, y)
+                elseif WED_HERO_DROP_COUNT < WED_HERO_DROP_LIMIT then
+                    if GetRandomInt(1, 100) <= WED_HERO_DROP_CHANCE then
+                        set tier = WED_HeroTier()
+                        set x = GetUnitX(victim) + GetRandomReal(32.0, 64.0) * Cos(GetRandomReal(0.0, 360.0) * bj_DEGTORAD)
+                        set y = GetUnitY(victim) + GetRandomReal(32.0, 64.0) * Sin(GetRandomReal(0.0, 360.0) * bj_DEGTORAD)
+                        call WED_CreateDrop(tier, x, y)
+                        set WED_HERO_DROP_COUNT = WED_HERO_DROP_COUNT + 1
+                    endif
                 endif
             endif
         endif
@@ -707,10 +800,11 @@ function WED_Init takes nothing returns nothing
     endloop
     call TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, Player(PLAYER_NEUTRAL_AGGRESSIVE), EVENT_PLAYER_UNIT_DEATH, null)
     call TriggerAddAction(WED_DROP_TRIGGER, function WED_OnDeath)
-    call DisplayTextToPlayer(GetLocalPlayer(), 0, 0, "|cff32cd32[战役掉落]|r 已启用：野怪最高 " + I2S(WED_LEVEL_CAP) + " 级，敌英雄最高 " + I2S(WED_HERO_LEVEL_CAP) + " 级，章节进度 " + I2S(WED_CHAPTER_PROGRESS) + "%。")
+    call DisplayTextToPlayer(GetLocalPlayer(), 0, 0, "|cff32cd32[战役掉落]|r 已启用：普通敌英雄掉率 " + I2S(WED_HERO_DROP_CHANCE) + "%，每章上限 " + I2S(WED_HERO_DROP_LIMIT) + " 件；强敌必掉。品质权重 " + WED_HERO_WEIGHTS + "。")
     set WED_DROP_TRIGGER = null
 endfunction
 """
+    )
 
 
 def prepare_bundle(source: Path, work: Path) -> WildDropBundle:
@@ -745,6 +839,10 @@ def prepare_campaign_bundle(
 ) -> CampaignDropBundle:
     if not chapters:
         raise ValueError("campaign drops: campaign has no chapters")
+    chapters = CAMP.order_chapter_names(
+        chapters,
+        CAMP.campaign_chapter_order(source),
+    )
     root = work
     root.mkdir(parents=True, exist_ok=True)
     archive = W.MPQArchive(str(source))
@@ -810,6 +908,7 @@ def prepare_campaign_bundle(
                     if len(chapters) == 1
                     else round(index * 100 / (len(chapters) - 1))
                 )
+                tuning = hero_drop_tuning(progress)
                 counts = {
                     name: len(pool)
                     for name, pool in pools.items()
@@ -830,6 +929,12 @@ def prepare_campaign_bundle(
                     chapter_level_cap=native_level_cap,
                     chapter_hero_level_cap=native_hero_level_cap,
                     chapter_progress=progress,
+                    drop_stage=tuning.stage,
+                    hero_drop_chance=tuning.chance,
+                    hero_drop_limit=HERO_DROP_LIMIT,
+                    hero_boss_level=hero_boss_level(campaign_level_cap),
+                    hero_weights=tuning.weights,
+                    hero_boss_weights=tuning.boss_weights,
                     counts=counts,
                     script_dir=script_dir,
                 )
@@ -901,6 +1006,14 @@ def prepare_campaign_bundle(
                             profile.chapter_hero_level_cap
                         ),
                         "chapter_progress": profile.chapter_progress,
+                        "drop_stage": profile.drop_stage,
+                        "hero_drop_chance": profile.hero_drop_chance,
+                        "hero_drop_limit": profile.hero_drop_limit,
+                        "hero_boss_level": profile.hero_boss_level,
+                        "hero_weights": list(profile.hero_weights),
+                        "hero_boss_weights": list(
+                            profile.hero_boss_weights
+                        ),
                         "counts": profile.counts,
                         "script_dir": str(profile.script_dir),
                     }
@@ -932,32 +1045,64 @@ def prepare_campaign_bundle(
     )
 
 
+def _campaign_profile_from_manifest(
+    item: dict[str, object],
+) -> CampaignDropProfile:
+    level_cap = int(item["level_cap"])
+    progress = int(item["chapter_progress"])
+    tuning = hero_drop_tuning(progress)
+    weights = tuple(
+        int(value)
+        for value in item.get("hero_weights", tuning.weights)
+    )
+    boss_weights = tuple(
+        int(value)
+        for value in item.get(
+            "hero_boss_weights",
+            tuning.boss_weights,
+        )
+    )
+    return CampaignDropProfile(
+        chapter=str(item["chapter"]),
+        chapter_index=int(item["chapter_index"]),
+        chapter_count=int(item["chapter_count"]),
+        level_cap=level_cap,
+        hero_level_cap=int(item["hero_level_cap"]),
+        chapter_level_cap=int(
+            item.get("chapter_level_cap", level_cap)
+        ),
+        chapter_hero_level_cap=int(
+            item.get("chapter_hero_level_cap", item["hero_level_cap"])
+        ),
+        chapter_progress=progress,
+        drop_stage=int(item.get("drop_stage", tuning.stage)),
+        hero_drop_chance=int(
+            item.get("hero_drop_chance", tuning.chance)
+        ),
+        hero_drop_limit=int(
+            item.get("hero_drop_limit", HERO_DROP_LIMIT)
+        ),
+        hero_boss_level=int(
+            item.get(
+                "hero_boss_level",
+                hero_boss_level(level_cap),
+            )
+        ),
+        hero_weights=weights,
+        hero_boss_weights=boss_weights,
+        counts={
+            str(name): int(count)
+            for name, count in dict(item["counts"]).items()
+        },
+        script_dir=Path(str(item["script_dir"])).resolve(),
+    )
+
+
 def load_campaign_manifest(manifest: Path) -> CampaignDropBundle:
     data = json.loads(manifest.read_text(encoding="utf-8"))
     root = manifest.resolve().parent
     profiles = tuple(
-        CampaignDropProfile(
-            chapter=str(item["chapter"]),
-            chapter_index=int(item["chapter_index"]),
-            chapter_count=int(item["chapter_count"]),
-            level_cap=int(item["level_cap"]),
-            hero_level_cap=int(item["hero_level_cap"]),
-            chapter_level_cap=int(
-                item.get("chapter_level_cap", item["level_cap"])
-            ),
-            chapter_hero_level_cap=int(
-                item.get(
-                    "chapter_hero_level_cap",
-                    item["hero_level_cap"],
-                )
-            ),
-            chapter_progress=int(item["chapter_progress"]),
-            counts={
-                str(name): int(count)
-                for name, count in item["counts"].items()
-            },
-            script_dir=Path(item["script_dir"]).resolve(),
-        )
+        _campaign_profile_from_manifest(item)
         for item in data.get("chapters", ())
     )
     if not profiles:
@@ -1208,6 +1353,28 @@ def _campaign_script_from_chapter(
     return data.decode("utf-8", "replace")
 
 
+def _script_function_segment(
+    script: str,
+    name: str,
+    next_name: str,
+) -> str:
+    start = script.find("function " + name)
+    if start < 0:
+        return ""
+    end = script.find("function " + next_name, start + 1)
+    return script[start:end] if end >= 0 else script[start:]
+
+
+def _script_weight_thresholds(segment: str) -> tuple[int, ...]:
+    return tuple(
+        int(value)
+        for value in re.findall(
+            r"roll\s*<=\s*(\d+)",
+            segment,
+        )
+    )
+
+
 def _verify_chapter_drop_objects(
     chapter_data: bytes,
     chapter: str,
@@ -1283,11 +1450,21 @@ def verify_campaign_bundle(
                 "function WED_Init",
                 "WED_CAMPAIGN_MODE = true",
                 "function WED_IsEnemyHeroTarget",
+                "function WED_HeroTier",
+                "function WED_HeroBossTier",
                 "exitwhen index == 16",
                 "TriggerRegisterPlayerUnitEvent",
                 "WED_HERO_DROPS",
                 "HaveSavedInteger",
                 "SaveInteger",
+                "WED_HERO_DROP_CHANCE",
+                "WED_HERO_DROP_LIMIT",
+                "WED_HERO_DROP_COUNT",
+                "WED_HERO_BOSS_LEVEL",
+                "WED_HERO_WEIGHTS",
+                "WED_HERO_BOSS_WEIGHTS",
+                "GetUnitLevel(victim) >= WED_HERO_BOSS_LEVEL",
+                "GetRandomInt(1, 100) <= WED_HERO_DROP_CHANCE",
             )
             for marker in required:
                 if marker not in script:
@@ -1295,6 +1472,11 @@ def verify_campaign_bundle(
                         "campaign drops: %s missing %s"
                         % (profile.chapter, marker)
                     )
+            if "WED_HeroOrangeChance" in script:
+                raise ValueError(
+                    "campaign drops: %s still uses a second orange roll"
+                    % profile.chapter
+                )
             neutral_registration = (
                 "TriggerRegisterPlayerUnitEvent(WED_DROP_TRIGGER, "
                 "Player(PLAYER_NEUTRAL_AGGRESSIVE), "
@@ -1325,6 +1507,26 @@ def verify_campaign_bundle(
                     % profile.chapter_progress,
                     script,
                 )
+                drop_stage = re.search(
+                    r"WED_HERO_DROP_STAGE = %d\b"
+                    % profile.drop_stage,
+                    script,
+                )
+                drop_chance = re.search(
+                    r"WED_HERO_DROP_CHANCE = %d\b"
+                    % profile.hero_drop_chance,
+                    script,
+                )
+                drop_limit = re.search(
+                    r"WED_HERO_DROP_LIMIT = %d\b"
+                    % profile.hero_drop_limit,
+                    script,
+                )
+                boss_level = re.search(
+                    r"WED_HERO_BOSS_LEVEL = %d\b"
+                    % profile.hero_boss_level,
+                    script,
+                )
             else:
                 level_cap = re.search(
                     r"integer WED_LEVEL_CAP = %d\b"
@@ -1341,9 +1543,78 @@ def verify_campaign_bundle(
                     % profile.chapter_progress,
                     script,
                 )
-            if level_cap is None or hero_cap is None or progress is None:
+                drop_stage = re.search(
+                    r"integer WED_HERO_DROP_STAGE = %d\b"
+                    % profile.drop_stage,
+                    script,
+                )
+                drop_chance = re.search(
+                    r"integer WED_HERO_DROP_CHANCE = %d\b"
+                    % profile.hero_drop_chance,
+                    script,
+                )
+                drop_limit = re.search(
+                    r"integer WED_HERO_DROP_LIMIT = %d\b"
+                    % profile.hero_drop_limit,
+                    script,
+                )
+                boss_level = re.search(
+                    r"integer WED_HERO_BOSS_LEVEL = %d\b"
+                    % profile.hero_boss_level,
+                    script,
+                )
+            if (
+                level_cap is None
+                or hero_cap is None
+                or progress is None
+                or drop_stage is None
+                or drop_chance is None
+                or drop_limit is None
+                or boss_level is None
+            ):
                 raise ValueError(
                     "campaign drops: %s profile constants mismatch"
+                    % profile.chapter
+                )
+            expected_weights = "/".join(
+                str(value) for value in profile.hero_weights
+            )
+            expected_boss_weights = "/".join(
+                str(value) for value in profile.hero_boss_weights
+            )
+            if (
+                'WED_HERO_WEIGHTS = "%s"' % expected_weights
+                not in script
+                or 'WED_HERO_BOSS_WEIGHTS = "%s"'
+                % expected_boss_weights
+                not in script
+            ):
+                raise ValueError(
+                    "campaign drops: %s hero weight constants mismatch"
+                    % profile.chapter
+                )
+            normal_roll = _script_function_segment(
+                script,
+                "WED_HeroTier",
+                "WED_HeroBossTier",
+            )
+            boss_roll = _script_function_segment(
+                script,
+                "WED_HeroBossTier",
+                "WED_IsEnemyHeroTarget",
+            )
+            if _script_weight_thresholds(
+                normal_roll
+            ) != _weighted_thresholds(profile.hero_weights):
+                raise ValueError(
+                    "campaign drops: %s normal hero weights mismatch"
+                    % profile.chapter
+                )
+            if _script_weight_thresholds(
+                boss_roll
+            ) != _weighted_thresholds(profile.hero_boss_weights):
+                raise ValueError(
+                    "campaign drops: %s boss weights mismatch"
                     % profile.chapter
                 )
     finally:

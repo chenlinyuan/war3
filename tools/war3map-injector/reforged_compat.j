@@ -144,6 +144,10 @@ function UnitItemInBagSlot takes unit whichUnit, integer itemSlot returns item
     return null
 endfunction
 
+function UnitEquipItem takes unit whichUnit, item whichItem returns boolean
+    return false
+endfunction
+
 function BlzGetItemAbility takes item whichItem, integer abilCode returns ability
     return null
 endfunction

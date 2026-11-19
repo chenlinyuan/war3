@@ -20,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -27,13 +28,16 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
 import fix_alas_campaign_names as NAMES  # noqa: E402
+import fix_campaign_loading_art as LOADING_ART  # noqa: E402
 import alas_item_rules as ITEM_RULES  # noqa: E402
 import campaign_paths as CAMP  # noqa: E402
 import merge_w3obj as M  # noqa: E402
+import mpq_patch as MP  # noqa: E402
 import official_campaign_metadata as OFFICIAL  # noqa: E402
 import port_item_skill_campaign as ITEM  # noqa: E402
 import port_weapon_campaign as WPN  # noqa: E402
 import port_wings_campaign as PC  # noqa: E402
+import universal_talents as TALENT_BUNDLE  # noqa: E402
 import wild_equipment_drops as WILD_DROPS  # noqa: E402
 import war3mpq as W  # noqa: E402
 
@@ -52,6 +56,66 @@ def run(args: list[object], env: dict[str, str] | None = None) -> None:
     print(">>>", " ".join(text), flush=True)
     if subprocess.run(text, env=env).returncode:
         raise SystemExit("command failed: " + " ".join(text))
+
+
+def final_pack_args(
+    source: Path,
+    work: Path,
+    output: Path,
+) -> list[object]:
+    """Pack only the chapter maps already injected by the one-pass build.
+
+    Campaign-level object data and assets are merged into every target
+    chapter before this step. Replacing campaign-root entries would require
+    expanding protected MPQ hash tables and can make unlisted resources
+    unnameable, so the final pack must preserve that root byte-for-byte.
+    """
+    return [
+        PY,
+        HERE / "port_wings_campaign.py",
+        "pack",
+        source,
+        "--work",
+        work,
+        "--out",
+        output,
+        "--chapters-only",
+    ]
+
+
+def patch_campaign_root_files(
+    path: Path,
+    patches: list[tuple[str, bytes]],
+    work: Path,
+) -> None:
+    if not patches:
+        return
+    fd, temp_name = tempfile.mkstemp(
+        suffix=".w3n",
+        dir=str(path.parent),
+    )
+    os.close(fd)
+    temporary = Path(temp_name)
+    try:
+        MP.patch(
+            str(path),
+            patches,
+            out_path=str(temporary),
+            backup=False,
+        )
+        check = W.MPQArchive(str(temporary))
+        try:
+            for internal, expected in patches:
+                if check.read_file(internal) != expected:
+                    raise SystemExit(
+                        "%s campaign loading-art read-back failed: %s"
+                        % (path.name, internal)
+                    )
+        finally:
+            check.close()
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def campaign_object_ids(path: Path) -> set[str]:
@@ -528,6 +592,12 @@ def validate_chapter(
                 b"function TT_CampaignAuditStore takes unit u,",
                 b"function TT_CampaignAuditRestoreProbe takes gamecache cache,",
                 b"function TT_CampaignAuditSave takes gamecache cache,",
+                b"function TT_BeginHeroReplacement takes unit u",
+                b"function TT_EndHeroReplacement takes unit u",
+                b"function TT_YDWEReplaceHeroBJNull takes unit u",
+                b"function TT_FlushDeferredHeroReplacement takes nothing returns nothing",
+                b"function TT_CaptureReplacementItems takes unit u",
+                b"function TT_RestoreReplacementItems takes unit u",
                 b"event=CAMPAIGN_NATIVE_NORMALIZE",
                 b"event=CAMPAIGN_TALENT_SNAPSHOT_STORE",
                 b"event=CAMPAIGN_TALENT_SNAPSHOT_RESTORE",
@@ -536,6 +606,13 @@ def validate_chapter(
                 b"event=CAMPAIGN_STORE_ABILITY",
                 b"event=CAMPAIGN_RESTORE_PROBE",
                 b"event=CAMPAIGN_CACHE_SAVE",
+                b"event=HERO_REPLACEMENT_BEGIN",
+                b"event=HERO_REPLACEMENT_END",
+                b"event=HERO_REPLACEMENT_DEFER_INIT",
+                b"event=HERO_REPLACEMENT_EXT_CAPTURE",
+                b"event=HERO_REPLACEMENT_EXT_RESTORE",
+                b"event=HERO_REPLACEMENT_EXT_FAIL",
+                b"event=HERO_REPLACEMENT_SKIP_SAME_TYPE",
             ):
                 if marker not in script:
                     raise SystemExit(
@@ -566,6 +643,18 @@ def validate_chapter(
                 (
                     b"call TT_CampaignAuditSave(",
                     talent_cache_counts["save"],
+                ),
+                (
+                    b"call TT_BeginHeroReplacement(",
+                    talent_cache_counts["hero_replacements_begin"],
+                ),
+                (
+                    b"call TT_EndHeroReplacement(",
+                    talent_cache_counts["hero_replacements_end"],
+                ),
+                (
+                    b"call TT_YDWEReplaceHeroBJNull(",
+                    talent_cache_counts["hero_replacements_ydwe"],
                 ),
             ):
                 actual = script.count(marker)
@@ -886,6 +975,7 @@ def build(args: argparse.Namespace) -> int:
             str(combined), [str(path) for path in inputs]
         )
         combined_sources[extension] = combined
+    loading_art_records: list[dict[str, object]] = []
     for index, chapter in enumerate(chapters, 1):
         chapter_key = CAMP.chapter_key(base, chapter)
         print("\n[%d/%d] one-pass ALAS injection: %s"
@@ -893,6 +983,28 @@ def build(args: argparse.Namespace) -> int:
         object_payloads = merge_chapter_objects(
             chapter, work, combined_sources
         )
+        loading_patches: list[tuple[Path, str]] = []
+        chapter_loading_record = None
+        if not args.skip_loading_art:
+            raw_loading_patches, chapter_loading_record = (
+                LOADING_ART.chapter_loading_patches(chapter)
+            )
+            loading_dir = work / "_loading_art" / chapter.stem
+            for patch_index, (internal, data) in enumerate(
+                raw_loading_patches
+            ):
+                loading_dir.mkdir(parents=True, exist_ok=True)
+                suffix = Path(internal.replace("\\", "/")).suffix or ".bin"
+                local = loading_dir / (
+                    "%02d%s" % (patch_index, suffix)
+                )
+                local.write_bytes(data)
+                loading_patches.append((local, internal))
+            if chapter_loading_record is not None:
+                loading_art_records.append({
+                    "chapter": chapter.name,
+                    **chapter_loading_record,
+                })
         ITEM.configure_equipment_ownership(
             work / "_obj_final" / chapter.stem, item_active
         )
@@ -931,6 +1043,18 @@ def build(args: argparse.Namespace) -> int:
         if campaign_talent_cache:
             base_script, talent_cache_counts = (
                 patch_campaign_talent_cache(base_script)
+            )
+            base_script, replacement_counts = (
+                TALENT_BUNDLE.patch_hero_replacements(base_script)
+            )
+            talent_cache_counts["hero_replacements_begin"] = (
+                replacement_counts["begin"]
+            )
+            talent_cache_counts["hero_replacements_end"] = (
+                replacement_counts["end"]
+            )
+            talent_cache_counts["hero_replacements_ydwe"] = (
+                replacement_counts["ydwe"]
             )
             expected_store = source_script.count(b"StoreUnitBJ")
             expected_restore = sum(
@@ -975,6 +1099,17 @@ def build(args: argparse.Namespace) -> int:
                     ),
                     flush=True,
                 )
+            if replacement_counts["begin"] or replacement_counts["ydwe"]:
+                print(
+                    "talent hero replacements %s: begin=%d end=%d ydwe=%d"
+                    % (
+                        chapter.name,
+                        replacement_counts["begin"],
+                        replacement_counts["end"],
+                        replacement_counts["ydwe"],
+                    ),
+                    flush=True,
+                )
         if args.suppress_source_backpack_auto:
             source_call = (
                 b"call UnitAddItemByIdSwapped('B30B', u)"
@@ -1001,6 +1136,11 @@ def build(args: argparse.Namespace) -> int:
             ]
         for local, internal in object_payloads:
             inject += ["--file", "%s=%s" % (local, internal)]
+        for local, internal in loading_patches:
+            inject += [
+                "--file", "%s=%s" % (local, internal),
+                "--store", internal,
+            ]
         for local, internal in assets:
             if internal.lower() in present:
                 if (
@@ -1032,8 +1172,18 @@ def build(args: argparse.Namespace) -> int:
         base,
         set(skipped_cinematics),
     )
-    run([PY, HERE / "port_wings_campaign.py", "pack", source,
-         "--work", work, "--out", output])
+    run(final_pack_args(source, work, output))
+    background_record = None
+    if not args.skip_loading_art:
+        background_patches, background_record = (
+            LOADING_ART.campaign_background_patches(source)
+        )
+        patch_campaign_root_files(output, background_patches, work)
+        if background_record is not None:
+            loading_art_records.append({
+                "chapter": "campaign-background",
+                **background_record,
+            })
     title = patch_title(output, work / "recover" / "alas_campaign_names")
     CAMP.verify_campaign_chapters(
         preserve_source,
@@ -1047,6 +1197,16 @@ def build(args: argparse.Namespace) -> int:
     print("output:", output)
     print("bytes:", output.stat().st_size)
     print("sha256:", digest)
+    if not args.skip_loading_art:
+        preserved = sum(
+            1 for record in loading_art_records
+            if record.get("skipped")
+        )
+        print(
+            "loading/score backgrounds:",
+            "widescreen-ready (%d), source artwork preserved (%d)"
+            % (len(loading_art_records) - preserved, preserved),
+        )
     return 0
 
 
@@ -1073,6 +1233,11 @@ def main() -> int:
     parser.add_argument(
         "--suppress-source-backpack-auto",
         action="store_true",
+    )
+    parser.add_argument(
+        "--skip-loading-art",
+        action="store_true",
+        help="keep source loading-screen and score-screen artwork",
     )
     return build(parser.parse_args())
 

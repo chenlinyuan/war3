@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "name": "blood-mission-qh-207",
+  "title": "血色使命I（淬火试炼）",
+  "source_sha256": "572f4db13e55efcf8d211096ff0af5e72e8a62989cbcb2fbfa5fa7858ac6a730",
+  "chapters": [
+    "c1.w3x",
+    "c2.w3x",
+    "c3.w3x",
+    "c4.w3x",
+    "c5.w3x",
+    "c6.w3x",
+    "c7.w3x",
+    "c8.w3x",
+    "c9.w3x",
+    "c10.w3x",
+    "c11.w3x",
+    "c12.w3x",
+    "c13.w3x",
+    "c14.w3x",
+    "c15.w3x",
+    "c16.w3x",
+    "c17.w3x",
+    "c18.w3x",
+    "c19.w3x"
+  ],
+  "key_policy": {
+    "default": false,
+    "true": [],
+    "false": []
+  },
+  "backpack_switch": {
+    "ability_ids": [
+      "A627"
+    ],
+    "source": "切换背包(F)",
+    "object_fields": [
+      "uabi"
+    ],
+    "runtime_grants": [
+      "UnitAddAbility",
+      "UnitAddAbilityBJ",
+      "UnitMakeAbilityPermanent",
+      "UnitRemoveAbility",
+      "UnitRemoveAbilityBJ"
+    ],
+    "expected_source_references": {
+      "ability_object_rows": 1,
+      "unit_field_tokens": 15,
+      "script_files": 13,
+      "spell_id_conditions": 35,
+      "runtime_add_calls": 1,
+      "runtime_remove_calls": 2,
+      "runtime_permanent_calls": 1
+    },
+    "task_item_cleanup": {
+      "chapter": "c3.w3x",
+      "items": [
+        "I62A",
+        "I629"
+      ],
+      "replaced_slot_removals": 4
+    }
+  },
+  "inventory_slot_rules": {
+    "movesword_chapters": [
+      "c3.w3x",
+      "c4.w3x",
+      "c6.w3x",
+      "c7.w3x",
+      "c8.w3x",
+      "c10.w3x",
+      "c11.w3x",
+      "c12.w3x",
+      "c13.w3x",
+      "c14.w3x",
+      "c15.w3x",
+      "c18.w3x"
+    ],
+    "movesword_item": "I627",
+    "movesword_replacements": 12,
+    "final_amulet_chapter": "c18.w3x",
+    "final_amulet_item": "I625",
+    "final_amulet_replacements": 1,
+    "manual_hero_copy_chapter": "c7.w3x",
+    "manual_hero_copy_slots": 6
+  },
+  "clean_source_findings": {
+    "war3campaign.w3a": [
+      "A627 is a custom Absk ability named 切换背包 with hotkey F.",
+      "The ability swaps the active six-slot inventory with one alternate per hero."
+    ],
+    "war3campaign.w3u": [
+      "Ten hero variants carry A627 in uabi."
+    ],
+    "c2.w3x": [
+      "Jere and Kevin switch triggers use udg_a/udg_b and udg_c/udg_d.",
+      "tip7 also matches A627 and is disabled by the generic condition removal."
+    ],
+    "c7.w3x": [
+      "A story transformation copies six item types from Jere to Jere2 without bridging extended backpack and equipment contents.",
+      "A later transformation removes A627 from Jere and adds it back with native UnitAddAbility."
+    ],
+    "c3.w3x": [
+      "The authored intro removes Jere slots 0 and 1 instead of item IDs I62A and I629.",
+      "ALAS reorders inventory slots around B30B, so slot-based cleanup deletes the wrong items and leaves task items occupying the hero inventory."
+    ],
+    "c18.w3x": [
+      "The finale removes Jere slot 0 as an implicit amulet removal, then adds I627.",
+      "This can delete B30B or another item if the inventory order changes."
+    ],
+    "movesword": [
+      "Twelve chapters remove I625 and drop whatever item happens to occupy slot 1.",
+      "The intended moved item is I627; the replacement searches all inventory domains by item ID."
+    ]
+  },
+  "intentional_failure_paths_preserved": [
+    "All non-backpack story triggers and quest progression",
+    "Campaign chapter order and transitions",
+    "The c3 alternative branch that issues the berserk order before cleanup",
+    "Other abilities and non-task items on the affected hero unit objects"
+  ],
+  "runtime_tests": [
+    "Build from the clean 2.07 campaign with a new backpack enabled; confirm the authored 切换背包(F) command is absent on Jere, Kevin, and laotou.",
+    "Open the ALAS B30B backpack and confirm items can be added, moved, saved, and restored across a chapter transition.",
+    "Complete c2 and enter c3; confirm I62A and I629 are both removed and neither appears in Jere's inventory.",
+    "After c3 starts, confirm B30B remains in Jere's inventory and does not fall to the ground.",
+    "In c7, complete the story transformation and confirm B30B, 30-slot contents, equipment slots, and the authored backpack switch state are all preserved.",
+    "Trigger the later I625 movesword sequence and confirm only I627 falls to the ground.",
+    "In c18, confirm the amulet removal no longer deletes B30B or another slot-0 item.",
+    "Confirm non-backpack abilities and the campaign story continue normally."
+  ]
+}

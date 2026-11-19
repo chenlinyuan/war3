@@ -29,12 +29,15 @@ real array wg_riderCd            // 槽位 -> 召唤冷却(游戏时间戳)
 unit array wg_riderSum1          // 槽位 -> 召唤物 1
 unit array wg_riderSum2          // 槽位 -> 召唤物 2
 hashtable wg_slotTable = null
+timer wg_mountTimer = null
+group wg_equipGroup = null
+timer wg_equipTimer = null
 // --- 召唤小龙的参数 ---
 //   ⚠ 下面这段由 tools/war3map-injector/gen_jass_tables.py 从 wings_config.py 生成
 //      （summon_count / summon_cd / summon_life）。**战役里把 summon_count 设 0 就关掉召唤。**
 // >>> GENERATED:BEGIN g_summon (wings_config.py) >>>
 // 每次英雄攻击最多召唤几只小龙（0 = 关掉召唤）
-integer WG_SUMMON_COUNT = 2
+integer WG_SUMMON_COUNT = 0
 // 召唤冷却（秒）
 real WG_SUMMON_CD = 15.0
 // 召唤物存活时间（秒）；0 = 不自动消失，只在下次召唤/卸下时替换
@@ -66,7 +69,7 @@ real WG_HERO_H = 144.0
 // 阿克蒙德之手的物品 ID（掠夺挂在它身上）
 // 1 = equipment skills are owned by the item; 0 = hero command card.
 boolean WG_ITEM_ACTIVE = false
-integer WG_HAND_ITEM = 'I000'
+integer WG_HAND_ITEM = 'I103'
 // 掠夺总开关（0 = 关掉这个被动）
 integer WG_PLUNDER_ENABLE = 1
 // 只掠夺最大生命 >= 这个值的单位（0 = 不限）
@@ -88,7 +91,7 @@ integer WG_HAND_SOUL_ELITE_CHANCE = 25
 integer WG_HAND_SOUL_MIN_LEVEL = 8
 real WG_HAND_SOUL_MIN_HP = 2000.0
 // --- 死亡之指（阿克蒙德之手的主动）---
-integer WG_FINGER_ABILITY = 'A000'
+integer WG_FINGER_ABILITY = 'A100'
 // 对英雄/非英雄的伤害倍率（非英雄=翻倍）
 real WG_FINGER_HERO_MULT = 25.0
 real WG_FINGER_OTHER_MULT = 50.0
@@ -153,7 +156,7 @@ integer WG_AVATAR_WING_ENDURANCE = 'W077'
 integer WG_AVATAR_WING_CRIT = 'W078'
 integer WG_AVATAR_DIVINE_DEFENSE = 6
 integer WG_AVATAR_CHAOS_ATTACK = 5
-integer WG_AVATAR_AIR_TARGET_FLAG = 2
+integer WG_AVATAR_AIR_TARGET_FLAG = 4
 integer WG_AVATAR_MAGIC_IMMUNITY = 'Amim'
 real WG_AVATAR_DURATION = 45.0
 real WG_AVATAR_LIFE_COST_PCT = 0.5
@@ -429,7 +432,7 @@ endfunction
 
 function WG_ListWings takes player p returns nothing
     // >>> GENERATED:BEGIN wing_list (wings_config.py) >>>
-    call WG_Message(p, "翅膀: I100 堕落天使之翼 / I101 炽天使之翼 / I102 恶魔之翼 / I104 星魂之力 / I130 试穿·纯白羽翼 / I131 试穿·冰蓝天使翼 / I132 试穿·彩虹羽翼 / I133 试穿·暗红骨翼 / I134 试穿·末日守卫翼")
+    call WG_Message(p, "翅膀: I100 堕落天使之翼 / I101 炽天使之翼 / I102 恶魔之翼 / I104 星魂之力")
     // >>> GENERATED:END wing_list <<<
     call WG_Message(p, "用法: wing <名称或ID>")
 endfunction
@@ -746,6 +749,9 @@ function WG_RideMount takes unit hero, integer eggIdx, string mname returns noth
     set wg_riderCd[slot] = 0.0
     set wg_riderDied[slot] = false
     set wg_riderHeal[slot] = 0
+    if wg_mountTimer != null then
+        call ResumeTimer(wg_mountTimer)
+    endif
     call WG_MountMessage(p, GetUnitName(hero) + " 已骑乘: " + mname)
     set mount = null
 endfunction
@@ -864,9 +870,11 @@ function WG_MountSync takes nothing returns nothing
     local unit mount
     local unit hero
     local integer idx
+    local boolean anyActive = false
     loop
         exitwhen slot >= WG_MAX_RIDERS
         if wg_riderRiding[slot] then
+            set anyActive = true
             set mount = wg_riderMount[slot]
             set hero = wg_riderHero[slot]
             if hero != null then
@@ -927,6 +935,9 @@ function WG_MountSync takes nothing returns nothing
         endif
         set slot = slot + 1
     endloop
+    if not anyActive and wg_mountTimer != null then
+        call PauseTimer(wg_mountTimer)
+    endif
 endfunction
 
 function WG_ListMounts takes player p returns nothing
@@ -953,16 +964,6 @@ function WG_GiveWingByName takes player p, string key returns nothing
         call WG_AddWing(p, 'I102')
     elseif WG_StrEqCI(key, "星魂之力") or WG_StrEqCI(key, "i104") then
         call WG_AddWing(p, 'I104')
-    elseif WG_StrEqCI(key, "试穿·纯白羽翼") or WG_StrEqCI(key, "i130") then
-        call WG_AddWing(p, 'I130')
-    elseif WG_StrEqCI(key, "试穿·冰蓝天使翼") or WG_StrEqCI(key, "i131") then
-        call WG_AddWing(p, 'I131')
-    elseif WG_StrEqCI(key, "试穿·彩虹羽翼") or WG_StrEqCI(key, "i132") then
-        call WG_AddWing(p, 'I132')
-    elseif WG_StrEqCI(key, "试穿·暗红骨翼") or WG_StrEqCI(key, "i133") then
-        call WG_AddWing(p, 'I133')
-    elseif WG_StrEqCI(key, "试穿·末日守卫翼") or WG_StrEqCI(key, "i134") then
-        call WG_AddWing(p, 'I134')
     // >>> GENERATED:END wing_names <<<
     else
         call WG_Message(p, "未找到翅膀: " + key + "（输入 wings 查看列表）")
@@ -1225,6 +1226,12 @@ function WG_ReportWings takes player p returns nothing
             set s = s + " 辉煌=" + I2S(GetUnitAbilityLevel(u, 'BHab'))
             set s = s + " 命令=" + I2S(GetUnitAbilityLevel(u, 'BOac'))
             set s = s + " 耐久=" + I2S(GetUnitAbilityLevel(u, 'BOae'))
+            set s = s + " 邪恶=" + I2S(GetUnitAbilityLevel(u, 'B646'))
+            set s = s + " 吸血=" + I2S(GetUnitAbilityLevel(u, 'B102'))
+            set s = s + " 辉煌=" + I2S(GetUnitAbilityLevel(u, 'B103'))
+            set s = s + " 命令=" + I2S(GetUnitAbilityLevel(u, 'B649'))
+            set s = s + " 耐久=" + I2S(GetUnitAbilityLevel(u, 'B104'))
+            set s = s + " 蛮撞=" + I2S(GetUnitAbilityLevel(u, 'B64B'))
             // >>> GENERATED:END buff_debug <<<
             call WG_MountMessage(p, s)
             // 死亡之指自检：最近一次施法的落点信息（排查"闪电位置不对"用）
@@ -1244,7 +1251,7 @@ function WG_ReportWings takes player p returns nothing
             call WG_FingerMarker(wg_fingerLastX2, wg_fingerLastY2, "记录:目标", 255, 220, 60)
             // 掠夺（阿克蒙德之手）自检：手上有没有这件装备 / 本图开没开
             if WG_HasHandItem(u) then
-                set s = "|cffff8800[掠夺]|r 持有阿克蒙德之手 ✓"
+                set s = "|cffff8800[掠夺]|r 持有魔神之握 ✓"
                 if WG_PLUNDER_ENABLE > 0 then
                     set s = s + "  击杀敌人时按等级掠夺金币（生命 >= "
                     set s = s + I2S(R2I(WG_PLUNDER_MIN_HP)) + "，非英雄 "
@@ -1404,7 +1411,7 @@ function WG_OnChat takes nothing returns nothing
             call WG_MountMessage(p, "请先选中一个英雄")
         else
             call UnitAddItemById(u, WG_HAND_ITEM)
-            call WG_MountMessage(p, GetUnitName(u) + " 获得 阿克蒙德之手")
+            call WG_MountMessage(p, GetUnitName(u) + " 获得 魔神之握")
         endif
     // unride: 卸下坐骑 (物品之外的备用入口)
     elseif WG_StrEqCI(cmd, "unride") then
@@ -1432,42 +1439,7 @@ function WG_InitData takes nothing returns nothing
     // 模型再放大 20% (玩家反馈偏小): 凤凰 0.78 -> 0.936, 龙 0.84 -> 1.008
     //   注意: 只放大坐骑本体; 召唤的小龙仍是 48%(绝对), 所以相对坐骑会更小一点。
     // >>> GENERATED:BEGIN mount_table (wings_config.py) >>>
-    set wg_eggCount = 5
-    set wg_eggItem[0] = 'I110'
-    set wg_eggUnit[0] = 'h01D'
-    set wg_eggOffItem[0] = 'I120'
-    set wg_eggName[0] = "火凤凰"
-    set wg_eggHeight[0] = WG_MOUNT_H
-    set wg_eggHeroHeight[0] = WG_HERO_H + 15.0
-    set wg_eggScale[0] = 0.936
-    set wg_eggItem[1] = 'I111'
-    set wg_eggUnit[1] = 'n02N'
-    set wg_eggOffItem[1] = 'I121'
-    set wg_eggName[1] = "蓝龙"
-    set wg_eggHeight[1] = WG_MOUNT_H
-    set wg_eggHeroHeight[1] = WG_HERO_H
-    set wg_eggScale[1] = 1.008
-    set wg_eggItem[2] = 'I112'
-    set wg_eggUnit[2] = 'n02M'
-    set wg_eggOffItem[2] = 'I122'
-    set wg_eggName[2] = "黑龙"
-    set wg_eggHeight[2] = WG_MOUNT_H
-    set wg_eggHeroHeight[2] = WG_HERO_H
-    set wg_eggScale[2] = 1.008
-    set wg_eggItem[3] = 'I113'
-    set wg_eggUnit[3] = 'n02P'
-    set wg_eggOffItem[3] = 'I123'
-    set wg_eggName[3] = "红龙"
-    set wg_eggHeight[3] = WG_MOUNT_H
-    set wg_eggHeroHeight[3] = WG_HERO_H + 5.0
-    set wg_eggScale[3] = 1.008
-    set wg_eggItem[4] = 'I114'
-    set wg_eggUnit[4] = 'n02L'
-    set wg_eggOffItem[4] = 'I124'
-    set wg_eggName[4] = "青铜龙"
-    set wg_eggHeight[4] = WG_MOUNT_H
-    set wg_eggHeroHeight[4] = WG_HERO_H
-    set wg_eggScale[4] = 1.008
+    set wg_eggCount = 0
     // >>> GENERATED:END mount_table <<<
     // 骑手槽位表: 英雄句柄 -> 槽位 (按英雄记状态, 见 WG_SlotOf)
     if wg_slotTable == null then
@@ -1478,7 +1450,7 @@ function WG_InitData takes nothing returns nothing
     //   ⚠ 翅膀物品里只放 主动+加速+模型(物品技能列表有 4 个上限);
     //     光环/被动装进下面的"隐藏魔法书", 由 WG_WingSync 加到英雄身上并隐藏。
     // >>> GENERATED:BEGIN wing_table (wings_config.py) >>>
-    set wg_wingCount = 9
+    set wg_wingCount = 4
     set wg_wingItem[0] = 'I100'
     set wg_wingBook[0] = 'W080'
     set wg_wingBook2[0] = 0
@@ -1495,26 +1467,6 @@ function WG_InitData takes nothing returns nothing
     set wg_wingBook[3] = 0
     set wg_wingBook2[3] = 0
     set wg_wingName[3] = "星魂之力"
-    set wg_wingItem[4] = 'I130'
-    set wg_wingBook[4] = 0
-    set wg_wingBook2[4] = 0
-    set wg_wingName[4] = "试穿·纯白羽翼"
-    set wg_wingItem[5] = 'I131'
-    set wg_wingBook[5] = 0
-    set wg_wingBook2[5] = 0
-    set wg_wingName[5] = "试穿·冰蓝天使翼"
-    set wg_wingItem[6] = 'I132'
-    set wg_wingBook[6] = 0
-    set wg_wingBook2[6] = 0
-    set wg_wingName[6] = "试穿·彩虹羽翼"
-    set wg_wingItem[7] = 'I133'
-    set wg_wingBook[7] = 0
-    set wg_wingBook2[7] = 0
-    set wg_wingName[7] = "试穿·暗红骨翼"
-    set wg_wingItem[8] = 'I134'
-    set wg_wingBook[8] = 0
-    set wg_wingBook2[8] = 0
-    set wg_wingName[8] = "试穿·末日守卫翼"
     // >>> GENERATED:END wing_table <<<
 endfunction
 
@@ -1737,44 +1689,40 @@ endfunction
 //   原版献祭口径：只烧敌人、**不打魔法免疫**、**不打建筑**；伤害类型 = 魔法/魔法（吃魔抗）
 //   数值：500 码 / 每 0.5 秒 / 最高属性 × 0.5（想调就改下面这两个数字）
 //   ⚠ 星魂之力在 WINGS 表里是第 4 件 → wg_wingItem[3]；以后换了顺序要跟着改。
-function WG_OnImmolation takes nothing returns nothing
-    local integer pid = 0
-    local unit u
+function WG_OnImmolationUnit takes nothing returns nothing
+    local unit u = GetEnumUnit()
     local unit t
     local player p
     local real dmg
-    local group g = CreateGroup()
+    local group g
+    if u == null or GetUnitTypeId(u) == 0 or IsUnitType(u, UNIT_TYPE_DEAD) then
+        set u = null
+        return
+    endif
+    if wg_wingItem[3] == 0 or not UnitHasItemOfTypeBJ(u, wg_wingItem[3]) then
+        set u = null
+        return
+    endif
+    set p = GetOwningPlayer(u)
+    set dmg = I2R(IMaxBJ(IMaxBJ(GetHeroStr(u, true), GetHeroAgi(u, true)), GetHeroInt(u, true))) * 0.5
+    set g = CreateGroup()
+    call GroupEnumUnitsInRange(g, GetUnitX(u), GetUnitY(u), 300.0, null)
     loop
-        exitwhen pid > 11
-        call GroupEnumUnitsOfPlayer(bj_lastCreatedGroup, Player(pid), null)
-        loop
-            set u = FirstOfGroup(bj_lastCreatedGroup)
-            exitwhen u == null
-            call GroupRemoveUnit(bj_lastCreatedGroup, u)
-            if IsUnitType(u, UNIT_TYPE_DEAD) == false and wg_wingItem[3] != 0 and UnitHasItemOfTypeBJ(u, wg_wingItem[3]) then
-                set p = GetOwningPlayer(u)
-                // 最高属性（含装备加成）= 三围取最大，和 WG_AshStat 的 "max" 口径一致。
-                // 这里内联是为了避开"WG_AshStat 定义在本函数之后、JASS 不许先引用"的限制。
-                set dmg = I2R(IMaxBJ(IMaxBJ(GetHeroStr(u, true), GetHeroAgi(u, true)), GetHeroInt(u, true))) * 0.5
-                call GroupEnumUnitsInRange(g, GetUnitX(u), GetUnitY(u), 300.0, null)
-                loop
-                    set t = FirstOfGroup(g)
-                    exitwhen t == null
-                    call GroupRemoveUnit(g, t)
-                    if IsUnitType(t, UNIT_TYPE_DEAD) == false and IsUnitEnemy(t, p) and IsUnitType(t, UNIT_TYPE_MAGIC_IMMUNE) != true and IsUnitType(t, UNIT_TYPE_STRUCTURE) != true then
-                        call UnitDamageTarget(u, t, dmg, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_MAGIC, WEAPON_TYPE_WHOKNOWS)
-                    endif
-                endloop
-                // 观感交给物品上的 `AIcf`（火焰风衣）技能本身："英雄被火焰包围"，
-                // 这里是纯伤害结算（300 码 / 每 0.5 秒 / 最高属性×0.5）。
-            endif
-        endloop
-        set pid = pid + 1
+        set t = FirstOfGroup(g)
+        exitwhen t == null
+        call GroupRemoveUnit(g, t)
+        if not IsUnitType(t, UNIT_TYPE_DEAD) and IsUnitEnemy(t, p) and not IsUnitType(t, UNIT_TYPE_MAGIC_IMMUNE) and not IsUnitType(t, UNIT_TYPE_STRUCTURE) then
+            call UnitDamageTarget(u, t, dmg, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_MAGIC, WEAPON_TYPE_WHOKNOWS)
+        endif
     endloop
     call DestroyGroup(g)
     set g = null
     set u = null
     set t = null
+endfunction
+
+function WG_OnImmolation takes nothing returns nothing
+    call ForGroup(wg_equipGroup, function WG_OnImmolationUnit)
 endfunction
 
 //---------------------------------------------------------------------------
@@ -2213,7 +2161,7 @@ endfunction
 
 function WG_ShowFingerSoulGain takes unit caster returns nothing
     local texttag tt = CreateTextTag()
-    call SetTextTagText(tt, "阿克蒙德之手·夺魂：智力 +1", 0.023)
+    call SetTextTagText(tt, "魔神之握·夺魂：智力 +1", 0.023)
     call SetTextTagPosUnit(tt, caster, 96.0)
     call SetTextTagColor(tt, 204, 0, 255, 255)
     call SetTextTagVelocity(tt, 0.0, 0.035)
@@ -2354,25 +2302,77 @@ function WG_SyncUnit takes unit u returns nothing
     endloop
 endfunction
 
-// 每秒对账。⚠ 必须遍历该玩家的**每一个单位**: 以前只用 WG_PlayerHero(第一个英雄),
-//   结果"换到第二个英雄身上戴翅膀就不生效"(光环/重生全都没挂上) —— 就是这里的问题。
+// 物品变化即时对账；周期自愈只处理装备了小集合中的英雄，不再枚举所有单位。
+function WG_HasManagedEquipment takes unit u returns boolean
+    local integer i = 0
+    if u == null or GetUnitTypeId(u) == 0 or not IsUnitType(u, UNIT_TYPE_HERO) then
+        return false
+    endif
+    if UnitHasItemOfTypeBJ(u, WG_HAND_ITEM) then
+        return true
+    endif
+    loop
+        exitwhen i >= wg_wingCount
+        if UnitHasItemOfTypeBJ(u, wg_wingItem[i]) then
+            return true
+        endif
+        set i = i + 1
+    endloop
+    return false
+endfunction
+
+function WG_TrackEquipmentUnit takes unit u returns nothing
+    if u == null then
+        return
+    endif
+    if wg_equipGroup == null then
+        set wg_equipGroup = CreateGroup()
+    endif
+    if WG_HasManagedEquipment(u) then
+        if not IsUnitInGroup(u, wg_equipGroup) then
+            call GroupAddUnit(wg_equipGroup, u)
+        endif
+        if wg_equipTimer != null then
+            call ResumeTimer(wg_equipTimer)
+        endif
+    elseif IsUnitInGroup(u, wg_equipGroup) then
+        call GroupRemoveUnit(wg_equipGroup, u)
+    endif
+endfunction
+
+function WG_OnEquipmentItemEvent takes nothing returns nothing
+    local unit u = GetTriggerUnit()
+    if u != null and GetUnitTypeId(u) != 0 and IsUnitType(u, UNIT_TYPE_HERO) then
+        call WG_TrackEquipmentUnit(u)
+        call WG_SyncUnit(u)
+        call WG_FingerSync(u)
+    endif
+    set u = null
+endfunction
+
+// Per-second reconciliation is limited to heroes that actually carry managed gear.
 function WG_WingSync takes nothing returns nothing
-    local integer pid = 0
     local unit u
     loop
-        exitwhen pid > 11
-        call GroupEnumUnitsOfPlayer(bj_lastCreatedGroup, Player(pid), null)
-        loop
-            set u = FirstOfGroup(bj_lastCreatedGroup)
-            exitwhen u == null
-            call GroupRemoveUnit(bj_lastCreatedGroup, u)
+        set u = FirstOfGroup(wg_equipGroup)
+        exitwhen u == null
+        call GroupRemoveUnit(wg_equipGroup, u)
+        if GetUnitTypeId(u) != 0 then
             call WG_SyncUnit(u)
-            // 死亡之指：按这个单位的智力调技能档位（没有这个技能就直接返回）
             call WG_FingerSync(u)
-        endloop
-        set pid = pid + 1
+        endif
+        if WG_HasManagedEquipment(u) then
+            call GroupAddUnit(wg_equipGroup, u)
+        endif
     endloop
+    if FirstOfGroup(wg_equipGroup) == null then
+        call PauseTimer(GetExpiredTimer())
+    endif
     set u = null
+endfunction
+
+function WG_TrackInitialEquipmentUnit takes nothing returns nothing
+    call WG_TrackEquipmentUnit(GetEnumUnit())
 endfunction
 
 //============================================================================
@@ -3158,6 +3158,11 @@ function WG_RegisterTriggers takes nothing returns nothing
     call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_UNIT_DROP_ITEM)
     call TriggerAddAction(t, function WG_OnHandItemEvent)
     set t = null
+    set t = CreateTrigger()
+    call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_UNIT_PICKUP_ITEM)
+    call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_UNIT_DROP_ITEM)
+    call TriggerAddAction(t, function WG_OnEquipmentItemEvent)
+    set t = null
     // 单位死亡事件 (诊断/自愈依据 + 召唤物句柄清理; 创建时逐个注册)
     set wg_deathTrig = CreateTrigger()
     call TriggerAddAction(wg_deathTrig, function WG_OnUnitDeath)
@@ -3196,10 +3201,15 @@ function WG_RegisterTriggers takes nothing returns nothing
     call TriggerRegisterAnyUnitEventBJ(t, EVENT_PLAYER_UNIT_DAMAGED)
     call TriggerAddAction(t, function WG_OnRangedVamp)
     set t = null
-    // 坐骑同步计时器 (0.03s, 比伏魔战记 0.04s 更快 -> 消除跟随卡顿)
-    call TimerStart(CreateTimer(), 0.03, true, function WG_MountSync)
-    // 翅膀"隐藏魔法书"对账 (1s): 戴翅膀 = 加书并隐藏, 摘掉 = 移书
-    call TimerStart(CreateTimer(), 1.0, true, function WG_WingSync)
+    // 坐骑跟随只在有人骑乘时运行。
+    set wg_mountTimer = CreateTimer()
+    call TimerStart(wg_mountTimer, 0.03, true, function WG_MountSync)
+    call PauseTimer(wg_mountTimer)
+    // 翅膀对账只遍历装备了翅膀/阿克蒙德之手的英雄；空闲时暂停。
+    set wg_equipGroup = CreateGroup()
+    set wg_equipTimer = CreateTimer()
+    call TimerStart(wg_equipTimer, 1.0, true, function WG_WingSync)
+    call PauseTimer(wg_equipTimer)
     // 星魂之力的「献祭」(0.5s): 500 码内每 0.5 秒按最高属性烧一次（不打魔免/不打建筑）
     call TimerStart(CreateTimer(), 0.5, true, function WG_OnImmolation)
     // 游戏时间基准计时器
@@ -3208,6 +3218,7 @@ function WG_RegisterTriggers takes nothing returns nothing
     set handGroup = CreateGroup()
     call GroupEnumUnitsInRect(handGroup, bj_mapInitialPlayableArea, null)
     call ForGroup(handGroup, function WG_HandInitialUnit)
+    call ForGroup(handGroup, function WG_TrackInitialEquipmentUnit)
     call DestroyGroup(handGroup)
     set handGroup = null
 endfunction

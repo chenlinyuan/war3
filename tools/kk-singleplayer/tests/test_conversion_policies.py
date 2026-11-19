@@ -94,6 +94,28 @@ endfunction
         self.assertEqual(stats["removed_tokens"], 1)
         self.assertEqual(BACKPACK.verify_objects(output, "w3u", {"A60Q"}), [])
 
+    def test_noop_object_patch_preserves_source_bytes(self) -> None:
+        from doctor.data import objects
+
+        data = objects.write_objects_bytes(
+            1,
+            [
+                (
+                    0,
+                    "hfoo",
+                    "\0\0\0\0",
+                    [("uabi", 3, 0, 0, b"AInv", b"\0\0\0\0")],
+                ),
+            ],
+            False,
+        )
+
+        output, stats = BACKPACK.patch_objects(data, "w3u", {"A60Q"})
+
+        self.assertEqual(output, data)
+        self.assertEqual(stats["removed_objects"], 0)
+        self.assertEqual(stats["removed_tokens"], 0)
+
 
 class HeroDeathPolicyTest(unittest.TestCase):
     def test_uses_zhujue_in_campaign_using_that_main_hero_name(self) -> None:
@@ -263,6 +285,16 @@ class CampaignProfileTest(unittest.TestCase):
         self.assertEqual(
             CAMPAIGN_PATCHES.backpack_switch_ids("burning-wrath"),
             {"A63G"},
+        )
+        self.assertEqual(
+            CAMPAIGN_PATCHES.backpack_switch_ids("linghan-wrath"),
+            {"A63G"},
+        )
+        self.assertEqual(
+            CAMPAIGN_PATCHES.backpack_switch_ids(
+                "blood-mission-qh-207"
+            ),
+            {"A627"},
         )
         self.assertFalse(
             CAMPAIGN_PATCHES.legacy_patch_enabled(

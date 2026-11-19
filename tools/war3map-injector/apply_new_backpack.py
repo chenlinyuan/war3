@@ -46,11 +46,67 @@ JASS_GLOBALS = """group ALAS_B30B_SCAN_GROUP = null
 region ALAS_B30B_REGION = null
 rect ALAS_B30B_RECT = null
 trigger ALAS_B30B_ENTER_TRIGGER = null
+trigger ALAS_B30B_ORDER_TRIGGER = null
 boolean ALAS_B30B_INITED = false
+hashtable ALAS_B30B_STATE_TABLE = null
+timer ALAS_B30B_LOG_CLOCK = null
+integer ALAS_B30B_LOG_SEQ = 0
+integer ALAS_B30B_LOG_NEXT = 0
+integer ALAS_B30B_LOG_COUNT = 0
+integer ALAS_B30B_LOG_SIZE = 80
+string array ALAS_B30B_LOG_LINES
 """
 
-JASS_FUNCTIONS = """function ALAS_B30B_HasBackpack takes unit u returns boolean
+JASS_FUNCTIONS = """function ALAS_B30B_NoOp takes nothing returns nothing
+endfunction
+
+function ALAS_B30B_LogAppend takes string line returns nothing
+    local integer slot = 0
+    set ALAS_B30B_LOG_SEQ = ALAS_B30B_LOG_SEQ + 1
+    set slot = ModuloInteger(ALAS_B30B_LOG_NEXT, ALAS_B30B_LOG_SIZE)
+    set ALAS_B30B_LOG_LINES[slot] = "[BACKPACK " + I2S(ALAS_B30B_LOG_SEQ) + "] t=" + R2S(TimerGetElapsed(ALAS_B30B_LOG_CLOCK)) + " " + line
+    set ALAS_B30B_LOG_NEXT = ModuloInteger(ALAS_B30B_LOG_NEXT + 1, ALAS_B30B_LOG_SIZE)
+    if ALAS_B30B_LOG_COUNT < ALAS_B30B_LOG_SIZE then
+        set ALAS_B30B_LOG_COUNT = ALAS_B30B_LOG_COUNT + 1
+    endif
+endfunction
+
+function ALAS_B30B_LogFlush takes nothing returns nothing
     local integer i = 0
+    local integer start = 0
+    if ALAS_B30B_LOG_COUNT <= 0 then
+        return
+    endif
+    set start = ALAS_B30B_LOG_NEXT - ALAS_B30B_LOG_COUNT
+    if start < 0 then
+        set start = start + ALAS_B30B_LOG_SIZE
+    endif
+    call PreloadGenClear()
+    call PreloadGenStart()
+    loop
+        exitwhen i >= ALAS_B30B_LOG_COUNT
+        call Preload(ALAS_B30B_LOG_LINES[ModuloInteger(start + i, ALAS_B30B_LOG_SIZE)])
+        set i = i + 1
+    endloop
+    call PreloadGenEnd("ALAS-BackpackLog.txt")
+endfunction
+
+function ALAS_B30B_FreeInventorySlots takes unit u returns integer
+    local integer i = 0
+    local integer count = 0
+    loop
+        exitwhen i > 5
+        if UnitItemInSlot(u, i) == null then
+            set count = count + 1
+        endif
+        set i = i + 1
+    endloop
+    return count
+endfunction
+
+function ALAS_B30B_HasBackpack takes unit u returns boolean
+    local integer i = 0
+    local integer itemId
     local item it
     if u == null or GetUnitTypeId(u) == 0 then
         return false
@@ -58,9 +114,12 @@ JASS_FUNCTIONS = """function ALAS_B30B_HasBackpack takes unit u returns boolean
     loop
         exitwhen i > 5
         set it = UnitItemInSlot(u, i)
-        if it != null and GetItemTypeId(it) == 'B30B' then
-            set it = null
-            return true
+        if it != null then
+            set itemId = GetItemTypeId(it)
+            if itemId == 'B30B' or (itemId >= 'Z000' and itemId <= 'Z063') then
+                set it = null
+                return true
+            endif
         endif
         set i = i + 1
     endloop
@@ -68,16 +127,43 @@ JASS_FUNCTIONS = """function ALAS_B30B_HasBackpack takes unit u returns boolean
     return false
 endfunction
 
-function ALAS_B30B_EnsureHero takes unit u returns nothing
+function ALAS_B30B_EnsureHero takes unit u, string reason returns nothing
+    local integer unitId
+    local real now
+    local real lastAttempt
+    local item bag
+    local player p
     if u == null or GetUnitTypeId(u) == 0 then
         return
     endif
     if not IsUnitType(u, UNIT_TYPE_HERO) then
         return
     endif
-    if not ALAS_B30B_HasBackpack(u) then
-        call UnitAddItemByIdSwapped('B30B', u)
+    set p = GetOwningPlayer(u)
+    if p == null or GetPlayerController(p) != MAP_CONTROL_USER or GetPlayerSlotState(p) != PLAYER_SLOT_STATE_PLAYING then
+        return
     endif
+    if ALAS_B30B_HasBackpack(u) then
+        return
+    endif
+    set unitId = GetHandleId(u)
+    set now = TimerGetElapsed(ALAS_B30B_LOG_CLOCK)
+    set lastAttempt = LoadReal(ALAS_B30B_STATE_TABLE, unitId, 0)
+    if lastAttempt > 0.0 and now - lastAttempt < 1.0 then
+        return
+    endif
+    call SaveReal(ALAS_B30B_STATE_TABLE, unitId, 0, now)
+    set bag = UnitAddItemByIdSwapped('B30B', u)
+    if bag != null and ALAS_B30B_HasBackpack(u) then
+        call ALAS_B30B_LogAppend("event=BACKPACK_ADD_OK hero=" + GetUnitName(u) + " owner=" + GetPlayerName(GetOwningPlayer(u)) + " reason=" + reason + " free=" + I2S(ALAS_B30B_FreeInventorySlots(u)))
+    else
+        if bag != null then
+            call SetItemPosition(bag, GetUnitX(u), GetUnitY(u))
+        endif
+        call ALAS_B30B_LogAppend("event=BACKPACK_ADD_FAIL hero=" + GetUnitName(u) + " owner=" + GetPlayerName(GetOwningPlayer(u)) + " reason=" + reason + " free=" + I2S(ALAS_B30B_FreeInventorySlots(u)))
+    endif
+    call ALAS_B30B_LogFlush()
+    set bag = null
 endfunction
 
 function ALAS_B30B_ScanInitial takes nothing returns nothing
@@ -87,14 +173,21 @@ function ALAS_B30B_ScanInitial takes nothing returns nothing
         set u = FirstOfGroup(ALAS_B30B_SCAN_GROUP)
         exitwhen u == null
         call GroupRemoveUnit(ALAS_B30B_SCAN_GROUP, u)
-        call ALAS_B30B_EnsureHero(u)
+        call ALAS_B30B_EnsureHero(u, "scan")
     endloop
     set u = null
 endfunction
 
 function ALAS_B30B_OnEnter takes nothing returns nothing
     local unit u = GetTriggerUnit()
-    call ALAS_B30B_EnsureHero(u)
+    call ALAS_B30B_EnsureHero(u, "enter")
+    set u = null
+endfunction
+
+function ALAS_B30B_OnOrder takes nothing returns nothing
+    local unit u = GetTriggerUnit()
+    call TriggerSleepAction(0.50)
+    call ALAS_B30B_EnsureHero(u, "order")
     set u = null
 endfunction
 
@@ -103,6 +196,9 @@ function ALAS_B30B_Init takes nothing returns nothing
         return
     endif
     set ALAS_B30B_INITED = true
+    set ALAS_B30B_STATE_TABLE = InitHashtable()
+    set ALAS_B30B_LOG_CLOCK = CreateTimer()
+    call TimerStart(ALAS_B30B_LOG_CLOCK, 8640000.0, false, function ALAS_B30B_NoOp)
     set ALAS_B30B_SCAN_GROUP = CreateGroup()
     set ALAS_B30B_RECT = Rect(GetRectMinX(bj_mapInitialPlayableArea), GetRectMinY(bj_mapInitialPlayableArea), GetRectMaxX(bj_mapInitialPlayableArea), GetRectMaxY(bj_mapInitialPlayableArea))
     set ALAS_B30B_REGION = CreateRegion()
@@ -110,7 +206,12 @@ function ALAS_B30B_Init takes nothing returns nothing
     set ALAS_B30B_ENTER_TRIGGER = CreateTrigger()
     call TriggerRegisterEnterRegion(ALAS_B30B_ENTER_TRIGGER, ALAS_B30B_REGION, null)
     call TriggerAddAction(ALAS_B30B_ENTER_TRIGGER, function ALAS_B30B_OnEnter)
-    call TimerStart(CreateTimer(), 0.25, false, function ALAS_B30B_ScanInitial)
+    set ALAS_B30B_ORDER_TRIGGER = CreateTrigger()
+    call TriggerRegisterAnyUnitEventBJ(ALAS_B30B_ORDER_TRIGGER, EVENT_PLAYER_UNIT_ISSUED_ORDER)
+    call TriggerAddAction(ALAS_B30B_ORDER_TRIGGER, function ALAS_B30B_OnOrder)
+    call ALAS_B30B_LogAppend("event=INIT runtime=jass")
+    call ALAS_B30B_LogFlush()
+    call TimerStart(CreateTimer(), 0.75, false, function ALAS_B30B_ScanInitial)
 endfunction
 """
 
@@ -118,6 +219,24 @@ JASS_ENTRY = "call ALAS_B30B_Init()\n"
 
 LUA_RUNTIME = """
 do
+    local logLines = {}
+    local logSeq = 0
+    local function logFlush()
+        PreloadGenClear()
+        PreloadGenStart()
+        for _, line in ipairs(logLines) do
+            Preload(line)
+        end
+        PreloadGenEnd("ALAS-BackpackLog.txt")
+    end
+    local function logEvent(line)
+        logSeq = logSeq + 1
+        table.insert(logLines, "[BACKPACK " .. logSeq .. "] " .. line)
+        if #logLines > 80 then
+            table.remove(logLines, 1)
+        end
+        logFlush()
+    end
     local scanGroup = CreateGroup()
     local areaRect = Rect(GetRectMinX(bj_mapInitialPlayableArea), GetRectMinY(bj_mapInitialPlayableArea), GetRectMaxX(bj_mapInitialPlayableArea), GetRectMaxY(bj_mapInitialPlayableArea))
     local enterRegion = CreateRegion()
@@ -126,19 +245,46 @@ do
         local i = 0
         while i <= 5 do
             local it = UnitItemInSlot(u, i)
-            if it ~= nil and GetItemTypeId(it) == FourCC("B30B") then
-                return true
+            if it ~= nil then
+                local itemId = GetItemTypeId(it)
+                if itemId == FourCC("B30B") or (itemId >= FourCC("Z000") and itemId <= FourCC("Z063")) then
+                    return true
+                end
             end
             i = i + 1
         end
         return false
     end
-    local function ensureHero(u)
+    local function freeSlots(u)
+        local count = 0
+        local i = 0
+        while i <= 5 do
+            if UnitItemInSlot(u, i) == nil then
+                count = count + 1
+            end
+            i = i + 1
+        end
+        return count
+    end
+    local function ensureHero(u, reason)
         if u == nil or GetUnitTypeId(u) == 0 or not IsUnitType(u, UNIT_TYPE_HERO) then
             return
         end
-        if not hasBackpack(u) then
-            UnitAddItemByIdSwapped(FourCC("B30B"), u)
+        local p = GetOwningPlayer(u)
+        if p == nil or GetPlayerController(p) ~= MAP_CONTROL_USER or GetPlayerSlotState(p) ~= PLAYER_SLOT_STATE_PLAYING then
+            return
+        end
+        if hasBackpack(u) then
+            return
+        end
+        local bag = UnitAddItemByIdSwapped(FourCC("B30B"), u)
+        if bag ~= nil and hasBackpack(u) then
+            logEvent("event=BACKPACK_ADD_OK hero=" .. GetUnitName(u) .. " owner=" .. GetPlayerName(GetOwningPlayer(u)) .. " reason=" .. reason .. " free=" .. freeSlots(u))
+        else
+            if bag ~= nil then
+                SetItemPosition(bag, GetUnitX(u), GetUnitY(u))
+            end
+            logEvent("event=BACKPACK_ADD_FAIL hero=" .. GetUnitName(u) .. " owner=" .. GetPlayerName(GetOwningPlayer(u)) .. " reason=" .. reason .. " free=" .. freeSlots(u))
         end
     end
     local function scanInitial()
@@ -149,15 +295,24 @@ do
                 break
             end
             GroupRemoveUnit(scanGroup, u)
-            ensureHero(u)
+            ensureHero(u, "scan")
         end
     end
     local enterTrigger = CreateTrigger()
     TriggerRegisterEnterRegion(enterTrigger, enterRegion, nil)
     TriggerAddAction(enterTrigger, function()
-        ensureHero(GetTriggerUnit())
+        ensureHero(GetTriggerUnit(), "enter")
     end)
-    TimerStart(CreateTimer(), 0.25, false, scanInitial)
+    local orderTrigger = CreateTrigger()
+    TriggerRegisterAnyUnitEventBJ(orderTrigger, EVENT_PLAYER_UNIT_ISSUED_ORDER)
+    TriggerAddAction(orderTrigger, function()
+        local u = GetTriggerUnit()
+        TimerStart(CreateTimer(), 0.50, false, function()
+            ensureHero(u, "order")
+        end)
+    end)
+    logEvent("event=INIT runtime=lua")
+    TimerStart(CreateTimer(), 0.75, false, scanInitial)
 end
 """
 
@@ -404,6 +559,7 @@ def process_campaign(source: Path, output: Path, work: Path, panels: tuple[str, 
             str(work / "extract"),
             "--out",
             str(output),
+            "--chapters-only",
         ]
     )
 
@@ -441,8 +597,58 @@ def verify_map(map_path: Path, panels: tuple[str, ...]) -> None:
     if (info.get("game_data_set"), info.get("game_data_version")) != (2, 2):
         raise SystemExit("map-info is not Reforged 2/2")
     script = jass or lua
+    script_is_lua = bool(lua) and not bool(jass)
     if "ALAS_B30B_EnsureHero" not in script and "local function ensureHero" not in script:
         raise SystemExit("new-backpack hero runtime missing")
+    player_target_markers = (
+        (
+            "local p = GetOwningPlayer(u)",
+            "GetPlayerController(p) ~= MAP_CONTROL_USER",
+            "GetPlayerSlotState(p) ~= PLAYER_SLOT_STATE_PLAYING",
+        )
+        if script_is_lua
+        else (
+            "set p = GetOwningPlayer(u)",
+            "GetPlayerController(p) != MAP_CONTROL_USER",
+            "GetPlayerSlotState(p) != PLAYER_SLOT_STATE_PLAYING",
+        )
+    )
+    for marker in player_target_markers:
+        if marker not in script:
+            raise SystemExit(
+                "new-backpack player-owned hero filter missing: "
+                + marker
+            )
+    ownership_markers = (
+        ('FourCC("Z000")', 'FourCC("Z063")')
+        if script_is_lua
+        else ("'Z000'", "'Z063'")
+    )
+    for marker in ownership_markers:
+        if marker not in script:
+            raise SystemExit(
+                "new-backpack talent-backpack ownership check missing: "
+                + marker
+            )
+    late_hero_markers = (
+        ("orderTrigger", "EVENT_PLAYER_UNIT_ISSUED_ORDER")
+        if script_is_lua
+        else ("ALAS_B30B_OnOrder", "ALAS_B30B_ORDER_TRIGGER")
+    )
+    for marker in late_hero_markers:
+        if marker not in script:
+            raise SystemExit(
+                "new-backpack late-hero order hook missing: " + marker
+            )
+    for marker in (
+        "ALAS-BackpackLog.txt",
+        "BACKPACK_ADD_OK",
+        "BACKPACK_ADD_FAIL",
+    ):
+        if marker not in script:
+            raise SystemExit(
+                "new-backpack runtime log marker missing: " + marker
+            )
 
 
 CURRENT_PANELS: tuple[str, ...] = DEFAULT_PANELS

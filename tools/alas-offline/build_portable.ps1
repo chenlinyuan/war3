@@ -1,3 +1,7 @@
+param(
+    [string]$DistPath
+)
+
 $ErrorActionPreference = "Stop"
 $AppDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Root = (Resolve-Path (Join-Path $AppDir "..\..")).Path
@@ -6,9 +10,21 @@ if (-not (Test-Path -LiteralPath $Python)) {
     throw "Build environment not found: $Python"
 }
 
-$Dist = Join-Path $Root "dist"
+$Dist = if ($DistPath) {
+    [System.IO.Path]::GetFullPath($DistPath)
+} else {
+    Join-Path $Root "dist"
+}
 $Build = Join-Path $Root "build\alas-offline"
 $Name = "ALAS-Offline"
+$BuildCache = Join-Path $Root ".alas-cache\build"
+$BuildTemp = Join-Path $BuildCache "temp"
+$PyInstallerCache = Join-Path $BuildCache "pyinstaller"
+New-Item -ItemType Directory -Path $BuildTemp -Force | Out-Null
+New-Item -ItemType Directory -Path $PyInstallerCache -Force | Out-Null
+$env:PYINSTALLER_CONFIG_DIR = $PyInstallerCache
+$env:TEMP = $BuildTemp
+$env:TMP = $BuildTemp
 $WingSource = Get-ChildItem -LiteralPath (Join-Path $Root "maps") -Directory |
     Where-Object { $_.Name -like "*.w3x.orig" } |
     Select-Object -First 1

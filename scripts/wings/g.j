@@ -28,6 +28,9 @@ real array wg_riderCd            // 槽位 -> 召唤冷却(游戏时间戳)
 unit array wg_riderSum1          // 槽位 -> 召唤物 1
 unit array wg_riderSum2          // 槽位 -> 召唤物 2
 hashtable wg_slotTable = null
+timer wg_mountTimer = null
+group wg_equipGroup = null
+timer wg_equipTimer = null
 // --- 召唤小龙的参数 ---
 //   ⚠ 下面这段由 tools/war3map-injector/gen_jass_tables.py 从 wings_config.py 生成
 //      （summon_count / summon_cd / summon_life）。**战役里把 summon_count 设 0 就关掉召唤。**

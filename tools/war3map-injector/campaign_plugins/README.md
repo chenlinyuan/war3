@@ -45,9 +45,12 @@ the build if hit counts or `verify()` do not match the manifest.
 2. Inventory every mall key, death/defeat trigger, group wipe, pet deletion,
    cache handoff, command gate, and cinematic exit.
 3. Create a new bundle with its own source SHA and exact rule chapter sets.
-4. Preserve story failures and only neutralize anti-platform behavior.
-5. Add synthetic positive/negative tests plus real-build count assertions.
-6. Run pjass, Map Doctor, Storm subarchive checks, read-back checks, and
+4. Open every verified shop key that grants a pet, pet-related privilege,
+   hero skin, or artifact. A category is complete only when all of its
+   redeem entries are covered.
+5. Preserve story failures and only neutralize anti-platform behavior.
+6. Add synthetic positive/negative tests plus real-build count assertions.
+7. Run pjass, Map Doctor, Storm subarchive checks, read-back checks, and
    deployed-hash verification.
 
 Do not add a campaign ID, unit ID, task handle, or key to the shared layer

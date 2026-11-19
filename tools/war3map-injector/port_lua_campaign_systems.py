@@ -33,7 +33,6 @@ FR_ASSETS = (
     ("Frostmourne10.blp", "Frostmourne10.blp"),
     ("Frostmourne100.blp", "Frostmourne100.blp"),
     ("IceStompRaised.mdx", r"war3campImported\IceStompRaised.mdx"),
-    ("Rune-Blue-Aura_Raised20.mdx", r"war3campImported\Rune-Blue-Aura_Raised20.mdx"),
 )
 ICONS = (
     ("BTNArchimondeHand_30HD.blp",

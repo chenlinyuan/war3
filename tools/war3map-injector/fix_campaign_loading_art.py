@@ -29,6 +29,17 @@ SCORE_SCREEN_WIDTH = TARGET_ASPECT
 SCORE_SCREEN_HEIGHT = 1.0
 
 
+def _screen_is_widescreen(screen: dict[str, Any]) -> bool:
+    size = screen.get("size")
+    if not isinstance(size, (list, tuple)) or len(size) != 2:
+        return False
+    width = int(size[0] or 0)
+    height = int(size[1] or 0)
+    if width < 1000 or height <= 0:
+        return False
+    return abs(width / height - TARGET_ASPECT) <= 0.02
+
+
 def compose_widescreen(image: Image.Image) -> Image.Image:
     """Restore the author's square-to-4:3 compression without cropping art."""
     image = image.convert("RGB")
@@ -207,6 +218,16 @@ def chapter_loading_patches(
     screen, datas = map_card._loading_screen(archive, model)
     if not screen.get("custom") or not screen.get("replaceable"):
         return [], None
+    if _screen_is_widescreen(screen):
+        return [], {
+            "model": str(screen.get("model") or ""),
+            "layout": str(screen.get("layout") or ""),
+            "textures": [
+                str(texture["file"])
+                for texture in screen.get("textures") or []
+            ],
+            "already_widescreen": True,
+        }
     patches, record = _loading_texture_patches(
         archive,
         screen,
@@ -236,15 +257,37 @@ def campaign_background_patches(
             return [], None
         actual_model, model_data = _read_archive_file(archive, model_path)
         cited = mdxtex.mdx_textures(model_data)
+        if len(cited) == 1:
+            layout = "single"
+        elif len(cited) == 4:
+            layout = "quadrants"
+        else:
+            return [], {
+                "model": model_path,
+                "layout": "complex",
+                "textures": list(cited),
+                "skipped": True,
+                "skip_reason": (
+                    "complex campaign background has %d textures"
+                    % len(cited)
+                ),
+            }
         datas: dict[str, bytes] = {}
         textures: list[dict[str, object]] = []
         screen: dict[str, Any] = {
             "model": model_path,
-            "layout": "single" if len(cited) == 1 else "quadrants",
+            "layout": layout,
             "textures": [],
         }
+        missing: list[str] = []
         for citation in cited:
-            actual, data = _read_archive_file(archive, citation)
+            try:
+                actual, data = _read_archive_file(archive, citation)
+            except ValueError as exc:
+                if not str(exc).startswith("archive entry is missing: "):
+                    raise
+                missing.append(citation)
+                continue
             width, height, kind = map_card._header_size(data, actual)
             quadrant = map_card._quadrant(actual)
             datas[actual] = data
@@ -258,6 +301,18 @@ def campaign_background_patches(
             }
             textures.append(texture)
             screen["textures"].append(texture)
+        if missing:
+            return [], {
+                "model": model_path,
+                "layout": layout,
+                "textures": list(cited),
+                "skipped": True,
+                "skip_reason": (
+                    "campaign background requires textures not stored in "
+                    "the source archive"
+                ),
+                "missing_textures": missing,
+            }
         if len(textures) == 1:
             screen["size"] = [textures[0]["width"], textures[0]["height"]]
         elif len(textures) == 4:
@@ -276,6 +331,16 @@ def campaign_background_patches(
                 screen["size"] = None
         else:
             screen["size"] = None
+        if _screen_is_widescreen(screen):
+            return [], {
+                "model": model_path,
+                "layout": str(screen["layout"]),
+                "textures": [
+                    str(texture["file"])
+                    for texture in screen["textures"]
+                ],
+                "already_widescreen": True,
+            }
         patches, record = _loading_texture_patches(
             archive,
             screen,

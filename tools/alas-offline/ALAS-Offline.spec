@@ -142,10 +142,31 @@ for name in (
     "classic_item_chat.j",
     "reforged_compat.j",
     "_patch_hm3w_name.py",
+    "_patch_backpack_switch.py",
     "sfmpq_add_file.ps1",
 ):
     datas.append(
         (str(injector_root / name), "tools/war3map-injector")
+    )
+for source in (injector_root / "campaign_plugins").rglob("*"):
+    if not source.is_file():
+        continue
+    relative = source.relative_to(injector_root)
+    if (
+        any(part == "__pycache__" for part in relative.parts)
+        or "tests" in relative.parts
+        or source.suffix.lower() in {".pyc", ".pyo"}
+    ):
+        continue
+    datas.append(
+        (
+            str(source),
+            str(
+                Path("tools/war3map-injector")
+                / Path("campaign_plugins")
+                / Path(relative).parent.relative_to("campaign_plugins")
+            ),
+        )
     )
 datas.append(
     (
@@ -210,6 +231,8 @@ hiddenimports = [
     "tkinter.messagebox",
     "PIL",
     "PIL.Image",
+    "PIL.ImageEnhance",
+    "PIL.ImageFilter",
     "PIL.ImageOps",
     "doctor.fix.shrink",
     "doctor.triggers.wtg",

@@ -34,6 +34,22 @@ PS32 = Path(
     r"C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
 )
 SF_ADD = HERE / "sfmpq_add_file.ps1"
+GENERATED_TITLE_SUFFIX = re.compile(
+    r"\s*[（(][^（）()]*"
+    r"(?:提取版|单机修复版|清源推导版|经典版|"
+    r"物品技能翅膀版|装备翅膀版|缓存修复|资源修复|"
+    r"载入图汉化|兼容版|测试版|修复版)"
+    r"[^（）()]*[）)]\s*$"
+)
+PLAIN_GENERATED_SUFFIX = re.compile(
+    r"\s*[-－—·]?\s*"
+    r"(?:提取版|单机修复版|清源推导版|经典版|"
+    r"物品技能翅膀版|装备翅膀版|缓存修复|资源修复|"
+    r"载入图汉化|兼容版|测试版|修复版)\s*$"
+)
+ALAS_PREFIX = re.compile(
+    r"^\s*[Aa][Ll][Aa][Ss](?=\s|[A-Z0-9\u2e80-\u9fff\uff00-\uffef]|$)"
+)
 
 # Explicit names prevent old abbreviations and colour tags from leaking back
 # into the campaign list.
@@ -55,6 +71,23 @@ TITLES = {
 def strip_colours(value: str) -> str:
     value = re.sub(r"\|c[0-9a-fA-F]{8}", "", value)
     return value.replace("|r", "").replace("|R", "").strip()
+
+
+def original_campaign_title(value: str) -> str:
+    """Return the authored title without tool-generation suffixes."""
+    value = ALAS_PREFIX.sub("", strip_colours(value)).strip()
+    while True:
+        cleaned = GENERATED_TITLE_SUFFIX.sub("", value).strip()
+        cleaned = PLAIN_GENERATED_SUFFIX.sub("", cleaned).strip()
+        if cleaned == value:
+            return cleaned
+        value = cleaned
+
+
+def alas_campaign_title(value: str) -> str:
+    """Return exactly ``alas <original title>``."""
+    title = original_campaign_title(value)
+    return "alas " + title if title else "alas"
 
 
 def wts_strings(data: bytes) -> dict[int, str]:
@@ -219,10 +252,8 @@ def desired_title(path: Path) -> str:
         if current and not re.fullmatch(
             r"\s*TRIGSTR_0*\d+\s*", current, re.I
         ):
-            if re.match(r"^\s*alas(?:\s|$)", current, re.I):
-                return current
-            return TITLES.get(current, "alas " + current)
-    return TITLES.get(path.stem, "alas " + path.stem[4:].lstrip())
+            return alas_campaign_title(TITLES.get(current, current))
+    return alas_campaign_title(TITLES.get(path.stem, path.stem))
 
 
 def main() -> int:

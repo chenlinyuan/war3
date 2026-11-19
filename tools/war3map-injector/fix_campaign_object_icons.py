@@ -17,6 +17,7 @@ DIS/DISBTN 版本。自定义图标如果只有启用版，命令卡就会显示
 """
 import argparse
 import collections
+import hashlib
 import os
 import struct
 import sys
@@ -34,13 +35,20 @@ from blp_icon import read_blp, write_blp1_palette  # noqa: E402
 
 ICON_FIELDS = {
     "w3a": ("aart", "arar", "auar"),
-    "w3q": ("aart", "arar", "auar"),
+    "w3q": ("gar1",),
     "w3u": ("uico", "ussi"),
     "w3t": ("iico",),
     "w3h": ("fart",),
     "w3b": ("bico",),
 }
-OBJECT_PREFIX = "war3campaign."
+OBJECT_PREFIXES = (
+    "war3campaign.",
+    "war3campaignSkin.",
+    "war3map.",
+    "war3mapSkin.",
+)
+IMAGE_EXTENSIONS = (".blp", ".dds", ".tga", ".png", ".jpg", ".jpeg")
+TEXT_ICON_KEYS = {"art", "researchart", "unart"}
 
 
 def collect_icon_refs(archive):
@@ -51,33 +59,88 @@ def collect_icon_refs(archive):
     因此按字段名和字符串值扫描更可靠，也不会受原版/自定义分段影响。
     """
     refs = []
-    for ext, fields in ICON_FIELDS.items():
-        data = archive.read_file(OBJECT_PREFIX + ext)
+    for prefix in OBJECT_PREFIXES:
+        for ext, fields in ICON_FIELDS.items():
+            data = archive.read_file(prefix + ext)
+            if not data:
+                continue
+            for field in fields:
+                needle = field.encode("latin-1")
+                pos = 0
+                while True:
+                    offset = data.find(needle, pos)
+                    if offset < 0:
+                        break
+                    pos = offset + 1
+                    if offset + 8 > len(data):
+                        break
+                    if struct.unpack_from("<i", data, offset + 4)[0] != 3:
+                        continue
+                    value_pos = offset + 8
+                    if ext in ("w3a", "w3q"):
+                        value_pos += 8  # level + column
+                    end = data.find(b"\x00", value_pos)
+                    if end < 0:
+                        continue
+                    value = data[value_pos:end].decode("utf-8", "replace")
+                    if not value or value in ("-", "_"):
+                        continue
+                    if (
+                        value.lower().endswith(IMAGE_EXTENSIONS)
+                        or "\\" in value
+                        or "/" in value
+                    ):
+                        refs.append(
+                            (
+                                ext,
+                                offset,
+                                field,
+                                value.replace("/", "\\"),
+                            )
+                        )
+    refs.extend(collect_text_icon_refs(archive))
+    return refs
+
+
+def collect_text_icon_refs(archive):
+    """Collect icon fields from map/campaign custom text object tables."""
+    refs = []
+    try:
+        names = archive.files()
+    except Exception:
+        return refs
+    for name in names:
+        lower = name.casefold()
+        if not lower.endswith(".txt"):
+            continue
+        if not (
+            lower.startswith("units\\")
+            or lower in ("war3mapskin.txt", "war3campaignskin.txt")
+        ):
+            continue
+        data = archive.read_file(name)
         if not data:
             continue
-        for field in fields:
-            needle = field.encode("latin-1")
-            pos = 0
-            while True:
-                offset = data.find(needle, pos)
-                if offset < 0:
-                    break
-                pos = offset + 1
-                if offset + 8 > len(data):
-                    break
-                if struct.unpack_from("<i", data, offset + 4)[0] != 3:
-                    continue
-                value_pos = offset + 8
-                if ext in ("w3a", "w3q"):
-                    value_pos += 8  # level + column
-                end = data.find(b"\x00", value_pos)
-                if end < 0:
-                    continue
-                value = data[value_pos:end].decode("utf-8", "replace")
-                if not value or value in ("-", "_"):
-                    continue
-                if value.lower().endswith(".blp") or "\\" in value:
-                    refs.append((ext, offset, field, value.replace("/", "\\")))
+        section = ""
+        for line in data.decode("utf-8", "surrogateescape").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                section = stripped[1:-1]
+                continue
+            if "=" not in stripped or stripped.startswith("//"):
+                continue
+            key, value = stripped.split("=", 1)
+            key = key.strip()
+            if key.casefold() not in TEXT_ICON_KEYS:
+                continue
+            for path in value.split(","):
+                path = path.strip().strip('"').replace("/", "\\")
+                if (
+                    path
+                    and not path.upper().startswith("TRIGSTR_")
+                    and path not in ("-", "_")
+                ):
+                    refs.append((name, section, key, path))
     return refs
 
 
@@ -102,17 +165,38 @@ class ArchiveFiles:
 
 
 def resolve_icon(files, path):
-    candidates = [path]
+    raw_candidates = [path]
     if "\\" not in path:
-        candidates += [
+        raw_candidates += [
             "war3campImported\\" + path,
             "war3mapImported\\" + path,
             "ReplaceableTextures\\CommandButtons\\" + path,
         ]
+    candidates = []
+    for candidate in raw_candidates:
+        candidates.append(candidate)
+        if not os.path.splitext(candidate)[1]:
+            candidates.extend(
+                candidate + extension
+                for extension in IMAGE_EXTENSIONS
+            )
+    candidates = list(dict.fromkeys(candidates))
     for candidate in candidates:
         if files.exists(candidate):
             return candidate
     return None
+
+
+def resolve_icon_with_fallback(files, fallback_files, path):
+    """Resolve an enabled icon locally, then from the parent campaign."""
+    original = resolve_icon(files, path)
+    if original:
+        return original, files
+    if fallback_files is not None:
+        original = resolve_icon(fallback_files, path)
+        if original:
+            return original, fallback_files
+    return None, None
 
 
 def disabled_base(filename):
@@ -223,21 +307,38 @@ def darken_icon(data):
             pass
 
 
-def build_patch(campaign):
-    archive = W.MPQArchive(campaign)
+def _build_archive_patch(path, fallback_campaign=None, disabled_cache=None):
+    archive = W.MPQArchive(str(path))
+    fallback_archive = (
+        W.MPQArchive(str(fallback_campaign))
+        if fallback_campaign is not None
+        else None
+    )
     try:
         files = ArchiveFiles(archive)
+        fallback_files = (
+            ArchiveFiles(fallback_archive)
+            if fallback_archive is not None
+            else None
+        )
         refs = collect_icon_refs(archive)
         by_icon = collections.defaultdict(list)
+        data_sources = {}
         for ext, object_id, field, value in refs:
-            original = resolve_icon(files, value)
+            original, source_files = resolve_icon_with_fallback(
+                files,
+                fallback_files,
+                value,
+            )
             if original:
                 by_icon[original].append((ext, object_id, field, value))
+                data_sources[original] = source_files
 
         existing = {path: inspect_disabled_states(files, path) for path in by_icon}
         patches = []
         patch_names = {}
         queued = set()
+        cache = disabled_cache if disabled_cache is not None else {}
         for path in sorted(by_icon):
             aliases = [
                 alias
@@ -247,16 +348,20 @@ def build_patch(campaign):
             ]
             if not aliases:
                 continue
-            original_data = files.read(path)
+            original_data = data_sources[path].read(path)
             if not original_data:
                 raise ValueError("cannot read icon: " + path)
-            try:
-                disabled_data = darken_icon(original_data)
-            except Exception:
-                # Some legacy BLP variants cannot be decoded by Pillow.  A
-                # direct copy still prevents the UI from showing a green
-                # missing-icon square, even though it is not darkened.
-                disabled_data = original_data
+            cache_key = hashlib.sha256(original_data).digest()
+            disabled_data = cache.get(cache_key)
+            if disabled_data is None:
+                try:
+                    disabled_data = darken_icon(original_data)
+                except Exception:
+                    # Some legacy BLP variants cannot be decoded by Pillow.  A
+                    # direct copy still prevents the UI from showing a green
+                    # missing-icon square, even though it is not darkened.
+                    disabled_data = original_data
+                cache[cache_key] = disabled_data
             for alias in aliases:
                 patches.append((alias, disabled_data))
                 queued.add(alias.lower())
@@ -264,6 +369,38 @@ def build_patch(campaign):
         return refs, by_icon, existing, patch_names, patches
     finally:
         archive.close()
+        if fallback_archive is not None:
+            fallback_archive.close()
+
+
+def build_patch(campaign, disabled_cache=None):
+    """Build campaign-level disabled icons from campaign object data."""
+    return _build_archive_patch(
+        campaign,
+        disabled_cache=disabled_cache,
+    )
+
+
+def build_chapter_patch(map_path, campaign, disabled_cache=None):
+    """Build chapter-local disabled icons, falling back to campaign assets."""
+    return _build_archive_patch(
+        map_path,
+        fallback_campaign=campaign,
+        disabled_cache=disabled_cache,
+    )
+
+
+def summary(info):
+    """Return a JSON-serializable disabled-icon patch summary."""
+    refs, by_icon, existing, _patch_names, patches = info
+    return {
+        "icon_references": len(refs),
+        "unique_enabled_icons": len(by_icon),
+        "covered_enabled_icons": sum(
+            1 for names in existing.values() if names
+        ),
+        "generated_icon_files": len(patches),
+    }
 
 
 def verify_patch(campaign, by_icon, patch_names):
@@ -278,10 +415,14 @@ def verify_patch(campaign, by_icon, patch_names):
                 bad.append((original, "missing disabled icon"))
                 continue
             data = files.read(found[0])
-            if not data or data[:4] not in (b"BLP1", b"BLP2"):
-                bad.append((original, "not BLP1/BLP2"))
+            if not data:
+                bad.append((original, "empty disabled icon"))
+                continue
+            if data[:4] in (b"BLP2", b"DDS "):
                 continue
             if data[:4] != b"BLP1":
+                # Imported legacy icons may be TGA/PNG/JPEG. A format-preserving
+                # copy is still a valid fallback when palette conversion fails.
                 continue
             content, alpha, width, height, _mips = struct.unpack_from(
                 "<IIIII", data, 4

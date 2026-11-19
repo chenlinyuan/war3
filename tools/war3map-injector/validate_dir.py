@@ -11,6 +11,8 @@ BASE = os.path.dirname(os.path.dirname(HERE))
 PJASS_DIR = os.path.join(BASE, "tools", "war3-tools", "偶久改图一条龙工具包",
                          "tools", "JassCraft")
 PJASS = os.path.join(PJASS_DIR, "pjass.exe")
+if not os.path.isfile(PJASS):
+    PJASS = os.path.join(BASE, "tools", "alas-offline", "assets", "pjass.exe")
 # ⚠ 参考脚本要用 Doctor 的 1.24 版：JassCraft 自带的是 1.07 时代的 common.j，
 #   缺 agent/hashtable/GetHandleId，会报一堆假错（见 docs/06-工具链/KKWE平台图单机化.md）。
 _VERSION = os.environ.get("JASS_REF_VERSION", "1.24").strip()

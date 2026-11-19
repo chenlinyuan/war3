@@ -164,17 +164,39 @@ def main():
     if target == map_path:
         tmp_before = map_path + ".verifybase"
         force_writable(tmp_before)
-        shutil.copy2(map_path, tmp_before)
+        os.replace(map_path, tmp_before)
         force_writable(tmp_before)
-    new_path = MP.patch(target, payload, out_path=None, backup=not args.no_backup,
-                        store=args.store)
+    patch_source = tmp_before if target == map_path else target
+    patch_output = map_path if target == map_path else None
+    try:
+        new_path = MP.patch(patch_source, payload, out_path=patch_output,
+                            backup=False, store=args.store)
+    except Exception:
+        if tmp_before and os.path.exists(tmp_before):
+            force_writable(map_path)
+            if os.path.exists(map_path):
+                os.remove(map_path)
+            os.replace(tmp_before, map_path)
+        raise
     ok = True
     if not args.no_verify:
         print("== 校验 ==")
         ok = MP.verify(tmp_before or map_path, new_path, payload)
         print("== %s ==" % ("校验通过 [OK]" if ok else "校验失败 [NG]"))
     if tmp_before and os.path.exists(tmp_before):
-        os.remove(tmp_before)
+        if not ok:
+            force_writable(map_path)
+            if os.path.exists(map_path):
+                os.remove(map_path)
+            os.replace(tmp_before, map_path)
+        elif args.no_backup:
+            os.remove(tmp_before)
+        else:
+            backup_path = map_path + ".origbak"
+            if not os.path.exists(backup_path):
+                os.replace(tmp_before, backup_path)
+            else:
+                os.remove(tmp_before)
     if ok and args.deploy:
         import deploy_mod
         dest, removed = deploy_mod.deploy(new_path, args.deploy)

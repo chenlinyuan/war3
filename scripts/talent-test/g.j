@@ -21,6 +21,13 @@ group TT_DH_GROUP = null
 boolean TT_INITED = false
 boolean TT_START_READY = false
 boolean TT_MELEE_HERO_TALENTS = false
+boolean TT_REPLACEMENT_ACTIVE = false
+boolean TT_REPLACEMENT_WAS_SELECTED = false
+unit TT_REPLACEMENT_OLD = null
+unit TT_REPLACEMENT_NEW = null
+integer TT_REPLACEMENT_INDEX = -1
+item array TT_REPLACEMENT_BAG_ITEMS
+item array TT_REPLACEMENT_EQUIPMENT_ITEMS
 integer TT_HERO_COUNT = 0
 unit array TT_HEROES
 boolean array TT_RANGED_HERO
@@ -40,8 +47,12 @@ integer array TT_TALENT_MASK
 integer array TT_EARNED_POINTS
 integer array TT_TALENT_MASTER_LEVEL
 integer array TT_AWARDED_MASK
+integer array TT_UNSPENT_POINTS
+integer array TT_SELECTED_TIER_COUNT
 boolean array TT_CAMPAIGN_NATIVE_PRESERVED
 boolean array TT_CAMPAIGN_SNAPSHOT_PENDING
+boolean array TT_CAMPAIGN_NATIVE_POINTS_PENDING
+boolean array TT_CAMPAIGN_RESTORED_POINTS_UNKNOWN
 boolean TT_CAMPAIGN_STORE_RESULT = false
 boolean TT_CAMPAIGN_SAVE_RESULT = false
 gamecache TT_CAMPAIGN_AUDIT_CACHE = null
@@ -50,6 +61,8 @@ string array TT_CAMPAIGN_AUDIT_MISSIONS
 string array TT_CAMPAIGN_AUDIT_KEYS
 string array TT_CAMPAIGN_AUDIT_LABELS
 integer array TT_PENDING_POINTS
+integer array TT_POINT_LEVEL_SEEN
+real array TT_POINT_LEVEL_SINCE
 boolean array TT_POINT_WAIT_CLEANUP
 integer array TT_POINT_WAIT_TICKS
 boolean array TT_POINT_USE_ACCEPTED

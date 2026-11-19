@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "name": "linghan-wrath",
+  "title": "凌寒之怒-暗黑之途",
+  "source_sha256": "6ee1f302edb0151772fbb40b799b6bf0489a70f271e9d808b0a40126387af278",
+  "source_sha256_aliases": [
+    "7c46b99eae5be7f17ed1fa8264dae6b02b3857d51ae70dc8a516d890890dc3f1",
+    "66dfed8abd138347ff96e72b4ad8029899d0980ea3b46171c8df89545d80a085"
+  ],
+  "chapters": [
+    "wu01.w3m",
+    "wu010.w3x",
+    "wu011.w3m",
+    "wu012.w3m",
+    "wu013.w3x",
+    "wu014.w3x",
+    "wu015.w3x",
+    "wu016.w3x",
+    "wu017.w3x",
+    "wu018.w3m",
+    "wu019.w3m",
+    "wu02.w3x",
+    "wu020.w3m",
+    "wu021.w3m",
+    "wu022.w3x",
+    "wu03.w3x",
+    "wu04.w3m",
+    "wu05.w3m",
+    "wu06.w3m",
+    "wu07.w3m",
+    "wu08.w3x",
+    "wu09.w3x",
+    "xmao000.w3x",
+    "zuizhong.w3x"
+  ],
+  "key_policy": {
+    "default": false,
+    "true": [
+      "0000H00006",
+      "BBTWO10",
+      "DY850",
+      "GCS6601",
+      "JJS120",
+      "JNTM66",
+      "JS877",
+      "JXN6678",
+      "LYJK5695",
+      "LYZZ588",
+      "PFZA223",
+      "PFFJSS2",
+      "QTDS662",
+      "SLTS5601",
+      "SMSH55",
+      "THZY330",
+      "TYZK520",
+      "WXMZ886",
+      "XJCW8863"
+    ],
+    "false": []
+  },
+  "mall_categories": {
+    "artifacts": {
+      "I67R": "THZY330",
+      "I67L": "TYZK520",
+      "I67M": "WXMZ886",
+      "I67N": "DY850"
+    },
+    "skins": {
+      "I679": "PFZA223",
+      "I67A": "PFFJSS2"
+    },
+    "pets": {
+      "I68O": "XJCW8863",
+      "I67B": "GCS6601",
+      "I67C": "QTDS662",
+      "I67D": "JJS120",
+      "I67E": "JNTM66",
+      "I67F": "LYZZ588",
+      "I67G": "JS877",
+      "I67H": "SMSH55",
+      "I67I": "LYJK5695",
+      "I67J": "JXN6678",
+      "I67K": "SLTS5601"
+    },
+    "pet_privileges": {
+      "I67S": "BBTWO10"
+    }
+  },
+  "chapter_key_rules": {
+    "wu01.w3m": {
+      "true": [
+        "0000H00006"
+      ]
+    }
+  },
+  "backpack_switch": {
+    "ability_ids": [
+      "A63G"
+    ],
+    "source": "切换背包(B)",
+    "object_fields": [
+      "uabi"
+    ],
+    "runtime_grants": [
+      "UnitAddAbilityBJ",
+      "UnitMakeAbilityPermanent"
+    ]
+  },
+  "rules": {
+    "wu01_anti_cheat_player_wipe": {
+      "chapter": "wu01.w3m",
+      "key": "0000H00006",
+      "trigger": "gg_trg____________________036",
+      "expected_count": 1,
+      "safe_action": "DisableTrigger(GetTriggeringTrigger())"
+    },
+    "wu02_cinematic_skip_window": {
+      "chapter": "wu02.w3x",
+      "trigger": "gg_trg____________________018",
+      "condition_function": "Trig____________________018Conditions",
+      "flag": "udg_dianyingtiaoguo10",
+      "broken_operator": "!=",
+      "broken_value": 20,
+      "authored_operator": "==",
+      "authored_value": 10,
+      "expected_count": 1
+    }
+  },
+  "intentional_failure_paths_preserved": [
+    "Authored story defeats and protected-unit failures",
+    "Enemy and cinematic cleanup",
+    "Player-unit cleanup not gated by the 0000H00006 platform guard",
+    "Cinematic skipping during the segment that is actually playing"
+  ],
+  "runtime_tests": [
+    "Start chapter 1 from a fresh campaign run and wait at least 15 seconds after loading.",
+    "Confirm the main hero, companions, pets, and other player units remain alive and controllable.",
+    "Confirm the opening cinematic completes and normal chapter 1 gameplay begins.",
+    "Confirm the authored chapter 1 victory still advances to wu02.w3x.",
+    "Start chapter 2 fresh and press ESC during its opening cinematic; confirm 亚歌娜 does not enter the player's hero roster early.",
+    "After completing the intended 20-target capture step, confirm 亚歌娜 appears, speaks, and joins as the authored second hero.",
+    "Claim every artifact, hero skin, pet, and pet-related privilege redeem item in the campaign shop."
+  ]
+}

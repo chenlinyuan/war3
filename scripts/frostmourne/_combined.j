@@ -21,15 +21,6 @@ hashtable fr_soul_source_table = null
 hashtable fr_soul_timer_table = null
 hashtable fr_cooldown_table = null
 hashtable fr_active_fx_table = null
-integer fr_ground_count = 0
-item array fr_ground_items
-integer array fr_ground_keys
-effect array fr_ground_effects
-real array fr_ground_x
-real array fr_ground_y
-hashtable fr_ground_table = null
-rect fr_world = null
-timer fr_ground_timer = null
 timer fr_clock = null
 
 boolean fr_inited = false
@@ -270,95 +261,8 @@ function FR_OnHeroRevive takes nothing returns nothing
     set u = null
 endfunction
 
-function FR_ItemOnGround takes item it returns boolean
-    local player p
-    if it == null or GetItemTypeId(it) != FR_ITEM_ID then
-        return false
-    endif
-    set p = GetItemPlayer(it)
-    if p == null then
-        return true
-    endif
-    return GetPlayerId(p) == PLAYER_NEUTRAL_PASSIVE
-endfunction
-
-function FR_AddGroundAura takes item it returns nothing
-    local integer i = 0
-    local integer key
-    local effect fx
-    local real x
-    local real y
-    if it == null or GetItemTypeId(it) != FR_ITEM_ID then
-        return
-    endif
-    set key = GetHandleId(it)
-    loop
-        exitwhen i >= fr_ground_count
-        if fr_ground_keys[i] == key then
-            return
-        endif
-        set i = i + 1
-    endloop
-    if fr_ground_count >= 16 then
-        return
-    endif
-    set fx = null
-    if HaveSavedHandle(fr_ground_table, key, 0) then
-        set fx = LoadEffectHandle(fr_ground_table, key, 0)
-    endif
-    set x = GetItemX(it)
-    set y = GetItemY(it)
-    if fx == null then
-        set fx = AddSpecialEffect("war3campImported\\Rune-Blue-Aura_Raised20.mdx", x, y)
-        call SaveEffectHandle(fr_ground_table, key, 0, fx)
-    endif
-    set fr_ground_items[fr_ground_count] = it
-    set fr_ground_keys[fr_ground_count] = key
-    set fr_ground_effects[fr_ground_count] = fx
-    set fr_ground_x[fr_ground_count] = x
-    set fr_ground_y[fr_ground_count] = y
-    set fr_ground_count = fr_ground_count + 1
-    set fx = null
-endfunction
-
-function FR_EnumGroundItem takes nothing returns nothing
-    call FR_AddGroundAura(GetEnumItem())
-endfunction
-
-function FR_RemoveItemAura takes item it returns nothing
-    local integer i = 0
-    local integer key
-    local integer last
-    if it == null then
-        return
-    endif
-    set key = GetHandleId(it)
-    loop
-        exitwhen i >= fr_ground_count
-        if fr_ground_keys[i] == key then
-            call DestroyEffect(fr_ground_effects[i])
-            call FlushChildHashtable(fr_ground_table, key)
-            set last = fr_ground_count - 1
-            set fr_ground_items[i] = fr_ground_items[last]
-            set fr_ground_keys[i] = fr_ground_keys[last]
-            set fr_ground_effects[i] = fr_ground_effects[last]
-            set fr_ground_x[i] = fr_ground_x[last]
-            set fr_ground_y[i] = fr_ground_y[last]
-            set fr_ground_items[last] = null
-            set fr_ground_keys[last] = 0
-            set fr_ground_effects[last] = null
-            set fr_ground_x[last] = 0.0
-            set fr_ground_y[last] = 0.0
-            set fr_ground_count = last
-            return
-        endif
-        set i = i + 1
-    endloop
-endfunction
-
 function FR_OnItemPickup takes nothing returns nothing
     local unit u = GetTriggerUnit()
-    call FR_RemoveItemAura(GetManipulatedItem())
     call FR_SyncAbility(u)
     set u = null
 endfunction
@@ -386,57 +290,6 @@ function FR_OnItemDrop takes nothing returns nothing
     call FR_SyncAbility(u)
     set it = null
     set u = null
-endfunction
-
-function FR_GroundAuraStep takes nothing returns nothing
-    local integer i = fr_ground_count
-    local integer last
-    local item it
-    local effect fx
-    local integer key
-    local real x
-    local real y
-    loop
-        exitwhen i <= 0
-        set i = i - 1
-        set it = fr_ground_items[i]
-        if not FR_ItemOnGround(it) then
-            // A-click may invalidate the item before the next scan. Use the
-            // effect handle saved in our own table instead of asking the dead
-            // item handle for its type ID.
-            set key = fr_ground_keys[i]
-            set fx = fr_ground_effects[i]
-            if fx != null then
-                call DestroyEffect(fx)
-            endif
-            call FlushChildHashtable(fr_ground_table, key)
-            set last = fr_ground_count - 1
-            set fr_ground_items[i] = fr_ground_items[last]
-            set fr_ground_keys[i] = fr_ground_keys[last]
-            set fr_ground_effects[i] = fr_ground_effects[last]
-            set fr_ground_x[i] = fr_ground_x[last]
-            set fr_ground_y[i] = fr_ground_y[last]
-            set fr_ground_items[last] = null
-            set fr_ground_keys[last] = 0
-            set fr_ground_effects[last] = null
-            set fr_ground_x[last] = 0.0
-            set fr_ground_y[last] = 0.0
-            set fr_ground_count = last
-        else
-            set x = GetItemX(it)
-            set y = GetItemY(it)
-            if SquareRoot((x - fr_ground_x[i]) * (x - fr_ground_x[i]) + (y - fr_ground_y[i]) * (y - fr_ground_y[i])) > 20.0 then
-                call DestroyEffect(fr_ground_effects[i])
-                set fr_ground_effects[i] = AddSpecialEffect("war3campImported\\Rune-Blue-Aura_Raised20.mdx", x, y)
-                set fr_ground_x[i] = x
-                set fr_ground_y[i] = y
-                call SaveEffectHandle(fr_ground_table, GetHandleId(it), 0, fr_ground_effects[i])
-            endif
-        endif
-    endloop
-    set it = null
-    set fx = null
-    call EnumItemsInRect(fr_world, null, function FR_EnumGroundItem)
 endfunction
 
 function FR_CreateFreezeFx takes unit u returns nothing
@@ -722,8 +575,6 @@ function FR_Init takes nothing returns nothing
     set fr_active_fx_table = InitHashtable()
     set fr_clock = CreateTimer()
     call TimerStart(fr_clock, 8640000.0, false, function FR_NoOp)
-    set fr_world = GetWorldBounds()
-    set fr_ground_table = InitHashtable()
     set fr_pickup_trigger = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(fr_pickup_trigger, EVENT_PLAYER_UNIT_PICKUP_ITEM)
     call TriggerAddAction(fr_pickup_trigger, function FR_OnItemPickup)
@@ -733,8 +584,6 @@ function FR_Init takes nothing returns nothing
     set fr_revive_trigger = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(fr_revive_trigger, EVENT_PLAYER_HERO_REVIVE_FINISH)
     call TriggerAddAction(fr_revive_trigger, function FR_OnHeroRevive)
-    set fr_ground_timer = CreateTimer()
-    call TimerStart(fr_ground_timer, 0.25, true, function FR_GroundAuraStep)
 
     set fr_attack_trigger = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(fr_attack_trigger, EVENT_PLAYER_UNIT_ATTACKED)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 
@@ -17,6 +19,9 @@ CINEMATIC_NAME_MARKERS = (
     "cinematic",
     "epilogue",
     "outro",
+    "movie",
+    "kaitoudianying",
+    "\u7535\u5f71",
     "过场",
     "過場",
     "幕间",
@@ -106,15 +111,43 @@ def has_playable_hero_restore(path: Path | str) -> bool:
     return any(marker in script for marker in PLAYABLE_EPILOGUE_MARKERS)
 
 
-def campaign_chapter_titles(campaign: Path | str) -> dict[str, str]:
-    """Read chapter button titles from a campaign archive.
+def _decode_campaign_text(data: bytes) -> str:
+    for encoding in ("utf-8-sig", "gb18030", "gbk", "latin-1"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("latin-1", "replace")
 
-    Malformed or protected campaign metadata is ignored; filename markers
-    remain available as the conservative fallback.
-    """
+
+def _campaign_wts_strings(data: bytes) -> dict[int, str]:
+    if not data:
+        return {}
+    text = _decode_campaign_text(data)
+    pattern = re.compile(
+        r"STRING\s+(\d+)\s*\r?\n\{\r?\n(.*?)\r?\n\}",
+        re.IGNORECASE | re.DOTALL,
+    )
+    return {
+        int(match.group(1)): match.group(2).strip()
+        for match in pattern.finditer(text)
+    }
+
+
+def _resolve_campaign_text(value: str, strings: dict[int, str]) -> str:
+    match = re.fullmatch(r"TRIGSTR_(\d+)", value.strip(), re.IGNORECASE)
+    if match is None:
+        return value
+    return strings.get(int(match.group(1)), value)
+
+
+def _campaign_metadata(
+    campaign: Path | str,
+) -> tuple[list[str], dict[str, str]]:
+    """Read the authored campaign button order and resolved chapter titles."""
     campaign = Path(campaign)
     if campaign.suffix.lower() != ".w3n" or not campaign.is_file():
-        return {}
+        return [], {}
     try:
         from doctor.data import campaign_info
 
@@ -123,31 +156,85 @@ def campaign_chapter_titles(campaign: Path | str) -> dict[str, str]:
         archive = W.MPQArchive(str(campaign))
         try:
             data = archive.read_file("war3campaign.w3f") or b""
+            strings = _campaign_wts_strings(
+                archive.read_file("war3campaign.wts") or b""
+            )
         finally:
             archive.close()
         if not data:
-            return {}
+            return [], {}
         model = campaign_info.parse(data)
     except Exception:
-        return {}
+        return [], {}
 
+    ordered: list[str] = []
+    seen: set[str] = set()
     titles: dict[str, str] = {}
     for button in model.get("buttons", ()):
         raw_map = button.get("map", b"")
         raw_title = button.get("title", b"")
         if isinstance(raw_map, bytes):
-            chapter = raw_map.decode("utf-8", "replace")
+            chapter = raw_map.decode("utf-8", "replace").replace("\0", "")
         else:
-            chapter = str(raw_map)
+            chapter = str(raw_map).replace("\0", "")
         if isinstance(raw_title, bytes):
-            title = raw_title.decode("utf-8", "replace")
+            title = raw_title.decode("utf-8", "replace").replace("\0", "")
         else:
-            title = str(raw_title)
-        key = normalize_chapter_name(chapter).casefold()
+            title = str(raw_title).replace("\0", "")
+        title = _resolve_campaign_text(title, strings)
+        chapter = normalize_chapter_name(chapter)
+        key = chapter.casefold()
         if key:
+            if key not in seen:
+                ordered.append(chapter)
+                seen.add(key)
             titles[key] = title
             titles.setdefault(key.rsplit("/", 1)[-1], title)
+    return ordered, titles
+
+
+def campaign_chapter_order(campaign: Path | str) -> list[str]:
+    """Return chapter paths in their authored campaign-button order."""
+    ordered, _titles = _campaign_metadata(campaign)
+    return ordered
+
+
+def campaign_chapter_titles(campaign: Path | str) -> dict[str, str]:
+    """Read resolved chapter button titles from a campaign archive.
+
+    Malformed or protected campaign metadata is ignored; filename markers
+    remain available as the conservative fallback.
+    """
+    _ordered, titles = _campaign_metadata(campaign)
     return titles
+
+
+def order_chapter_names(
+    chapter_names: Iterable[str],
+    campaign_order: Sequence[str],
+) -> list[str]:
+    """Order chapter keys by campaign metadata, retaining unknown chapters."""
+    names = list(dict.fromkeys(chapter_names))
+    rank: dict[str, int] = {}
+    for index, name in enumerate(campaign_order):
+        key = normalize_chapter_name(name).casefold()
+        if not key:
+            continue
+        rank.setdefault(key, index)
+        rank.setdefault(key.rsplit("/", 1)[-1], index)
+
+    original = {name: index for index, name in enumerate(names)}
+
+    def sort_key(name: str) -> tuple[int, int]:
+        key = normalize_chapter_name(name).casefold()
+        authored = rank.get(key)
+        if authored is None:
+            authored = rank.get(key.rsplit("/", 1)[-1])
+        if authored is None:
+            return (1, original[name])
+        return (0, authored)
+
+    return sorted(names, key=sort_key)
 
 
 def select_campaign_chapters(
@@ -158,11 +245,15 @@ def select_campaign_chapters(
 ) -> tuple[list[Path], dict[str, str]]:
     """Split chapters into ALAS targets and explicitly skipped cinematics."""
     root = Path(base).resolve()
-    titles = campaign_chapter_titles(campaign) if campaign else {}
+    order, titles = _campaign_metadata(campaign) if campaign else ([], {})
+    paths = {
+        chapter_key(root, path): path
+        for path in chapter_paths(root)
+    }
     selected: list[Path] = []
     skipped: dict[str, str] = {}
-    for path in chapter_paths(root):
-        key = chapter_key(root, path)
+    for key in order_chapter_names(paths, order):
+        path = paths[key]
         folded = key.casefold()
         title = titles.get(folded) or titles.get(
             folded.rsplit("/", 1)[-1], ""

@@ -22,6 +22,13 @@ group TT_DH_GROUP = null
 boolean TT_INITED = false
 boolean TT_START_READY = false
 boolean TT_MELEE_HERO_TALENTS = false
+boolean TT_REPLACEMENT_ACTIVE = false
+boolean TT_REPLACEMENT_WAS_SELECTED = false
+unit TT_REPLACEMENT_OLD = null
+unit TT_REPLACEMENT_NEW = null
+integer TT_REPLACEMENT_INDEX = -1
+item array TT_REPLACEMENT_BAG_ITEMS
+item array TT_REPLACEMENT_EQUIPMENT_ITEMS
 integer TT_HERO_COUNT = 0
 unit array TT_HEROES
 boolean array TT_RANGED_HERO
@@ -41,8 +48,12 @@ integer array TT_TALENT_MASK
 integer array TT_EARNED_POINTS
 integer array TT_TALENT_MASTER_LEVEL
 integer array TT_AWARDED_MASK
+integer array TT_UNSPENT_POINTS
+integer array TT_SELECTED_TIER_COUNT
 boolean array TT_CAMPAIGN_NATIVE_PRESERVED
 boolean array TT_CAMPAIGN_SNAPSHOT_PENDING
+boolean array TT_CAMPAIGN_NATIVE_POINTS_PENDING
+boolean array TT_CAMPAIGN_RESTORED_POINTS_UNKNOWN
 boolean TT_CAMPAIGN_STORE_RESULT = false
 boolean TT_CAMPAIGN_SAVE_RESULT = false
 gamecache TT_CAMPAIGN_AUDIT_CACHE = null
@@ -51,6 +62,8 @@ string array TT_CAMPAIGN_AUDIT_MISSIONS
 string array TT_CAMPAIGN_AUDIT_KEYS
 string array TT_CAMPAIGN_AUDIT_LABELS
 integer array TT_PENDING_POINTS
+integer array TT_POINT_LEVEL_SEEN
+real array TT_POINT_LEVEL_SINCE
 boolean array TT_POINT_WAIT_CLEANUP
 integer array TT_POINT_WAIT_TICKS
 boolean array TT_POINT_USE_ACCEPTED
@@ -109,9 +122,13 @@ function TT_IsLiveHero takes unit u returns boolean
     return IsUnitType(u, UNIT_TYPE_HERO) and GetHeroLevel(u) > 0
 endfunction
 
+function TT_HasInventoryAbility takes unit u returns boolean
+    return GetUnitAbilityLevel(u, 'AInv') > 0
+endfunction
+
 function TT_IsTalentHero takes unit u returns boolean
     local player p
-    if not TT_IsLiveHero(u) then
+    if not TT_IsLiveHero(u) or not TT_HasInventoryAbility(u) then
         return false
     endif
     set p = GetOwningPlayer(u)
@@ -548,6 +565,7 @@ function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean
     local integer i = 0
     local integer desiredId = TT_BackpackId(heroIndex)
     local item it
+    local item oldBag = null
     loop
         exitwhen i > 5
         set it = UnitItemInSlot(u, i)
@@ -558,7 +576,8 @@ function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean
                 return true
             endif
             if GetItemTypeId(it) == 'B30B' then
-                call RemoveItem(it)
+                set oldBag = UnitRemoveItemFromSlot(u, i)
+                set it = null
             endif
         endif
         set i = i + 1
@@ -566,6 +585,10 @@ function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean
     set it = UnitAddItemByIdSwapped(desiredId, u)
     if it != null and TT_InventoryCount(u, desiredId) > 0 then
         set TT_BACKPACK_ATTEMPTED[heroIndex] = true
+        if oldBag != null then
+            call RemoveItem(oldBag)
+            set oldBag = null
+        endif
         call DisplayTextToPlayer(GetOwningPlayer(u), 0, 0, "|cff32cd32[背包]|r 已发放英雄装备背包，点击物品栏中的背包打开。")
         call TT_LogAppend("event=BACKPACK_OK hero=" + GetUnitName(u) + " index=" + I2S(heroIndex) + " id=" + I2S(desiredId) + " free=" + I2S(TT_FreeInventorySlots(u)))
         call TT_LogFlush()
@@ -577,6 +600,13 @@ function TT_EnsureBackpack takes unit u, integer heroIndex returns boolean
         call TT_LogFlush()
         if it != null then
             call RemoveItem(it)
+        endif
+        if oldBag != null then
+            if not UnitAddItem(u, oldBag) then
+                call SetItemPosition(oldBag, GetUnitX(u), GetUnitY(u))
+            endif
+            call TT_LogAppend("event=BACKPACK_FALLBACK hero=" + GetUnitName(u) + " index=" + I2S(heroIndex) + " restored=B30B")
+            set oldBag = null
         endif
         set it = null
         return false
@@ -724,9 +754,13 @@ function TT_OnPointTimer takes nothing returns nothing
                 set TT_POINT_GRANT_FAILED_LEVEL[i] = 0
                 set TT_PENDING_POINTS[i] = TT_PENDING_POINTS[i] - 1
                 call TT_MarkFirstEarnedMilestone(u, i)
+                set TT_UNSPENT_POINTS[i] = TT_AwardedCount(i) - TT_SELECTED_TIER_COUNT[i]
+                if TT_UNSPENT_POINTS[i] < 0 then
+                    set TT_UNSPENT_POINTS[i] = 0
+                endif
                 set TT_EARNED_POINTS[i] = TT_AwardedCount(i)
                 call TT_NotifyTalentGranted(u, 1, TT_EARNED_POINTS[i])
-                call TT_LogAppend("event=POINT_GRANT_COMMITTED index=" + I2S(i) + " remaining=" + I2S(TT_PENDING_POINTS[i]))
+                call TT_LogAppend("event=POINT_GRANT_COMMITTED index=" + I2S(i) + " remaining=" + I2S(TT_PENDING_POINTS[i]) + " unspent=" + I2S(TT_UNSPENT_POINTS[i]))
                 call TT_LogFlush()
                 if TT_POINT_WAIT_CLEANUP[i] or TT_PENDING_POINTS[i] > 0 then
                     set pending = true
@@ -770,6 +804,7 @@ function TT_GrantEarnedPoints takes unit u returns nothing
     local integer missing = 0
     local integer level = GetHeroLevel(u)
     local integer heroIndex = TT_RegisterHero(u)
+    local real now = 0.0
     if heroIndex < 0 or GetUnitAbilityLevel(u, 'T405') == 0 then
         return
     endif
@@ -778,6 +813,17 @@ function TT_GrantEarnedPoints takes unit u returns nothing
     endif
     if level > TT_POINT_GRANT_FAILED_LEVEL[heroIndex] then
         set TT_POINT_GRANT_FAILED[heroIndex] = false
+    endif
+    set now = TimerGetElapsed(TT_LOG_CLOCK)
+    if TT_POINT_LEVEL_SEEN[heroIndex] != level then
+        set TT_POINT_LEVEL_SEEN[heroIndex] = level
+        set TT_POINT_LEVEL_SINCE[heroIndex] = now
+        call TT_LogAppend("event=POINT_LEVEL_WAIT hero=" + GetUnitName(u) + " index=" + I2S(heroIndex) + " level=" + I2S(level))
+        call TT_LogFlush()
+        return
+    endif
+    if now - TT_POINT_LEVEL_SINCE[heroIndex] < 0.75 then
+        return
     endif
     call TT_SyncAwardedFromMarkers(u)
     loop
@@ -2126,6 +2172,35 @@ function TT_SelectedTierCount takes unit u returns integer
     return count
 endfunction
 
+function TT_RevealSelectedTalentAbilities takes unit u returns nothing
+    local integer tier = 0
+    local integer choice = 0
+    local integer abilityId = 0
+    loop
+        exitwhen tier >= 6
+        set choice = TT_ReadTierChoice(u, tier)
+        if choice > 0 then
+            set abilityId = TT_TalentAbilityId(TT_UnitTierNodeCode(u, tier, choice - 1))
+            if GetUnitAbilityLevel(u, abilityId) > 0 then
+                call BlzUnitHideAbility(u, abilityId, false)
+                call TT_LogAppend("event=TALENT_SELECTED_ABILITY_VISIBLE hero=" + GetUnitName(u) + " tier=" + I2S(tier) + " choice=" + I2S(choice) + " ability=" + I2S(abilityId))
+            endif
+        endif
+        set tier = tier + 1
+    endloop
+endfunction
+
+function TT_RecomputeUnspentPoints takes unit u, integer heroIndex, string reason returns nothing
+    local integer selected = TT_SelectedTierCount(u)
+    local integer balance = TT_AwardedCount(heroIndex) - selected
+    if balance < 0 then
+        set balance = 0
+    endif
+    set TT_UNSPENT_POINTS[heroIndex] = balance
+    set TT_SELECTED_TIER_COUNT[heroIndex] = selected
+    call TT_LogAppend("event=TALENT_POINTS_BALANCE hero=" + GetUnitName(u) + " index=" + I2S(heroIndex) + " awarded=" + I2S(TT_AwardedCount(heroIndex)) + " selected=" + I2S(selected) + " unspent=" + I2S(balance) + " reason=" + reason)
+endfunction
+
 function TT_SavedTierChoice takes integer heroIndex, integer tier returns integer
     local integer weight = TT_ChoiceWeight(tier)
     local integer choice = TT_TALENT_MASK[heroIndex] / weight
@@ -2203,7 +2278,7 @@ function TT_LogHeroState takes unit u, integer heroIndex, string eventName retur
         return
     endif
     set ownerName = GetPlayerName(GetOwningPlayer(u))
-    call TT_LogAppend("event=" + eventName + " hero=" + GetUnitName(u) + " owner=" + ownerName + " level=" + I2S(GetHeroLevel(u)) + " index=" + I2S(heroIndex) + " Q=" + I2S(GetUnitAbilityLevel(u, TT_UnitTalentId(u, heroIndex))) + " earned=" + I2S(TT_EarnedTalentPoints(u)) + " mask=" + I2S(TT_TALENT_MASK[heroIndex]) + " actual=" + TT_ActualSelectionText(u) + " saved=" + TT_SelectionText(u, heroIndex))
+    call TT_LogAppend("event=" + eventName + " hero=" + GetUnitName(u) + " owner=" + ownerName + " level=" + I2S(GetHeroLevel(u)) + " index=" + I2S(heroIndex) + " Q=" + I2S(GetUnitAbilityLevel(u, TT_UnitTalentId(u, heroIndex))) + " earned=" + I2S(TT_EarnedTalentPoints(u)) + " unspent=" + I2S(TT_UNSPENT_POINTS[heroIndex]) + " mask=" + I2S(TT_TALENT_MASK[heroIndex]) + " actual=" + TT_ActualSelectionText(u) + " saved=" + TT_SelectionText(u, heroIndex))
 endfunction
 
 function TT_EnsureTalentChild takes unit u, integer abilityCode returns nothing
@@ -2247,6 +2322,12 @@ function TT_CaptureTalentState takes unit u returns nothing
         call TT_LogAppend("event=TALENT_INFER_AWARDED index=" + I2S(heroIndex) + " selected=" + I2S(selected) + " earned=" + I2S(level))
     endif
     set TT_EARNED_POINTS[heroIndex] = level
+    set TT_SELECTED_TIER_COUNT[heroIndex] = selected
+    set level = level - selected
+    if level < 0 then
+        set level = 0
+    endif
+    set TT_UNSPENT_POINTS[heroIndex] = level
     set level = GetUnitAbilityLevel(u, TT_UnitTalentId(u, heroIndex))
     if level > TT_TALENT_MASTER_LEVEL[heroIndex] then
         set TT_TALENT_MASTER_LEVEL[heroIndex] = level
@@ -2290,6 +2371,7 @@ function TT_RestoreTalentState takes unit u returns nothing
         set tier = tier + 1
     endloop
     call TT_HideTalentBooks(u)
+    call TT_RevealSelectedTalentAbilities(u)
 endfunction
 
 function TT_EnsureTalentMaster takes unit u, integer heroIndex returns nothing
@@ -2419,6 +2501,7 @@ function TT_CampaignNormalizeUnitForStore takes unit u returns nothing
     call BlzUnitHideAbility(u, 'T405', true)
     call TT_PreserveTalentNodes(u)
     call TT_HideTalentBooks(u)
+    call TT_RevealSelectedTalentAbilities(u)
     call TT_SyncAttributeTalents(u)
     set TT_TALENT_MASK[heroIndex] = mask
     set TT_AWARDED_MASK[heroIndex] = awarded
@@ -2441,86 +2524,12 @@ function TT_EnsureLevelMarkers takes nothing returns nothing
     set TT_LEVEL_MARKERS[5] = 'T415'
 endfunction
 
-function TT_FinishTalentUiRebuild takes unit u, integer heroIndex, timer t returns nothing
-    local integer talentId = TT_UnitTalentId(u, heroIndex)
-    local integer originalPoints = LoadInteger(TT_TALENT_UI_TABLE, GetHandleId(t), 2)
-    local integer selectedCount = LoadInteger(TT_TALENT_UI_TABLE, GetHandleId(t), 3)
-    local integer delta = 0
-    set delta = GetHeroSkillPoints(u) - originalPoints
-    if delta > 0 then
-        call UnitModifySkillPoints(u, -delta)
-    elseif delta < 0 then
-        call UnitModifySkillPoints(u, -delta)
-    endif
-    if GetUnitAbilityLevel(u, talentId) < selectedCount + 1 then
-        call SetUnitAbilityLevel(u, talentId, selectedCount + 1)
-    endif
-    call TT_RestoreTalentState(u)
-    call TT_PreserveTalentNodes(u)
-    call TT_HideTalentBooks(u)
-    call TT_SyncAttributeTalents(u)
-    set TT_TALENT_MASTER_LEVEL[heroIndex] = GetUnitAbilityLevel(u, talentId)
-    call TT_LogAppend("event=TALENT_UI_REBUILD mask=" + I2S(TT_TALENT_MASK[heroIndex]) + " selected=" + I2S(selectedCount) + " Q=" + I2S(TT_TALENT_MASTER_LEVEL[heroIndex]) + " pointsBefore=" + I2S(originalPoints) + " pointsAfter=" + I2S(GetHeroSkillPoints(u)) + " actual=" + TT_ActualSelectionText(u))
-    call TT_LogFlush()
-endfunction
-
-function TT_OnTalentSelectionStep takes nothing returns nothing
-    local timer t = GetExpiredTimer()
-    local integer timerId = GetHandleId(t)
-    local unit u = LoadUnitHandle(TT_TALENT_UI_TABLE, timerId, 0)
-    local integer heroIndex = LoadInteger(TT_TALENT_UI_TABLE, timerId, 1)
-    local integer tier = LoadInteger(TT_TALENT_UI_TABLE, timerId, 4)
-    local integer choice = 0
-    local integer abilityId = 0
-    local integer talentId
-    local boolean found = false
-    if u == null or GetUnitTypeId(u) == 0 or heroIndex < 0 then
-        call TT_LogAppend("event=TALENT_UI_REBUILD_SKIP unit=" + I2S(GetHandleId(u)))
-        call TT_LogFlush()
-        call FlushChildHashtable(TT_TALENT_UI_TABLE, timerId)
-        call DestroyTimer(t)
-        set t = null
-        set u = null
-        return
-    endif
-    set talentId = TT_UnitTalentId(u, heroIndex)
-    loop
-        exitwhen tier >= 6
-        set choice = TT_SavedTierChoice(heroIndex, tier)
-        if choice > 0 then
-            set found = true
-            exitwhen true
-        endif
-        set tier = tier + 1
-    endloop
-    if found then
-        set abilityId = TT_TalentAbilityId(TT_UnitTierNodeCode(u, tier, choice - 1))
-        call SelectHeroSkill(u, abilityId)
-        call TT_LogAppend("event=TALENT_UI_SELECT tier=" + I2S(tier) + " choice=" + I2S(choice) + " ability=" + I2S(abilityId) + " level=" + I2S(GetUnitAbilityLevel(u, abilityId)) + " Q=" + I2S(GetUnitAbilityLevel(u, talentId)) + " points=" + I2S(GetHeroSkillPoints(u)))
-        call TT_LogFlush()
-        call SaveInteger(TT_TALENT_UI_TABLE, timerId, 4, tier + 1)
-        call TimerStart(t, 0.15, false, function TT_OnTalentSelectionStep)
-    else
-        call TT_FinishTalentUiRebuild(u, heroIndex, t)
-        set TT_CAMPAIGN_UI_REBUILD_PENDING[heroIndex] = false
-        call FlushChildHashtable(TT_TALENT_UI_TABLE, timerId)
-        call DestroyTimer(t)
-    endif
-    set t = null
-    set u = null
-endfunction
-
 function TT_OnTalentUiRebuildTimer takes nothing returns nothing
     local timer t = GetExpiredTimer()
     local integer timerId = GetHandleId(t)
     local unit u = LoadUnitHandle(TT_TALENT_UI_TABLE, timerId, 0)
     local integer heroIndex = TT_RegisteredHeroIndex(u)
-    local integer talentId
-    local integer genericId
-    local integer hunterId
-    local integer selectedCount = 0
-    local integer tier = 0
-    local integer i = 0
+    local integer selectedCount
     if u == null or GetUnitTypeId(u) == 0 or heroIndex < 0 then
         call TT_LogAppend("event=TALENT_UI_REBUILD_SKIP unit=" + I2S(GetHandleId(u)))
         call TT_LogFlush()
@@ -2530,60 +2539,18 @@ function TT_OnTalentUiRebuildTimer takes nothing returns nothing
         set u = null
         return
     endif
-    loop
-        exitwhen tier >= 6
-        if TT_SavedTierChoice(heroIndex, tier) > 0 then
-            set selectedCount = selectedCount + 1
-        endif
-        set tier = tier + 1
-    endloop
-    if selectedCount <= 0 then
-        set TT_CAMPAIGN_UI_REBUILD_PENDING[heroIndex] = false
-        call FlushChildHashtable(TT_TALENT_UI_TABLE, timerId)
-        call DestroyTimer(t)
-        set t = null
-        set u = null
-        return
-    endif
-    set talentId = TT_UnitTalentId(u, heroIndex)
-    set genericId = TT_TalentId(heroIndex)
-    set hunterId = TT_DemonHunterTalentId(heroIndex)
-    if talentId == hunterId then
-        call UnitRemoveAbility(u, genericId)
-    else
-        call UnitRemoveAbility(u, hunterId)
-    endif
-    call UnitRemoveAbility(u, talentId)
-    set i = 0
-    loop
-        exitwhen i >= 18
-        call UnitRemoveAbility(u, TT_TalentAbilityId(100 + i))
-        set i = i + 1
-    endloop
-    if TT_MELEE_HERO_TALENTS and TT_IsDemonHunter(u) then
-        set i = 0
-        loop
-            exitwhen i >= 12
-            call UnitRemoveAbility(u, TT_DemonHunterNodeCode(i))
-            set i = i + 1
-        endloop
-    endif
-    set i = 0
-    loop
-        exitwhen i >= 10
-        call UnitRemoveAbility(u, TT_TalentAbilityId(200 + i))
-        set i = i + 1
-    endloop
-    call UnitAddAbility(u, talentId)
-    call UnitMakeAbilityPermanent(u, true, talentId)
-    call UnitModifySkillPoints(u, selectedCount)
-    call SaveInteger(TT_TALENT_UI_TABLE, timerId, 1, heroIndex)
-    call SaveInteger(TT_TALENT_UI_TABLE, timerId, 2, GetHeroSkillPoints(u) - selectedCount)
-    call SaveInteger(TT_TALENT_UI_TABLE, timerId, 3, selectedCount)
-    call SaveInteger(TT_TALENT_UI_TABLE, timerId, 4, 0)
-    call TT_LogAppend("event=TALENT_UI_PREPARE selected=" + I2S(selectedCount) + " Q=" + I2S(GetUnitAbilityLevel(u, talentId)) + " points=" + I2S(GetHeroSkillPoints(u)))
+    call TT_PreserveTalentNodes(u)
+    call TT_HideTalentBooks(u)
+    call TT_RevealSelectedTalentAbilities(u)
+    call TT_SyncAttributeTalents(u)
+    set selectedCount = TT_SelectedTierCount(u)
+    call TT_RecomputeUnspentPoints(u, heroIndex, "UI_REFRESH")
+    set TT_TALENT_MASTER_LEVEL[heroIndex] = GetUnitAbilityLevel(u, TT_UnitTalentId(u, heroIndex))
+    set TT_CAMPAIGN_UI_REBUILD_PENDING[heroIndex] = false
+    call TT_LogAppend("event=TALENT_UI_REFRESH selected=" + I2S(selectedCount) + " Q=" + I2S(TT_TALENT_MASTER_LEVEL[heroIndex]) + " unspent=" + I2S(TT_UNSPENT_POINTS[heroIndex]) + " actual=" + TT_ActualSelectionText(u))
     call TT_LogFlush()
-    call TimerStart(t, 0.15, false, function TT_OnTalentSelectionStep)
+    call FlushChildHashtable(TT_TALENT_UI_TABLE, timerId)
+    call DestroyTimer(t)
     set t = null
     set u = null
 endfunction
@@ -2605,24 +2572,111 @@ endfunction
 
 function TT_CampaignStoreTalentSnapshot takes unit u, gamecache cache, string missionKey, string key returns nothing
     local integer heroIndex = -1
+    local integer available = 0
+    local integer nativeAvailable = 0
     local string snapshotKey = ""
-    if u == null or cache == null or GetUnitTypeId(u) == 0 or not TT_IsTalentHero(u) then
+    if u == null or cache == null or GetUnitTypeId(u) == 0 or not TT_IsLiveHero(u) then
+        call TT_LogAppend("event=CAMPAIGN_TALENT_SNAPSHOT_SKIP mission=" + missionKey + " key=" + key + " reason=unit_not_live")
+        call TT_LogFlush()
         return
     endif
-    set heroIndex = TT_RegisterHero(u)
+    set heroIndex = TT_RegisteredHeroIndex(u)
     if heroIndex < 0 then
+        set heroIndex = TT_SavedBackpackIndex(u)
+    endif
+    if heroIndex < 0 then
+        set heroIndex = TT_RegisterHero(u)
+    endif
+    if heroIndex < 0 then
+        call TT_LogAppend("event=CAMPAIGN_TALENT_SNAPSHOT_SKIP mission=" + missionKey + " key=" + key + " reason=hero_index_missing")
+        call TT_LogFlush()
         return
     endif
-    call TT_CaptureTalentState(u)
+    if TT_IsTalentHero(u) then
+        call TT_CaptureTalentState(u)
+    endif
+    set available = TT_UNSPENT_POINTS[heroIndex]
+    if available < 0 then
+        set available = 0
+    endif
+    set nativeAvailable = GetHeroSkillPoints(u)
+    if nativeAvailable < 0 then
+        set nativeAvailable = 0
+    endif
     set snapshotKey = TT_CampaignTalentSnapshotKey(missionKey, key)
     call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":v", 1)
+    call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":balance-v", 1)
     call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":mask", TT_TALENT_MASK[heroIndex])
     call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":awarded", TT_AWARDED_MASK[heroIndex])
     call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":earned", TT_EARNED_POINTS[heroIndex])
     call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":master", TT_TALENT_MASTER_LEVEL[heroIndex])
+    call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":points", nativeAvailable)
+    call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":unspent", available)
     call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":type", GetUnitTypeId(u))
     call StoreInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":level", GetHeroLevel(u))
-    call TT_LogAppend("event=CAMPAIGN_TALENT_SNAPSHOT_STORE mission=" + missionKey + " key=" + key + " mask=" + I2S(TT_TALENT_MASK[heroIndex]) + " awarded=" + I2S(TT_AWARDED_MASK[heroIndex]) + " master=" + I2S(TT_TALENT_MASTER_LEVEL[heroIndex]) + " level=" + I2S(GetHeroLevel(u)))
+    call TT_LogAppend("event=CAMPAIGN_TALENT_SNAPSHOT_STORE mission=" + missionKey + " key=" + key + " mask=" + I2S(TT_TALENT_MASK[heroIndex]) + " awarded=" + I2S(TT_AWARDED_MASK[heroIndex]) + " master=" + I2S(TT_TALENT_MASTER_LEVEL[heroIndex]) + " unspent=" + I2S(available) + " native=" + I2S(nativeAvailable) + " level=" + I2S(GetHeroLevel(u)))
+    call TT_LogFlush()
+endfunction
+
+function TT_CampaignPreserveNativePoints takes unit u, integer heroIndex returns nothing
+    local integer available = 0
+    local integer selected = 0
+    local integer eligible = 0
+    local integer level = 0
+    local integer target = 0
+    local integer awarded = 0
+    local integer i = 0
+    if u == null or heroIndex < 0 or GetUnitTypeId(u) == 0 then
+        return
+    endif
+    set available = GetHeroSkillPoints(u)
+    if available < 0 then
+        set available = 0
+    endif
+    set selected = TT_SelectedTierCount(u)
+    set level = GetHeroLevel(u)
+    set i = 0
+    loop
+        exitwhen i >= TT_POINT_COUNT
+        if level >= TT_LEVEL_REQ[i] then
+            set eligible = eligible + 1
+        endif
+        set i = i + 1
+    endloop
+    set target = available + selected
+    if target > eligible then
+        set target = eligible
+    endif
+    if TT_CAMPAIGN_RESTORED_POINTS_UNKNOWN[heroIndex] then
+        set target = eligible
+        set TT_CAMPAIGN_RESTORED_POINTS_UNKNOWN[heroIndex] = false
+        call TT_LogAppend("event=CAMPAIGN_LEGACY_POINTS_ASSUMED_PRESERVED hero=" + GetUnitName(u) + " index=" + I2S(heroIndex) + " eligible=" + I2S(eligible) + " selected=" + I2S(selected) + " nativeAvailable=" + I2S(available))
+    endif
+    set awarded = TT_AwardedCount(heroIndex)
+    if target < awarded then
+        set target = awarded
+    endif
+    if target > awarded then
+        call TT_MarkAwardedToCount(heroIndex, target)
+    endif
+    set TT_EARNED_POINTS[heroIndex] = target
+    set TT_SELECTED_TIER_COUNT[heroIndex] = selected
+    set TT_UNSPENT_POINTS[heroIndex] = target - selected
+    if TT_UNSPENT_POINTS[heroIndex] < 0 then
+        set TT_UNSPENT_POINTS[heroIndex] = 0
+    endif
+    call TT_EnsureLevelMarkers()
+    set i = 0
+    loop
+        exitwhen i >= target
+        if GetUnitAbilityLevel(u, TT_LEVEL_MARKERS[i]) == 0 then
+            call UnitAddAbility(u, TT_LEVEL_MARKERS[i])
+        endif
+        call UnitMakeAbilityPermanent(u, true, TT_LEVEL_MARKERS[i])
+        call BlzUnitHideAbility(u, TT_LEVEL_MARKERS[i], true)
+        set i = i + 1
+    endloop
+    call TT_LogAppend("event=CAMPAIGN_NATIVE_POINTS_PRESERVED hero=" + GetUnitName(u) + " index=" + I2S(heroIndex) + " native=" + I2S(available) + " selected=" + I2S(selected) + " eligible=" + I2S(eligible) + " target=" + I2S(target) + " awarded=" + I2S(TT_AwardedCount(heroIndex)) + " unspent=" + I2S(TT_UNSPENT_POINTS[heroIndex]))
     call TT_LogFlush()
 endfunction
 
@@ -2634,31 +2688,49 @@ function TT_CampaignRestoreTalentSnapshot takes unit u, gamecache cache, string 
     local integer master = 1
     local integer storedType = 0
     local integer storedLevel = 0
+    local integer storedPoints = 0
+    local integer storedUnspent = 0
+    local integer unspent = 0
+    local integer maxUnspent = 0
     local integer nativeMask = 0
     local integer nativeQ = 0
     local integer nativeSelected = 0
     local integer i = 0
     local boolean nativePreserved = false
+    local boolean hasStoredUnspent = false
+    local string unspentSource = "LEGACY"
     local string snapshotKey = ""
     if u == null or cache == null or GetUnitTypeId(u) == 0 or not TT_IsTalentHero(u) then
-        return
-    endif
-    set snapshotKey = TT_CampaignTalentSnapshotKey(missionKey, key)
-    if not HaveStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":v") then
-        call TT_LogAppend("event=CAMPAIGN_TALENT_SNAPSHOT_MISSING mission=" + missionKey + " key=" + key)
-        call TT_LogFlush()
         return
     endif
     set heroIndex = TT_RegisterHeroCore(u, true)
     if heroIndex < 0 then
         return
     endif
+    set snapshotKey = TT_CampaignTalentSnapshotKey(missionKey, key)
+    if not HaveStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":v") then
+        set TT_CAMPAIGN_NATIVE_POINTS_PENDING[heroIndex] = true
+        set TT_CAMPAIGN_RESTORED_POINTS_UNKNOWN[heroIndex] = true
+        call TT_LogAppend("event=CAMPAIGN_TALENT_SNAPSHOT_MISSING mission=" + missionKey + " key=" + key + " nativeQ=" + I2S(GetUnitAbilityLevel(u, TT_UnitTalentId(u, heroIndex))) + " native=" + I2S(GetHeroSkillPoints(u)) + " unspentUnknown=1")
+        call TT_LogFlush()
+        return
+    endif
+    set TT_CAMPAIGN_NATIVE_POINTS_PENDING[heroIndex] = false
+    set TT_CAMPAIGN_RESTORED_POINTS_UNKNOWN[heroIndex] = false
     set mask = GetStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":mask")
     set awarded = GetStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":awarded")
     set earned = GetStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":earned")
     set master = GetStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":master")
     set storedType = GetStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":type")
     set storedLevel = GetStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":level")
+    if HaveStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":points") then
+        set storedPoints = GetStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":points")
+    endif
+    if HaveStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":unspent") then
+        set storedUnspent = GetStoredInteger(cache, "ALAS_TALENT_SNAPSHOT_V1", snapshotKey + ":unspent")
+        set hasStoredUnspent = true
+        set unspentSource = "SNAPSHOT"
+    endif
     if mask < 0 then
         set mask = 0
     endif
@@ -2691,6 +2763,23 @@ function TT_CampaignRestoreTalentSnapshot takes unit u, gamecache cache, string 
         call TT_EnsureTalentMaster(u, heroIndex)
         call TT_RestoreTalentState(u)
     endif
+    set maxUnspent = TT_AwardedCount(heroIndex) - TT_SelectedTierCount(u)
+    if maxUnspent < 0 then
+        set maxUnspent = 0
+    endif
+    if hasStoredUnspent then
+        set unspent = storedUnspent
+    else
+        set unspent = maxUnspent
+    endif
+    if unspent < 0 then
+        set unspent = 0
+    endif
+    if unspent > maxUnspent then
+        set unspent = maxUnspent
+    endif
+    set TT_UNSPENT_POINTS[heroIndex] = unspent
+    set TT_SELECTED_TIER_COUNT[heroIndex] = TT_SelectedTierCount(u)
     set i = 0
     loop
         exitwhen i >= TT_POINT_COUNT
@@ -2710,8 +2799,9 @@ function TT_CampaignRestoreTalentSnapshot takes unit u, gamecache cache, string 
     call BlzUnitHideAbility(u, 'T405', true)
     call TT_PreserveTalentNodes(u)
     call TT_HideTalentBooks(u)
+    call TT_RevealSelectedTalentAbilities(u)
     call TT_SyncAttributeTalents(u)
-    call TT_LogAppend("event=CAMPAIGN_TALENT_SNAPSHOT_RESTORE mission=" + missionKey + " key=" + key + " mask=" + I2S(mask) + " awarded=" + I2S(awarded) + " earned=" + I2S(TT_EARNED_POINTS[heroIndex]) + " master=" + I2S(master) + " nativeMask=" + I2S(nativeMask) + " nativeQ=" + I2S(nativeQ) + " nativeSelected=" + I2S(nativeSelected) + " preserved=" + TT_CampaignAuditBool(nativePreserved) + " storedType=" + I2S(storedType) + " storedLevel=" + I2S(storedLevel) + " actual=" + TT_ActualSelectionText(u))
+    call TT_LogAppend("event=CAMPAIGN_TALENT_SNAPSHOT_RESTORE mission=" + missionKey + " key=" + key + " mask=" + I2S(mask) + " awarded=" + I2S(awarded) + " earned=" + I2S(TT_EARNED_POINTS[heroIndex]) + " master=" + I2S(master) + " nativeMask=" + I2S(nativeMask) + " nativeQ=" + I2S(nativeQ) + " nativeSelected=" + I2S(nativeSelected) + " preserved=" + TT_CampaignAuditBool(nativePreserved) + " storedType=" + I2S(storedType) + " storedLevel=" + I2S(storedLevel) + " storedNative=" + I2S(storedPoints) + " unspent=" + I2S(unspent) + " source=" + unspentSource + " actual=" + TT_ActualSelectionText(u))
     call TT_LogFlush()
 endfunction
 
@@ -2771,7 +2861,11 @@ function TT_ResetTalents takes unit u returns nothing
     set TT_TALENT_MASK[heroIndex] = 0
     set TT_CAMPAIGN_NATIVE_PRESERVED[heroIndex] = false
     set TT_CAMPAIGN_SNAPSHOT_PENDING[heroIndex] = false
+    set TT_CAMPAIGN_NATIVE_POINTS_PENDING[heroIndex] = false
+    set TT_CAMPAIGN_RESTORED_POINTS_UNKNOWN[heroIndex] = false
     set TT_PENDING_POINTS[heroIndex] = restorePoints
+    set TT_UNSPENT_POINTS[heroIndex] = 0
+    set TT_SELECTED_TIER_COUNT[heroIndex] = 0
     set TT_POINT_WAIT_CLEANUP[heroIndex] = false
     set TT_POINT_GRANT_FAILED[heroIndex] = false
     set TT_POINT_GRANT_FAILED_LEVEL[heroIndex] = 0
@@ -2897,8 +2991,13 @@ function TT_EnsureHeroNow takes unit u returns nothing
         call TT_EnsureTalentMaster(u, heroIndex)
     endif
     call TT_HideTalentBooks(u)
+    call TT_RevealSelectedTalentAbilities(u)
     call TT_SyncAttributeTalents(u)
     if GetUnitAbilityLevel(u, 'T405') > 0 then
+        if TT_CAMPAIGN_NATIVE_POINTS_PENDING[heroIndex] then
+            call TT_CampaignPreserveNativePoints(u, heroIndex)
+            set TT_CAMPAIGN_NATIVE_POINTS_PENDING[heroIndex] = false
+        endif
         call TT_ValidateTalentPoints(u)
         return
     endif
@@ -2906,6 +3005,10 @@ function TT_EnsureHeroNow takes unit u returns nothing
     call UnitAddAbility(u, 'T405')
     call UnitMakeAbilityPermanent(u, true, 'T405')
     call BlzUnitHideAbility(u, 'T405', true)
+    if TT_CAMPAIGN_NATIVE_POINTS_PENDING[heroIndex] then
+        call TT_CampaignPreserveNativePoints(u, heroIndex)
+        set TT_CAMPAIGN_NATIVE_POINTS_PENDING[heroIndex] = false
+    endif
     call TT_ValidateTalentPoints(u)
     call TT_LogHeroState(u, heroIndex, "HERO_INITIALIZED")
     call TT_LogFlush()
@@ -2962,12 +3065,25 @@ function TT_OnHeroSkill takes nothing returns nothing
     set u = null
 endfunction
 
+function TT_CampaignReconcilePanelPoints takes unit u returns nothing
+    local integer heroIndex = TT_RegisteredHeroIndex(u)
+    if heroIndex < 0 or GetUnitAbilityLevel(u, 'T405') == 0 then
+        return
+    endif
+    call TT_CaptureTalentState(u)
+    call TT_LogHeroState(u, heroIndex, "PANEL_RECONCILE")
+    call TT_ValidateTalentPoints(u)
+    call TT_ScheduleTalentUiRebuild(u, heroIndex)
+    call TT_LogFlush()
+endfunction
+
 function TT_OnPanelAbility takes nothing returns nothing
     local integer abilityId = GetSpellAbilityId()
     local unit u = GetTriggerUnit()
     if abilityId == 'AIni' or abilityId == 'AEqu' or abilityId == 'ASde' or abilityId == 'ATal' then
         call TT_LogAppend("event=PANEL_ABILITY hero=" + GetUnitName(u) + " id=" + I2S(abilityId))
         call TT_LogFlush()
+        call TT_CampaignReconcilePanelPoints(u)
     endif
     set u = null
 endfunction
@@ -3077,31 +3193,33 @@ function TT_SyncArtifacts takes nothing returns nothing
 endfunction
 
 function TT_SyncPlayers takes nothing returns nothing
-    local integer playerIndex = 0
-    local integer heroIndex
+    local integer heroIndex = 0
     local unit u
     if not TT_START_READY then
         return
     endif
     loop
-        exitwhen playerIndex >= bj_MAX_PLAYERS
-        call GroupEnumUnitsOfPlayer(TT_SCAN_GROUP, Player(playerIndex), null)
-        loop
-            set u = FirstOfGroup(TT_SCAN_GROUP)
-            exitwhen u == null
-            call GroupRemoveUnit(TT_SCAN_GROUP, u)
-            if TT_IsTalentHero(u) then
-                if GetUnitAbilityLevel(u, 'T405') == 0 then
-                    call TT_EnsureHero(u)
-                    call TT_ResetNativeTalents(u)
-                endif
-                call TT_SyncAttributeTalents(u)
-                call TT_PreserveTalentNodes(u)
-                set heroIndex = TT_RegisteredHeroIndex(u)
-                call TT_DemonHunterSync(u, heroIndex)
+        exitwhen heroIndex >= TT_HERO_COUNT or heroIndex >= 64
+        set u = TT_HEROES[heroIndex]
+        if u != null and GetUnitTypeId(u) == 0 then
+            set TT_HEROES[heroIndex] = null
+            set u = null
+        elseif TT_IsTalentHero(u) then
+            if GetUnitAbilityLevel(u, 'T405') == 0 then
+                call TT_EnsureHero(u)
+                call TT_ResetNativeTalents(u)
             endif
-        endloop
-        set playerIndex = playerIndex + 1
+            call TT_SyncAttributeTalents(u)
+            call TT_PreserveTalentNodes(u)
+            if GetUnitAbilityLevel(u, 'T405') > 0 then
+                if not TT_CAMPAIGN_UI_REBUILD_PENDING[heroIndex] then
+                    call TT_CaptureTalentState(u)
+                endif
+                call TT_ValidateTalentPoints(u)
+            endif
+            call TT_DemonHunterSync(u, heroIndex)
+        endif
+        set heroIndex = heroIndex + 1
     endloop
     call TT_DemonHunterSyncSlows()
     call TT_DemonHunterSyncAfterimages()
@@ -3173,8 +3291,12 @@ endfunction
 function TT_MarkStartReady takes nothing returns nothing
     set TT_START_READY = true
     call TT_LogAppend("event=START_READY")
-    call TT_ScanInitial()
-    call TT_SyncPlayers()
+    if TT_REPLACEMENT_ACTIVE and TT_REPLACEMENT_NEW != null then
+        call ExecuteFunc("TT_FlushDeferredHeroReplacement")
+    else
+        call TT_ScanInitial()
+        call TT_SyncPlayers()
+    endif
     call TT_LogFlush()
 endfunction
 
@@ -3267,6 +3389,319 @@ function TT_OnChat takes nothing returns nothing
     set u = null
 endfunction
 
+function TT_RemoveForeignTalentBackpacks takes unit u, integer keepIndex returns nothing
+    local integer slot = 0
+    local integer backpackIndex = 0
+    local item it
+    loop
+        exitwhen slot > 5
+        set it = UnitItemInSlot(u, slot)
+        if it != null then
+            set backpackIndex = 0
+            loop
+                exitwhen backpackIndex >= 64
+                if GetItemTypeId(it) == TT_BackpackId(backpackIndex) and backpackIndex != keepIndex then
+                    call RemoveItem(it)
+                    set it = null
+                    exitwhen true
+                endif
+                set backpackIndex = backpackIndex + 1
+            endloop
+        endif
+        set slot = slot + 1
+    endloop
+    set it = null
+endfunction
+
+function TT_UnitCarriesItem takes unit u, item target returns boolean
+    local integer slot = 0
+    local item it
+    loop
+        exitwhen slot > 5
+        set it = UnitItemInSlot(u, slot)
+        if it == target then
+            set it = null
+            return true
+        endif
+        set slot = slot + 1
+    endloop
+    set slot = 0
+    loop
+        exitwhen slot >= 30
+        set it = UnitItemInBagSlot(u, slot)
+        if it == target then
+            set it = null
+            return true
+        endif
+        set slot = slot + 1
+    endloop
+    set slot = 0
+    loop
+        exitwhen slot >= 9
+        set it = BlzUnitItemInEquipmentSlot(u, ConvertLoadoutSlot(slot))
+        if it == target then
+            set it = null
+            return true
+        endif
+        set slot = slot + 1
+    endloop
+    set it = null
+    return false
+endfunction
+
+function TT_CaptureReplacementItems takes unit u returns nothing
+    local integer slot = 0
+    local item it
+    loop
+        exitwhen slot >= 30
+        set it = UnitItemInBagSlot(u, slot)
+        set TT_REPLACEMENT_BAG_ITEMS[slot] = it
+        if it != null then
+            call TT_LogAppend("event=HERO_REPLACEMENT_EXT_CAPTURE domain=bag slot=" + I2S(slot) + " id=" + I2S(GetItemTypeId(it)))
+        endif
+        set slot = slot + 1
+    endloop
+    set slot = 0
+    loop
+        exitwhen slot >= 9
+        set it = BlzUnitItemInEquipmentSlot(u, ConvertLoadoutSlot(slot))
+        set TT_REPLACEMENT_EQUIPMENT_ITEMS[slot] = it
+        if it != null then
+            call TT_LogAppend("event=HERO_REPLACEMENT_EXT_CAPTURE domain=equipment slot=" + I2S(slot) + " id=" + I2S(GetItemTypeId(it)))
+        endif
+        set slot = slot + 1
+    endloop
+    set it = null
+endfunction
+
+function TT_RestoreReplacementEquipment takes unit u returns nothing
+    local integer slot = 0
+    local item it
+    loop
+        exitwhen slot >= 9
+        set it = TT_REPLACEMENT_EQUIPMENT_ITEMS[slot]
+        if it != null and GetItemTypeId(it) != 0 and not TT_UnitCarriesItem(u, it) then
+            if UnitEquipItem(u, it) then
+                call TT_LogAppend("event=HERO_REPLACEMENT_EXT_RESTORE domain=equipment slot=" + I2S(slot) + " id=" + I2S(GetItemTypeId(it)))
+                call TT_LogFlush()
+            elseif UnitAddItem(u, it) then
+                call TT_LogAppend("event=HERO_REPLACEMENT_EXT_BAGGED domain=equipment slot=" + I2S(slot) + " id=" + I2S(GetItemTypeId(it)))
+                call TT_LogFlush()
+            else
+                call SetItemPosition(it, GetUnitX(u), GetUnitY(u))
+                call TT_LogAppend("event=HERO_REPLACEMENT_EXT_FAIL domain=equipment slot=" + I2S(slot) + " id=" + I2S(GetItemTypeId(it)))
+                call TT_LogFlush()
+            endif
+        endif
+        set TT_REPLACEMENT_EQUIPMENT_ITEMS[slot] = null
+        set slot = slot + 1
+    endloop
+    set it = null
+endfunction
+
+function TT_RestoreReplacementBag takes unit u returns nothing
+    local integer slot = 0
+    local item it
+    loop
+        exitwhen slot >= 30
+        set it = TT_REPLACEMENT_BAG_ITEMS[slot]
+        if it != null and GetItemTypeId(it) != 0 and not TT_UnitCarriesItem(u, it) then
+            if UnitAddItem(u, it) then
+                call TT_LogAppend("event=HERO_REPLACEMENT_EXT_RESTORE domain=bag slot=" + I2S(slot) + " id=" + I2S(GetItemTypeId(it)))
+                call TT_LogFlush()
+            else
+                call SetItemPosition(it, GetUnitX(u), GetUnitY(u))
+                call TT_LogAppend("event=HERO_REPLACEMENT_EXT_FAIL domain=bag slot=" + I2S(slot) + " id=" + I2S(GetItemTypeId(it)))
+                call TT_LogFlush()
+            endif
+        endif
+        set TT_REPLACEMENT_BAG_ITEMS[slot] = null
+        set slot = slot + 1
+    endloop
+    set it = null
+endfunction
+
+function TT_RestoreReplacementItems takes unit u returns nothing
+    call TT_RestoreReplacementEquipment(u)
+    call TT_RestoreReplacementBag(u)
+endfunction
+
+function TT_BeginHeroReplacement takes unit u returns nothing
+    local integer heroIndex = -1
+    if TT_REPLACEMENT_ACTIVE or u == null or GetUnitTypeId(u) == 0 then
+        return
+    endif
+    set heroIndex = TT_RegisteredHeroIndex(u)
+    if heroIndex < 0 then
+        set heroIndex = TT_RegisterHero(u)
+    endif
+    if heroIndex < 0 then
+        call TT_LogAppend("event=HERO_REPLACEMENT_BEGIN_SKIP hero=" + GetUnitName(u) + " reason=not_registered")
+        call TT_LogFlush()
+        return
+    endif
+    call TT_CaptureReplacementItems(u)
+    call TT_CaptureTalentState(u)
+    set TT_REPLACEMENT_ACTIVE = true
+    set TT_REPLACEMENT_WAS_SELECTED = IsUnitSelected(u, GetOwningPlayer(u))
+    set TT_REPLACEMENT_OLD = u
+    set TT_REPLACEMENT_INDEX = heroIndex
+    call TT_LogHeroState(u, heroIndex, "HERO_REPLACEMENT_BEGIN")
+    call TT_LogFlush()
+endfunction
+
+function TT_EndHeroReplacement takes unit u returns nothing
+    local integer heroIndex = TT_REPLACEMENT_INDEX
+    local integer savedIndex = -1
+    if not TT_REPLACEMENT_ACTIVE or u == null or GetUnitTypeId(u) == 0 then
+        return
+    endif
+    if not TT_START_READY then
+        set TT_REPLACEMENT_NEW = u
+        call TT_LogAppend("event=HERO_REPLACEMENT_DEFER_INIT hero=" + GetUnitName(u))
+        call TT_LogFlush()
+        return
+    endif
+    if not TT_IsTalentHero(u) then
+        call TT_LogAppend("event=HERO_REPLACEMENT_END_DEFER hero=" + GetUnitName(u) + " reason=not_player_hero")
+        call TT_LogFlush()
+        return
+    endif
+    if heroIndex < 0 then
+        set heroIndex = TT_SavedBackpackIndex(u)
+    endif
+    if heroIndex < 0 then
+        set heroIndex = TT_RegisterHeroCore(u, true)
+    endif
+    if heroIndex < 0 then
+        call TT_LogAppend("event=HERO_REPLACEMENT_END_SKIP hero=" + GetUnitName(u) + " reason=no_slot")
+        call TT_LogFlush()
+        return
+    endif
+    set TT_HEROES[heroIndex] = u
+    if TT_HERO_COUNT <= heroIndex then
+        set TT_HERO_COUNT = heroIndex + 1
+    endif
+    call TT_RestoreReplacementItems(u)
+    set TT_CAMPAIGN_NATIVE_PRESERVED[heroIndex] = false
+    set TT_CAMPAIGN_SNAPSHOT_PENDING[heroIndex] = true
+    set savedIndex = TT_SavedBackpackIndex(u)
+    if savedIndex >= 0 and savedIndex != heroIndex then
+        call TT_RemoveForeignTalentBackpacks(u, heroIndex)
+    endif
+    if savedIndex < 0 then
+        call TT_RemoveForeignTalentBackpacks(u, heroIndex)
+    endif
+    if not TT_EnsureBackpack(u, heroIndex) then
+        call TT_LogHeroState(u, heroIndex, "HERO_REPLACEMENT_WAIT_BACKPACK")
+        call TT_LogFlush()
+    else
+        call TT_EnsureHeroNow(u)
+        call TT_LogHeroState(u, heroIndex, "HERO_REPLACEMENT_TALENT_RESET")
+        call TT_ResetTalents(u)
+        if TT_REPLACEMENT_WAS_SELECTED then
+            call SelectUnitForPlayerSingle(u, GetOwningPlayer(u))
+        endif
+        call TT_LogHeroState(u, heroIndex, "HERO_REPLACEMENT_END")
+        call TT_LogFlush()
+    endif
+    set TT_REPLACEMENT_ACTIVE = false
+    set TT_REPLACEMENT_WAS_SELECTED = false
+    set TT_REPLACEMENT_OLD = null
+    set TT_REPLACEMENT_NEW = null
+    set TT_REPLACEMENT_INDEX = -1
+endfunction
+
+function TT_YDWEReplaceHeroBJNull takes unit u, integer newUnitId, integer unitStateMethod returns nothing
+    local unit oldUnit = u
+    local unit newUnit
+    local boolean wasHidden
+    local integer slot = 0
+    local item it
+    local real ratio = 0.0
+    if u == null or GetUnitTypeId(u) == 0 then
+        set bj_lastReplacedUnit = u
+        return
+    endif
+    if GetUnitTypeId(u) == newUnitId then
+        set bj_lastReplacedUnit = u
+        call TT_LogAppend("event=HERO_REPLACEMENT_SKIP_SAME_TYPE hero=" + GetUnitName(u) + " type=" + I2S(newUnitId))
+        call TT_LogFlush()
+        return
+    endif
+    call TT_BeginHeroReplacement(oldUnit)
+    set wasHidden = IsUnitHidden(oldUnit)
+    call ShowUnit(oldUnit, false)
+    if newUnitId == 'ugol' then
+        set newUnit = CreateBlightedGoldmine(GetOwningPlayer(oldUnit), GetUnitX(oldUnit), GetUnitY(oldUnit), GetUnitFacing(oldUnit))
+    else
+        set newUnit = CreateUnit(GetOwningPlayer(oldUnit), newUnitId, GetUnitX(oldUnit), GetUnitY(oldUnit), GetUnitFacing(oldUnit))
+    endif
+    if newUnit == null then
+        call ShowUnit(oldUnit, not wasHidden)
+        set TT_REPLACEMENT_ACTIVE = false
+        set TT_REPLACEMENT_WAS_SELECTED = false
+        set TT_REPLACEMENT_OLD = null
+        set TT_REPLACEMENT_NEW = null
+        set TT_REPLACEMENT_INDEX = -1
+        set bj_lastReplacedUnit = oldUnit
+        call TT_LogAppend("event=HERO_REPLACEMENT_CREATE_FAIL type=" + I2S(newUnitId))
+        call TT_LogFlush()
+        return
+    endif
+    if unitStateMethod == bj_UNIT_STATE_METHOD_RELATIVE then
+        if GetUnitState(oldUnit, UNIT_STATE_MAX_LIFE) > 0.0 then
+            set ratio = GetUnitState(oldUnit, UNIT_STATE_LIFE) / GetUnitState(oldUnit, UNIT_STATE_MAX_LIFE)
+            call SetUnitState(newUnit, UNIT_STATE_LIFE, ratio * GetUnitState(newUnit, UNIT_STATE_MAX_LIFE))
+        endif
+        if GetUnitState(oldUnit, UNIT_STATE_MAX_MANA) > 0.0 and GetUnitState(newUnit, UNIT_STATE_MAX_MANA) > 0.0 then
+            set ratio = GetUnitState(oldUnit, UNIT_STATE_MANA) / GetUnitState(oldUnit, UNIT_STATE_MAX_MANA)
+            call SetUnitState(newUnit, UNIT_STATE_MANA, ratio * GetUnitState(newUnit, UNIT_STATE_MAX_MANA))
+        endif
+    elseif unitStateMethod == bj_UNIT_STATE_METHOD_ABSOLUTE then
+        call SetUnitState(newUnit, UNIT_STATE_LIFE, GetUnitState(oldUnit, UNIT_STATE_LIFE))
+        if GetUnitState(newUnit, UNIT_STATE_MAX_MANA) > 0.0 then
+            call SetUnitState(newUnit, UNIT_STATE_MANA, GetUnitState(oldUnit, UNIT_STATE_MANA))
+        endif
+    elseif unitStateMethod == bj_UNIT_STATE_METHOD_MAXIMUM then
+        call SetUnitState(newUnit, UNIT_STATE_LIFE, GetUnitState(newUnit, UNIT_STATE_MAX_LIFE))
+        call SetUnitState(newUnit, UNIT_STATE_MANA, GetUnitState(newUnit, UNIT_STATE_MAX_MANA))
+    endif
+    call SetResourceAmount(newUnit, GetResourceAmount(oldUnit))
+    if IsUnitType(oldUnit, UNIT_TYPE_HERO) and IsUnitType(newUnit, UNIT_TYPE_HERO) then
+        call SetHeroXP(newUnit, GetHeroXP(oldUnit), false)
+        loop
+            exitwhen slot > 5
+            set it = UnitItemInSlot(oldUnit, slot)
+            if it != null then
+                call UnitRemoveItem(oldUnit, it)
+                if not UnitAddItem(newUnit, it) then
+                    call SetItemPosition(it, GetUnitX(newUnit), GetUnitY(newUnit))
+                endif
+            endif
+            set slot = slot + 1
+        endloop
+    endif
+    if wasHidden then
+        call KillUnit(oldUnit)
+    endif
+    call RemoveUnit(oldUnit)
+    set bj_lastReplacedUnit = newUnit
+    call TT_EndHeroReplacement(newUnit)
+    set oldUnit = null
+    set newUnit = null
+    set it = null
+endfunction
+
+function TT_FlushDeferredHeroReplacement takes nothing returns nothing
+    if TT_REPLACEMENT_ACTIVE and TT_REPLACEMENT_NEW != null then
+        call TT_EndHeroReplacement(TT_REPLACEMENT_NEW)
+    endif
+    call TT_ScanInitial()
+    call TT_SyncPlayers()
+    call TT_LogFlush()
+endfunction
+
 function TT_Init takes nothing returns nothing
     local trigger chatTrigger
     local integer i = 0
@@ -3352,7 +3787,7 @@ function TT_Init takes nothing returns nothing
         call TriggerAddAction(TT_DH_MB_EFFECT_TRIGGER, function TT_DemonHunterOnManaBurnEffect)
     endif
     call TimerStart(CreateTimer(), 1.50, false, function TT_MarkStartReady)
-    call TimerStart(CreateTimer(), 0.50, true, function TT_SyncPlayers)
+    call TimerStart(CreateTimer(), 1.00, true, function TT_SyncPlayers)
     call DisplayTextToPlayer(GetLocalPlayer(), 0, 0, "|cff32cd32[天赋]|r 通用天赋已启用，最高 " + I2S(TT_MAX_LEVEL) + " 级共提供 " + I2S(TT_POINT_COUNT) + " 点，按等级平滑分配。")
     set chatTrigger = null
 endfunction

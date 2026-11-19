@@ -23,6 +23,17 @@ from doctor.data import objects as DOBJ  # noqa: E402
 from doctor.data import w3i as W3I  # noqa: E402
 
 
+HERO_REPLACEMENT_BEGIN_MARKER = (
+    b"ALAS_TALENT_HERO_REPLACEMENT_BEGIN"
+)
+HERO_REPLACEMENT_END_MARKER = (
+    b"ALAS_TALENT_HERO_REPLACEMENT_END"
+)
+HERO_YDWE_REPLACEMENT_MARKER = (
+    b"ALAS_TALENT_YDWE_HERO_REPLACEMENT"
+)
+
+
 @dataclass(frozen=True)
 class TalentBundle:
     ability_object: Path
@@ -254,6 +265,323 @@ def _patch_talent_script_id(target: Path, breakthrough_buff_id: str) -> None:
             raise ValueError(
                 "talent runtime still references the occupied buff ID"
             )
+
+
+def patch_hero_replacements(
+    script: bytes,
+) -> tuple[bytes, dict[str, int]]:
+    """Bridge author hero-replacement triggers into talent state.
+
+    Xiao Jia campaigns commonly save three attributes and the hero level,
+    create a replacement skin unit, copy six inventory slots, remove the old
+    unit, then reassign a global hero handle. Talent state is keyed by the
+    registered hero slot, so the replacement must capture before removal and
+    adopt the same slot after the new unit becomes player-controlled.
+    """
+    begin_call = b"call TT_BeginHeroReplacement("
+    end_call = b"call TT_EndHeroReplacement("
+    if (
+        HERO_REPLACEMENT_BEGIN_MARKER in script
+        or HERO_YDWE_REPLACEMENT_MARKER in script
+    ):
+        return script, {
+            "begin": script.count(begin_call),
+            "end": script.count(end_call),
+            "ydwe": script.count(
+                b"call TT_YDWEReplaceHeroBJNull("
+            ),
+        }
+
+    begin_pattern = re.compile(
+        rb"call\s+SaveInteger\([^\r\n]*?"
+        rb"GetHeroStr\((udg_[A-Za-z0-9_]+),\s*false\)"
+    )
+    assign_pattern = re.compile(
+        rb"^\s*set\s+(udg_[A-Za-z0-9_]+)\s*="
+        rb"\s*LoadUnitHandle\("
+    )
+    created_assign_pattern = re.compile(
+        rb"^\s*set\s+(udg_[A-Za-z0-9_]+)\s*="
+        rb"\s*bj_lastCreatedUnit\s*$"
+    )
+    owner_pattern = re.compile(
+        rb"call\s+SetUnitOwner\("
+        rb"(udg_[A-Za-z0-9_]+),\s*Player\(0\),\s*true\)"
+    )
+    manual_copy_pattern = re.compile(
+        rb"UnitAddItemByIdSwapped\(\s*GetItemTypeId\(\s*"
+        rb"UnitItemInSlot\(\s*(udg_[A-Za-z0-9_]+)\s*,\s*\d+\s*\)"
+        rb"\s*\)\s*,\s*(udg_[A-Za-z0-9_]+)\s*\)",
+        re.IGNORECASE,
+    )
+    show_hidden_pattern = re.compile(
+        rb"call\s+ShowUnit\(\s*(udg_[A-Za-z0-9_]+)\s*,"
+        rb"\s*false\s*\)",
+        re.IGNORECASE,
+    )
+    ydwe_replace_pattern = re.compile(
+        rb"^([ \t]*)call\s+YDWEReplaceUnitBJNull\("
+        rb"\s*(udg_[A-Za-z0-9_]*hero[A-Za-z0-9_]*)\s*,",
+        re.IGNORECASE,
+    )
+    lines = script.splitlines(keepends=True)
+    ydwe_lines: list[bytes] = []
+    ydwe_count = 0
+    for line in lines:
+        match = ydwe_replace_pattern.search(line)
+        if match is None:
+            ydwe_lines.append(line)
+            continue
+        body = line.rstrip(b"\r\n")
+        ending = line[len(body):]
+        body = body.replace(
+            b"YDWEReplaceUnitBJNull(",
+            b"TT_YDWEReplaceHeroBJNull(",
+            1,
+        )
+        if HERO_YDWE_REPLACEMENT_MARKER not in body:
+            body += b" // " + HERO_YDWE_REPLACEMENT_MARKER
+        ydwe_lines.append(body + ending)
+        ydwe_count += 1
+    lines = ydwe_lines
+
+    output: list[bytes] = []
+    begin_count = 0
+    end_count = 0
+    index = 0
+
+    while index < len(lines):
+        if not lines[index].startswith(b"function "):
+            output.append(lines[index])
+            index += 1
+            continue
+        end = index + 1
+        while end < len(lines) and not lines[end].startswith(
+            b"endfunction"
+        ):
+            end += 1
+        if end >= len(lines):
+            raise ValueError("unterminated JASS function")
+        chunk = lines[index : end + 1]
+        joined = b"".join(chunk)
+        replacement_shape = (
+            b"CreateNUnitsAtLoc(" in joined
+            and b"UnitAddItemSwapped(" in joined
+            and b"SetHeroLevelBJ(" in joined
+            and b"RemoveUnit(udg_" in joined
+        )
+        manual_matches = list(manual_copy_pattern.finditer(joined))
+        manual_sources = {
+            match.group(1) for match in manual_matches
+        }
+        manual_targets = {
+            match.group(2) for match in manual_matches
+        }
+        manual_copy_shape = (
+            len(manual_matches) >= 2
+            and len(manual_sources) == 1
+            and len(manual_targets) == 1
+        )
+        mall_skin_shape = (
+            b"DzAPI_Map_HasMallItem(" in joined
+            and b"CreateNUnitsAtLoc(" in joined
+            and b"ModifyHeroStat(bj_HEROSTAT_STR" in joined
+            and b"UnitAddItemSwapped(" in joined
+        )
+        if not replacement_shape and not manual_copy_shape and not mall_skin_shape:
+            output.extend(chunk)
+            index = end + 1
+            continue
+
+        if mall_skin_shape:
+            show_positions = [
+                position
+                for position, line in enumerate(chunk)
+                if show_hidden_pattern.search(line) is not None
+            ]
+            assignment_positions = [
+                position
+                for position, line in enumerate(chunk)
+                if created_assign_pattern.search(
+                    line.rstrip(b"\r\n")
+                ) is not None
+            ]
+            matched = None
+            for show_position in show_positions:
+                source = show_hidden_pattern.search(
+                    chunk[show_position]
+                ).group(1)
+                assignment_position = next(
+                    (
+                        position
+                        for position in assignment_positions
+                        if position > show_position
+                        and created_assign_pattern.search(
+                            chunk[position].rstrip(b"\r\n")
+                        ).group(1) == source
+                    ),
+                    -1,
+                )
+                if assignment_position >= 0:
+                    matched = (show_position, assignment_position, source)
+                    break
+            if matched is not None:
+                show_position, assignment_position, source = matched
+                copy_positions = [
+                    position
+                    for position, line in enumerate(chunk)
+                    if position > assignment_position
+                    and b"UnitAddItemSwapped(" in line
+                ]
+                end_position = assignment_position
+                if copy_positions:
+                    end_position = next(
+                        (
+                            position
+                            for position in range(
+                                copy_positions[-1] + 1,
+                                len(chunk),
+                            )
+                            if b"endloop" in chunk[position]
+                        ),
+                        copy_positions[-1],
+                    )
+                for position, line in enumerate(chunk):
+                    if position == show_position:
+                        output.append(
+                            b"    call TT_BeginHeroReplacement("
+                            + source
+                            + b") // "
+                            + HERO_REPLACEMENT_BEGIN_MARKER
+                            + b"\n"
+                        )
+                        begin_count += 1
+                    output.append(line)
+                    if position == end_position:
+                        output.append(
+                            b"    call TT_EndHeroReplacement("
+                            + source
+                            + b") // "
+                            + HERO_REPLACEMENT_END_MARKER
+                            + b"\n"
+                        )
+                        end_count += 1
+                index = end + 1
+                continue
+
+        if manual_copy_shape:
+            source = next(iter(manual_sources))
+            target = next(iter(manual_targets))
+            copy_positions = [
+                position
+                for position, line in enumerate(chunk)
+                if manual_copy_pattern.search(line) is not None
+            ]
+            first_copy = copy_positions[0]
+            last_copy = copy_positions[-1]
+            for position, line in enumerate(chunk):
+                if position == first_copy:
+                    output.append(
+                        b"    call TT_BeginHeroReplacement("
+                        + source
+                        + b") // "
+                        + HERO_REPLACEMENT_BEGIN_MARKER
+                        + b"\n"
+                    )
+                    begin_count += 1
+                output.append(line)
+                if position == last_copy:
+                    output.append(
+                        b"    call TT_EndHeroReplacement("
+                        + target
+                        + b") // "
+                        + HERO_REPLACEMENT_END_MARKER
+                        + b"\n"
+                    )
+                    end_count += 1
+            index = end + 1
+            continue
+
+        begin_positions = [
+            position
+            for position, line in enumerate(chunk)
+            if begin_pattern.search(line) is not None
+        ]
+        replacements: dict[int, tuple[bytes, int]] = {}
+        for position in begin_positions:
+            active_hero = begin_pattern.search(
+                chunk[position]
+            ).group(1)
+            next_begin = next(
+                (
+                    candidate
+                    for candidate in begin_positions
+                    if candidate > position
+                ),
+                len(chunk),
+            )
+            assigned = False
+            owner_position = -1
+            for candidate in range(position + 1, next_begin):
+                line = chunk[candidate]
+                assignment = assign_pattern.search(line)
+                if (
+                    assignment is not None
+                    and assignment.group(1) == active_hero
+                ):
+                    assigned = True
+                owner = owner_pattern.search(line)
+                if (
+                    assigned
+                    and owner is not None
+                    and owner.group(1) == active_hero
+                ):
+                    owner_position = candidate
+                    break
+            if owner_position >= 0:
+                replacements[position] = (
+                    active_hero,
+                    owner_position,
+                )
+
+        end_positions = {
+            owner_position: hero
+            for hero, owner_position in replacements.values()
+        }
+        for position, line in enumerate(chunk):
+            if position in replacements:
+                active_hero = replacements[position][0]
+                output.append(
+                    b"    call TT_BeginHeroReplacement("
+                    + active_hero
+                    + b") // "
+                    + HERO_REPLACEMENT_BEGIN_MARKER
+                    + b"\n"
+                )
+                begin_count += 1
+            output.append(line)
+            if position in end_positions:
+                active_hero = end_positions[position]
+                output.append(
+                    b"    call TT_EndHeroReplacement("
+                    + active_hero
+                    + b") // "
+                    + HERO_REPLACEMENT_END_MARKER
+                    + b"\n"
+                )
+                end_count += 1
+        index = end + 1
+
+    if begin_count != end_count:
+        raise ValueError(
+            "hero replacement patch mismatch: %d begin, %d end"
+            % (begin_count, end_count)
+        )
+    return b"".join(output), {
+        "begin": begin_count,
+        "end": end_count,
+        "ydwe": ydwe_count,
+    }
 
 
 def _render_script(
@@ -489,8 +817,10 @@ def _verify_script(
         )
     for marker in (
         "TT_SavedBackpackIndex",
+        "TT_HasInventoryAbility",
         "TT_IsTalentHero",
         "TT_EnsureBackpack",
+        "BACKPACK_FALLBACK",
         "TT_GrantEarnedPoints",
         "TT_ClearTalentMilestones",
         "TT_ResetTalents",
@@ -532,13 +862,25 @@ def _verify_script(
         "TT_EarnedTalentPoints",
         "TT_TALENT_MASTER_LEVEL",
         "TT_AWARDED_MASK",
+        "TT_UNSPENT_POINTS",
+        "TT_SELECTED_TIER_COUNT",
+        "TT_RevealSelectedTalentAbilities",
         "TT_IsAwarded",
         "TT_CampaignNormalizeUnitForStore",
         "TT_CampaignStoreTalentSnapshot",
         "TT_CampaignRestoreTalentSnapshot",
-        "TT_OnTalentSelectionStep",
-        "TT_FinishTalentUiRebuild",
+        "TT_OnTalentUiRebuildTimer",
         "TT_ScheduleTalentUiRebuild",
+        "TT_BeginHeroReplacement",
+        "TT_EndHeroReplacement",
+        "TT_REPLACEMENT_WAS_SELECTED",
+        "TT_CaptureReplacementItems",
+        "TT_RestoreReplacementItems",
+        "TT_RestoreReplacementEquipment",
+        "TT_RestoreReplacementBag",
+        "TT_RemoveForeignTalentBackpacks",
+        "TT_YDWEReplaceHeroBJNull",
+        "TT_FlushDeferredHeroReplacement",
         "TT_CampaignAuditStore",
         "TT_CampaignAuditAbilities",
         "TT_CampaignAuditRestoreProbe",
@@ -556,9 +898,15 @@ def _verify_script(
         "CAMPAIGN_TALENT_SNAPSHOT_STORE",
         "CAMPAIGN_TALENT_SNAPSHOT_RESTORE",
         "CAMPAIGN_TALENT_SNAPSHOT_MISSING",
-        "TALENT_UI_REBUILD",
-        "TALENT_UI_PREPARE",
-        "TALENT_UI_SELECT",
+        "TALENT_UI_REFRESH",
+        "HERO_REPLACEMENT_BEGIN",
+        "HERO_REPLACEMENT_DEFER_INIT",
+        "HERO_REPLACEMENT_END",
+        "HERO_REPLACEMENT_EXT_CAPTURE",
+        "HERO_REPLACEMENT_EXT_RESTORE",
+        "HERO_REPLACEMENT_EXT_FAIL",
+        "HERO_REPLACEMENT_SKIP_SAME_TYPE",
+        "HERO_REPLACEMENT_WAIT_BACKPACK",
         "TT_RegisteredHeroIndex",
         "TT_MarkStartReady",
         "TT_OnPointTimer",
@@ -566,6 +914,9 @@ def _verify_script(
         "START_READY",
         "POINT_ITEM_ISSUED",
         "POINT_GRANT_COMMITTED",
+        "POINT_LEVEL_WAIT",
+        "TALENT_POINTS_BALANCE",
+        "TALENT_SELECTED_ABILITY_VISIBLE",
         "POINT_GRANT_BLOCKED",
         "UnitUseItem(u, it)",
         "HERO_WAIT_BACKPACK",

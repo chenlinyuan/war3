@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "name": "blood-elf-curse",
+  "title": "血精灵之诅咒：AI 副官",
+  "source_sha256": "3b421e78373db8b11d6c84862d2005d2fd3fa386f73ede0223cdb118ec2a1ac9",
+  "chapters": [
+    "HumanX01.w3x",
+    "HumanX02.w3x",
+    "HumanX03.w3x",
+    "HumanX03Interlude.w3x",
+    "HumanX04.w3x",
+    "HumanX04Interlude.w3x",
+    "HumanX05.w3x",
+    "HumanX06.w3x",
+    "HumanX06Finale.w3x",
+    "HumanX07Homecoming.w3x"
+  ],
+  "key_policy": {
+    "default": false,
+    "true": [],
+    "false": [
+      "A001",
+      "A002",
+      "A003",
+      "A004",
+      "A005",
+      "A006"
+    ]
+  },
+  "key_roles": {
+    "A001": "逐日者典藏外观和属性",
+    "A002": "随行英雄典藏外观和属性",
+    "A003": "炽羽宠物",
+    "A004": "星辉宠物",
+    "A005": "额外金币",
+    "A006": "额外木材"
+  },
+  "reforged_compatibility": {
+    "remove_legacy_portrait_cameras": true
+  },
+  "expected_static_results": {
+    "unknown_mall_keys_enabled": 0,
+    "legacy_portrait_cameras": 0
+  },
+  "runtime_tests": [
+    "Start chapter 1 in Reforged and confirm the map remains stable through the opening cinematic.",
+    "Confirm no mall entitlement message grants skins, pets, gold, or lumber without a purchase.",
+    "Confirm the campaign chapter list, chapter entry, save, and chapter transition still work."
+  ]
+}

@@ -13,9 +13,7 @@ globals
     hashtable WGL_COOLDOWN_HT = null
     hashtable WGL_GROWTH_HT = null
     hashtable WGL_DEFERRED_HT = null
-    trigger WGL_ATTACK_SPEED_TRIGGER = null
     timer WGL_COOLDOWN_CLOCK = null
-    integer WGL_ATTACK_SPEED_MAX_LEVEL = 201
     integer WGL_GROWTH_CHANCE_PERCENT = 2
     real WGL_GROWTH_ATTACK_GUARD = 0.12
     real WGL_CHARGE_BASE_DISTANCE = 100.0
@@ -57,44 +55,6 @@ endfunction
 function WGL_CooldownClockTick takes nothing returns nothing
 endfunction
 
-function WGL_ClearAttackSpeedAbility takes unit u returns nothing
-    if u == null or GetUnitTypeId(u) == 0 then
-        return
-    endif
-    if GetUnitAbilityLevel(u, 'A111') > 0 then
-        call UnitMakeAbilityPermanent(u, false, 'A111')
-        call UnitRemoveAbility(u, 'A111')
-    endif
-endfunction
-
-function WGL_SyncAttackSpeed takes unit u returns nothing
-    local integer level
-    if u == null or GetUnitTypeId(u) == 0 then
-        return
-    endif
-    if not IsUnitType(u, UNIT_TYPE_HERO) then
-        return
-    endif
-    if not WGL_HasWarglaive(u) then
-        call WGL_ClearAttackSpeedAbility(u)
-        return
-    endif
-    set level = GetHeroAgi(u, true) + 1
-    if level < 1 then
-        set level = 1
-    elseif level > WGL_ATTACK_SPEED_MAX_LEVEL then
-        set level = WGL_ATTACK_SPEED_MAX_LEVEL
-    endif
-    if GetUnitAbilityLevel(u, 'A111') == 0 then
-        call UnitAddAbility(u, 'A111')
-        call UnitMakeAbilityPermanent(u, true, 'A111')
-    endif
-    if GetUnitAbilityLevel(u, 'A111') != level then
-        call SetUnitAbilityLevel(u, 'A111', level)
-    endif
-    call BlzUnitHideAbility(u, 'A111', true)
-endfunction
-
 function WGL_SyncUnit takes unit u returns nothing
     local integer unitId
     local real cooldownRemaining
@@ -106,7 +66,6 @@ function WGL_SyncUnit takes unit u returns nothing
         return
     endif
     if WGL_HasWarglaive(u) then
-        call WGL_SyncAttackSpeed(u)
         if GetUnitAbilityLevel(u, 'A113') == 0 then
             call UnitAddAbility(u, 'A113')
             call UnitMakeAbilityPermanent(u, true, 'A113')
@@ -119,7 +78,6 @@ function WGL_SyncUnit takes unit u returns nothing
             call FlushChildHashtable(WGL_COOLDOWN_HT, unitId)
         endif
     else
-        call WGL_ClearAttackSpeedAbility(u)
         if GetUnitAbilityLevel(u, 'A113') > 0 then
             set unitId = GetHandleId(u)
             set cooldownRemaining = BlzGetUnitAbilityCooldownRemaining(u, 'A113')
@@ -232,7 +190,6 @@ function WGL_OnGrowthAttack takes nothing returns nothing
         return
     endif
     call SetHeroAgi(attacker, GetHeroAgi(attacker, false) + 1, true)
-    call WGL_SyncAttackSpeed(attacker)
     call WGL_ShowGrowthText(attacker)
     set attacker = null
     set victim = null
@@ -539,7 +496,6 @@ function WGL_OnItemEvent takes nothing returns nothing
         return
     endif
     if GetTriggerEventId() == EVENT_PLAYER_UNIT_DROP_ITEM and it != null and GetItemTypeId(it) == 'I106' then
-        call WGL_ClearAttackSpeedAbility(u)
         if GetUnitAbilityLevel(u, 'A113') > 0 then
             set unitId = GetHandleId(u)
             set cooldownRemaining = BlzGetUnitAbilityCooldownRemaining(u, 'A113')
@@ -557,12 +513,6 @@ function WGL_OnItemEvent takes nothing returns nothing
     call WGL_SyncUnit(u)
     call WGL_ScheduleSync(u)
     set it = null
-    set u = null
-endfunction
-
-function WGL_OnHeroLevel takes nothing returns nothing
-    local unit u = GetTriggerUnit()
-    call WGL_SyncAttackSpeed(u)
     set u = null
 endfunction
 
@@ -598,9 +548,6 @@ function WGL_Init takes nothing returns nothing
     set WGL_GROWTH_TRIGGER = CreateTrigger()
     call TriggerRegisterAnyUnitEventBJ(WGL_GROWTH_TRIGGER, EVENT_PLAYER_UNIT_DAMAGED)
     call TriggerAddAction(WGL_GROWTH_TRIGGER, function WGL_OnGrowthAttack)
-    set WGL_ATTACK_SPEED_TRIGGER = CreateTrigger()
-    call TriggerRegisterAnyUnitEventBJ(WGL_ATTACK_SPEED_TRIGGER, EVENT_PLAYER_HERO_LEVEL)
-    call TriggerAddAction(WGL_ATTACK_SPEED_TRIGGER, function WGL_OnHeroLevel)
     set initial = CreateGroup()
     call GroupEnumUnitsInRect(initial, bj_mapInitialPlayableArea, null)
     call ForGroup(initial, function WGL_SyncInitialUnit)

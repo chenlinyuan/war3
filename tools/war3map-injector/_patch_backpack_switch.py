@@ -49,7 +49,9 @@ def patch_script(
         quoted = re.escape(ability_id)
         call_pattern = re.compile(
             r"(?m)^(?P<indent>[ \t]*)call[ \t]+"
-            r"(?:UnitAddAbilityBJ|UnitMakeAbilityPermanent|UnitRemoveAbilityBJ)"
+            r"(?:UnitMakeAbilityPermanent|SetPlayerAbilityAvailable|"
+            r"UnitAddAbilityBJ|UnitRemoveAbilityBJ|"
+            r"UnitAddAbility|UnitRemoveAbility)"
             r"\([^\r\n]*'" + quoted + r"'[^\r\n]*\)"
             r"[ \t]*(?://[^\r\n]*)?(?P<eol>\r\n|\n|\r|$)"
         )
@@ -92,7 +94,10 @@ def verify_script(text: str, ability_ids: set[str]) -> list[str]:
     for ability_id in sorted(ability_ids):
         quoted = re.escape(ability_id)
         if re.search(
-            r"UnitAddAbilityBJ\([^\r\n]*'" + quoted + r"'",
+            r"(?:UnitMakeAbilityPermanent|SetPlayerAbilityAvailable|"
+            r"UnitAddAbilityBJ|UnitRemoveAbilityBJ|"
+            r"UnitAddAbility|UnitRemoveAbility)"
+            r"\([^\r\n]*'" + quoted + r"'",
             text,
             re.I,
         ):
@@ -149,9 +154,12 @@ def patch_objects(
         if changed:
             new_mods = OBJ.with_item_sets(new_mods, mods)
         objects.append((table, original, new, new_mods))
-    output = OBJ.write_objects_bytes(version, objects, with_levels)
-    if consumed != len(data) and data[consumed:].strip(b"\0"):
-        output += data[consumed:]
+    if removed_objects or removed_tokens:
+        output = OBJ.write_objects_bytes(version, objects, with_levels)
+        if consumed != len(data) and data[consumed:].strip(b"\0"):
+            output += data[consumed:]
+    else:
+        output = data
     return output, {
         "rule": "backpack-switch-objects",
         "extension": extension,

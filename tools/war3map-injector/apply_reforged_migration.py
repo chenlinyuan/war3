@@ -60,10 +60,10 @@ def migrated_map_info(data: bytes, label: str) -> tuple[bytes, str]:
         raise SystemExit(label + ": missing war3map.w3i")
     model = W3I.parse(data)
     version = int(model.get("version", 0))
-    if version < 25:
+    if version < 18:
         raise SystemExit(
             "%s: map-info v%d is too old for automatic migration "
-            "(minimum v25)" % (label, version)
+            "(minimum v18)" % (label, version)
         )
     current = (
         int(model.get("game_data_set", 0)),

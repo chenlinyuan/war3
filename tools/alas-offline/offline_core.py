@@ -50,6 +50,7 @@ sys.path.insert(0, str(DOCTOR))
 import fix_alas_campaign_names as NAMES  # noqa: E402
 import alas_item_rules as ITEM_RULES  # noqa: E402
 import campaign_paths as CAMP  # noqa: E402
+import campaign_plugins as CAMPAIGN_PLUGINS  # noqa: E402
 import port_alas_jass_campaign as JASS_CAMPAIGN  # noqa: E402
 import universal_talents as TALENT_BUNDLE  # noqa: E402
 import wild_equipment_drops as WILD_DROPS  # noqa: E402
@@ -61,6 +62,9 @@ from doctor.triggers import wtg  # noqa: E402
 
 
 Log = Callable[[str], None]
+
+EQUIPMENT_MODE_DEFAULT = "item"
+EQUIPMENT_MODE_CHOICES = ("item", "command")
 
 
 class OfflineToolError(RuntimeError):
@@ -201,6 +205,9 @@ class CampaignInfo:
     reforged_migration_required: bool
     reforged_migration_supported: bool
     reforged_migration_reason: str
+    kk_profile: str | None
+    source_backpack_switch_ids: list[str]
+    source_backpack_switch_source: str
     chapters: list[str]
     injectable_chapters: list[str]
     cinematic_chapters: dict[str, str]
@@ -220,6 +227,7 @@ class BuildResult:
     ft_data: bool
     reforged_migrate: bool
     equipment_mode: str
+    remove_source_backpack_switch: bool
     new_backpack: bool
     new_backpack_panels: tuple[str, ...]
     universal_talents: bool
@@ -324,6 +332,18 @@ def default_output_dir(source: Path) -> Path:
 
 
 def default_cache_dir() -> Path:
+    configured = os.environ.get("ALAS_CACHE_DIR", "").strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
+    preferred = (
+        Path("G:/")
+        / "\u5de5\u4f5c\u9879\u76ee"
+        / "Work"
+        / "war3"
+        / ".alas-cache"
+    )
+    if Path(preferred.anchor).is_dir():
+        return preferred
     local = Path(os.environ.get("LOCALAPPDATA", profile_cache_fallback()))
     return local / "ALASOffline"
 
@@ -468,10 +488,8 @@ def suggested_output_name(source: Path) -> str:
         title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", title).strip(" .")
         if title:
             return title + ".w3n"
-    stem = source.stem
-    if stem.lower().startswith("alas"):
-        stem = stem[4:].lstrip()
-    return "alas" + stem + source.suffix.lower()
+    title = NAMES.alas_campaign_title(source.stem)
+    return title + source.suffix.lower()
 
 
 def _normalized_campaign_name(name: str) -> str:
@@ -616,6 +634,31 @@ def _reforged_migration_compatibility(
     )
 
 
+def _source_backpack_profile(
+    title: str,
+    chapters: list[str],
+) -> tuple[str | None, list[str], str]:
+    plugin = CAMPAIGN_PLUGINS.for_identity(title, chapters)
+    if plugin is None:
+        return None, [], ""
+    config = plugin.backpack_switch
+    values = config.get("ability_ids", ())
+    if isinstance(values, str):
+        values = (values,)
+    ability_ids = sorted(
+        {
+            str(value).strip()
+            for value in values
+            if str(value).strip()
+        }
+    )
+    return (
+        plugin.name,
+        ability_ids,
+        str(config.get("source") or ""),
+    )
+
+
 def _universal_talents_compatibility(
     source_kind: str,
     script_type: str,
@@ -650,9 +693,14 @@ def analyze_source(path: Path) -> CampaignInfo:
     chapters: list[str] = []
     map_info_versions: dict[str, int | None] = {}
     try:
-        chapters = sorted(
+        available_chapters = [
             name for name in outer.listfile
             if name.lower().endswith((".w3x", ".w3m"))
+        ]
+        chapter_order = CAMP.campaign_chapter_order(path)
+        chapters = CAMP.order_chapter_names(
+            available_chapters,
+            chapter_order,
         )
         if not chapters:
             raise OfflineToolError("战役中没有列出章节地图，可能是未命名保护块。")
@@ -740,10 +788,14 @@ def analyze_source(path: Path) -> CampaignInfo:
         new_backpack_supported,
         reforged_migration_supported,
     )
+    title = NAMES.read_campaign_title(path)[0] or ""
+    profile_name, backpack_ids, backpack_source = (
+        _source_backpack_profile(title, chapters)
+    )
     return CampaignInfo(
         source=str(path),
         source_kind="campaign",
-        title=NAMES.read_campaign_title(path)[0] or "",
+        title=title,
         script_type=script_type,
         map_info_versions=map_info_versions,
         new_backpack_supported=new_backpack_supported,
@@ -753,6 +805,9 @@ def analyze_source(path: Path) -> CampaignInfo:
         reforged_migration_required=reforged_migration_required,
         reforged_migration_supported=reforged_migration_supported,
         reforged_migration_reason=reforged_migration_reason,
+        kk_profile=profile_name,
+        source_backpack_switch_ids=backpack_ids,
+        source_backpack_switch_source=backpack_source,
         chapters=chapters,
         injectable_chapters=injectable_chapters,
         cinematic_chapters=cinematic_chapters,
@@ -832,6 +887,9 @@ def analyze_map(path: Path) -> CampaignInfo:
         reforged_migration_required=reforged_migration_required,
         reforged_migration_supported=reforged_migration_supported,
         reforged_migration_reason=reforged_migration_reason,
+        kk_profile=None,
+        source_backpack_switch_ids=[],
+        source_backpack_switch_source="",
         chapters=[],
         injectable_chapters=[],
         cinematic_chapters={},
@@ -855,7 +913,8 @@ class OfflineBuilder:
         compact_archive: bool = True,
         ft_data: bool = False,
         reforged_migrate: bool = False,
-        equipment_mode: str = "command",
+        equipment_mode: str = EQUIPMENT_MODE_DEFAULT,
+        remove_source_backpack_switch: bool = False,
         new_backpack: bool = False,
         new_backpack_panels: tuple[str, ...] | None = None,
         universal_talents: bool = False,
@@ -901,11 +960,14 @@ class OfflineBuilder:
             raise OfflineToolError(
                 "游戏数据改为 FT 与 Reforged 数据迁移不能同时启用。"
             )
-        if equipment_mode not in ("item", "command"):
+        if equipment_mode not in EQUIPMENT_MODE_CHOICES:
             raise OfflineToolError(
                 "equipment_mode must be item or command"
             )
         self.equipment_mode = equipment_mode
+        self.remove_source_backpack_switch = bool(
+            remove_source_backpack_switch
+        )
         self.universal_talents = bool(universal_talents)
         self.melee_hero_talents = bool(
             melee_hero_talents
@@ -938,22 +1000,29 @@ class OfflineBuilder:
             raise OfflineToolError(
                 "wild map drops and campaign drops are mutually exclusive"
             )
-        panels = tuple(new_backpack_panels or ("inventory", "stats"))
         allowed_panels = ("inventory", "equipment", "stats", "talents")
+        panels = tuple(new_backpack_panels or ("inventory", "stats"))
         if any(panel not in allowed_panels for panel in panels):
             raise OfflineToolError("unknown new-backpack panel")
         if len(set(panels)) != len(panels):
             raise OfflineToolError("duplicate new-backpack panel")
+        selected_panels = set(panels)
+        if self.new_backpack:
+            selected_panels.update(("inventory", "stats"))
         if (
             self.wild_equipment_drops
             or self.campaign_equipment_drops
-        ) and "equipment" not in panels:
-            panels = tuple(panels) + ("equipment",)
-        if self.new_backpack and not panels:
+        ):
+            selected_panels.add("equipment")
+        if self.universal_talents and "talents" not in selected_panels:
             raise OfflineToolError(
-                "new backpack requires at least one selected panel"
+                "\u901a\u7528\u5929\u8d4b\u6811\u5fc5\u987b"
+                "\u52fe\u9009\u201c\u5929\u8d4b\u680f\u201d\u9875\u7b7e"
             )
-        self.new_backpack_panels = panels
+        self.new_backpack_panels = tuple(
+            panel for panel in allowed_panels
+            if panel in selected_panels
+        )
         self.follow_game_graphics = follow_game_graphics
         self.repair_saves = repair_saves
         self.repair_save_dir = repair_save_dir
@@ -984,6 +1053,23 @@ class OfflineBuilder:
                 capture_output=True,
                 creationflags=creationflags,
             )
+
+    def _warn_game_running(self) -> None:
+        running = running_war3_processes()
+        if running:
+            self.log(
+                "\u68c0\u6d4b\u5230 "
+                + "\u3001".join(running)
+                + " \u6b63\u5728\u8fd0\u884c\u3002"
+                "\u53ef\u4ee5\u7ee7\u7eed\u6539\u56fe\uff1b"
+                "\u5b9e\u673a\u9a8c\u8bc1\u524d\u8bf7\u5b8c\u5168\u9000\u51fa"
+                "\u5e76\u91cd\u542f\u5ba2\u6237\u7aef\u4ee5\u5237\u65b0"
+                "\u5bf9\u8c61\u548c\u80fd\u529b\u7f13\u5b58\u3002"
+            )
+
+    def _requires_generic_backpack(self) -> bool:
+        """Keep B30B as the fallback even when Zxxx talent bags are added."""
+        return self.new_backpack
 
     def _env(self) -> dict[str, str]:
         env = dict(os.environ)
@@ -2010,7 +2096,6 @@ class OfflineBuilder:
                 "war3campImported\\Frostmourne.mdx",
                 "war3campImported\\DemonBoltImpactSilent.mdx",
                 "war3campImported\\IceStompRaised.mdx",
-                "war3campImported\\Rune-Blue-Aura_Raised20.mdx",
                 "WingOfTheLucifer.MDX",
                 "FWIND.MDX",
                 "DoomgGuardWings.mdx",
@@ -2341,6 +2426,88 @@ class OfflineBuilder:
                     raise OfflineToolError(
                         name + " 未设置 Reforged 2/2 数据版本"
                     )
+                base_backpack = next(
+                    (
+                        mods
+                        for _table, _old, new, mods in entries
+                        if new.replace("\0", "") == "B30B"
+                    ),
+                    None,
+                )
+                if base_backpack is None:
+                    raise OfflineToolError(
+                        name + " \u7f3a\u5c11 B30B"
+                    )
+                base_fields = {
+                    mod[0]: (
+                        mod[4].decode("utf-8", "replace")
+                        if isinstance(mod[4], bytes)
+                        else mod[4]
+                    )
+                    for mod in base_backpack
+                }
+                if base_fields.get("iabi") != expected:
+                    raise OfflineToolError(
+                        name
+                        + " \u7684 B30B \u9875\u7b7e\u4e0d\u6b63\u786e"
+                    )
+                if (
+                    b"ALAS_B30B_Init" not in script
+                    and b"local function ensureHero" not in script
+                ):
+                    raise OfflineToolError(
+                        name + " \u7f3a\u5c11 B30B \u53d1\u653e\u811a\u672c"
+                    )
+                player_target_markers = (
+                    (
+                        b"local p = GetOwningPlayer(u)",
+                        b"GetPlayerController(p) ~= MAP_CONTROL_USER",
+                        b"GetPlayerSlotState(p) ~= "
+                        b"PLAYER_SLOT_STATE_PLAYING",
+                    )
+                    if script_type == "lua"
+                    else (
+                        b"set p = GetOwningPlayer(u)",
+                        b"GetPlayerController(p) != MAP_CONTROL_USER",
+                        b"GetPlayerSlotState(p) != "
+                        b"PLAYER_SLOT_STATE_PLAYING",
+                    )
+                )
+                if any(
+                    marker not in script
+                    for marker in player_target_markers
+                ):
+                    raise OfflineToolError(
+                        name
+                        + " \u7684 B30B \u53d1\u653e"
+                        "\u672a\u9650\u5b9a\u4e3a\u73a9\u5bb6"
+                        "\u82f1\u96c4"
+                    )
+                order_markers = (
+                    (b"orderTrigger", b"EVENT_PLAYER_UNIT_ISSUED_ORDER")
+                    if script_type == "lua"
+                    else (
+                        b"ALAS_B30B_OnOrder",
+                        b"ALAS_B30B_ORDER_TRIGGER",
+                    )
+                )
+                if any(marker not in script for marker in order_markers):
+                    raise OfflineToolError(
+                        name
+                        + " \u7f3a\u5c11\u82f1\u96c4"
+                        "\u547d\u4ee4\u8865\u53d1\u80cc\u5305\u811a\u672c"
+                    )
+                for marker in (
+                    b"ALAS-BackpackLog.txt",
+                    b"BACKPACK_ADD_OK",
+                    b"BACKPACK_ADD_FAIL",
+                ):
+                    if marker not in script:
+                        raise OfflineToolError(
+                            name
+                            + " \u7f3a\u5c11\u80cc\u5305"
+                            "\u8fd0\u884c\u65e5\u5fd7\u811a\u672c"
+                        )
                 if self.universal_talents:
                     talent_backpacks = []
                     for _table, _old, new, mods in entries:
@@ -2748,6 +2915,7 @@ class OfflineBuilder:
         self.log("源地图: " + str(source))
         self.log("工具版本: " + APP_VERSION)
         self.log("脚本类型: JASS")
+        self._warn_game_running()
         running = running_war3_processes()
         if running:
             self.log(
@@ -2775,6 +2943,22 @@ class OfflineBuilder:
                 [output],
                 game_version="1.27",
             )
+            blocker_details = [
+                "%s(%d)"
+                % (item.get("chapter"), int(item.get("blockers", 0)))
+                for item in doctor_results
+                if int(item.get("blockers", 0)) > 0
+            ]
+            if blocker_details:
+                failed_output = work / ("doctor-failed-" + output.name)
+                if output.exists():
+                    shutil.move(str(output), str(failed_output))
+                raise OfflineToolError(
+                    "Map Doctor blockers remain: "
+                    + ", ".join(blocker_details)
+                    + " | failed output: "
+                    + str(failed_output)
+                )
         save_repair = self._repair_saves(output, "map", info.title)
         finished = time.strftime("%Y-%m-%d %H:%M:%S")
         result = BuildResult(
@@ -2787,6 +2971,7 @@ class OfflineBuilder:
             ft_data=False,
             reforged_migrate=False,
             equipment_mode="item-browser",
+            remove_source_backpack_switch=False,
             new_backpack=False,
             new_backpack_panels=(),
             universal_talents=False,
@@ -3051,6 +3236,7 @@ class OfflineBuilder:
                 + " 正在运行。修改对象数据或脚本后，必须完全退出游戏/编辑器"
                 "再测试；仅重新开始当前地图可能继续使用旧缓存。"
             )
+        self._warn_game_running()
         compat_report = work / "compat-report.json"
         compat_output = work / "compat" / ("compat-" + source.name)
         code = self.run([
@@ -3066,6 +3252,48 @@ class OfflineBuilder:
         build_source = Path(compatibility["output"])
         if compatibility.get("changed"):
             self.log("已应用源文件兼容修复: " + str(build_source))
+        remove_source_backpack = bool(
+            self.remove_source_backpack_switch
+            or (
+                self.new_backpack
+                and info.source_backpack_switch_ids
+            )
+        )
+        if (
+            self.remove_source_backpack_switch
+            and not info.source_backpack_switch_ids
+        ):
+            raise OfflineToolError(
+                "当前源文件没有可识别的原作者切换背包配置；"
+                "请先为该战役建立独立配置，不能按其他地图的 ID 猜测。"
+            )
+        if remove_source_backpack:
+            backpack_source = work / "compat" / (
+                "no-source-backpack-" + build_source.name
+            )
+            backpack_args: list[object] = [
+                self.python_executable,
+                INJECTOR / "apply_source_backpack_removal.py",
+                "--source",
+                build_source,
+                "--output",
+                backpack_source,
+            ]
+            for ability_id in info.source_backpack_switch_ids:
+                backpack_args.extend(["--ability-id", ability_id])
+            code = self.run(backpack_args)
+            if code:
+                raise OfflineToolError("原作者切换背包移除失败。")
+            self.log(
+                "已移除原作者切换背包: "
+                + ", ".join(info.source_backpack_switch_ids)
+                + (
+                    "（" + info.source_backpack_switch_source + "）"
+                    if info.source_backpack_switch_source
+                    else ""
+                )
+            )
+            build_source = backpack_source
         if self.reforged_migrate:
             migrated_source = work / "compat" / (
                 "reforged-" + build_source.name
@@ -3081,10 +3309,10 @@ class OfflineBuilder:
                 raise OfflineToolError("Reforged 数据迁移失败。")
             build_source = migrated_source
         elif self.new_backpack and self.universal_talents:
-            # Universal talents grant their own Zxxx backpack items rather than
-            # using apply_new_backpack.py. Those items still depend on the
-            # Reforged AIni/AEqu/ASde panel abilities, so the target chapters
-            # must use the 2/2 data baseline even when map-info is already v31.
+            # Universal talents add per-hero Zxxx bags, while B30B remains the
+            # fallback. Both depend on Reforged AIni/AEqu/ASde panel abilities,
+            # so target chapters must use the 2/2 data baseline even when
+            # map-info is already v31.
             reforged_data_source = work / "compat" / (
                 "reforged-data-" + build_source.name
             )
@@ -3130,7 +3358,7 @@ class OfflineBuilder:
             if code:
                 raise OfflineToolError("单图画面模式转换失败。")
             build_source = graphics_source
-        if self.new_backpack and not self.universal_talents:
+        if self._requires_generic_backpack():
             backpack_source = work / "compat" / (
                 "backpack-" + build_source.name
             )
@@ -3209,13 +3437,25 @@ class OfflineBuilder:
             self.log(
                 "campaign drop profiles: "
                 + ", ".join(
-                    "%s(global=%d,native=%d/%d,%d%%)"
+                    "%s(global=%d,native=%d/%d,%d%%,stage=%d,"
+                    "chance=%d%%,weights=%s,limit=%d,boss=%d+%s)"
                     % (
                         profile.chapter,
                         profile.level_cap,
                         profile.chapter_level_cap,
                         profile.chapter_hero_level_cap,
                         profile.chapter_progress,
+                        profile.drop_stage + 1,
+                        profile.hero_drop_chance,
+                        "/".join(
+                            str(value) for value in profile.hero_weights
+                        ),
+                        profile.hero_drop_limit,
+                        profile.hero_boss_level,
+                        "/".join(
+                            str(value)
+                            for value in profile.hero_boss_weights
+                        ),
                     )
                     for profile in campaign_drop_bundle.profiles
                 )
@@ -3395,6 +3635,22 @@ class OfflineBuilder:
                 base = build_work / "base"
                 doctor_targets = CAMP.chapter_paths(base)
             doctor_results = self._run_doctor(doctor_targets)
+            blocker_details = [
+                "%s(%d)"
+                % (item.get("chapter"), int(item.get("blockers", 0)))
+                for item in doctor_results
+                if int(item.get("blockers", 0)) > 0
+            ]
+            if blocker_details:
+                failed_output = work / ("doctor-failed-" + output.name)
+                if output.exists():
+                    shutil.move(str(output), str(failed_output))
+                raise OfflineToolError(
+                    "Map Doctor blockers remain: "
+                    + ", ".join(blocker_details)
+                    + " | failed output: "
+                    + str(failed_output)
+                )
         if self.cancelled:
             raise OfflineToolError("用户取消。")
         save_repair = self._repair_saves(
@@ -3416,6 +3672,9 @@ class OfflineBuilder:
             ft_data=self.ft_data,
             reforged_migrate=self.reforged_migrate,
             equipment_mode=self.equipment_mode,
+            remove_source_backpack_switch=(
+                remove_source_backpack
+            ),
             new_backpack=self.new_backpack,
             new_backpack_panels=self.new_backpack_panels,
             universal_talents=self.universal_talents,

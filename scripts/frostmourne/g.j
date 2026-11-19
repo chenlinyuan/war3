@@ -20,15 +20,6 @@ hashtable fr_soul_source_table = null
 hashtable fr_soul_timer_table = null
 hashtable fr_cooldown_table = null
 hashtable fr_active_fx_table = null
-integer fr_ground_count = 0
-item array fr_ground_items
-integer array fr_ground_keys
-effect array fr_ground_effects
-real array fr_ground_x
-real array fr_ground_y
-hashtable fr_ground_table = null
-rect fr_world = null
-timer fr_ground_timer = null
 timer fr_clock = null
 
 boolean fr_inited = false

@@ -10,7 +10,6 @@ Usage:
     python campaign_singleplayer.py <campaign.w3n|directory>
     python campaign_singleplayer.py <directory> --output-dir <dir>
     python campaign_singleplayer.py <campaign.w3n> --extract-only
-    python campaign_singleplayer.py <campaign.w3n> --remove-backpack-switch
     python campaign_singleplayer.py <campaign.w3n> --target classic
     python campaign_singleplayer.py <campaign.w3n> --target reforged
     python campaign_singleplayer.py <directory> --campaign 194213
@@ -20,11 +19,13 @@ For every campaign the tool:
   2. recovers `kkmap.jc` to JASS with Devo's Map Doctor when necessary;
   3. replaces KK/platform native declarations with in-place stubs;
   4. applies the maintained set of anti-softlock/script fixes;
-  5. optionally removes the campaign-specific authored backpack-switch ability;
-  6. runs pjass and writes the repaired chapter back to its archive;
-  7. clears the chapter MPQ hash-table platform flags;
-  8. repacks chapters as uncompressed entries and validates the result with
+  5. runs pjass and writes the repaired chapter back to its archive;
+  6. clears the chapter MPQ hash-table platform flags;
+  7. repacks chapters as uncompressed entries and validates the result with
      the game's Storm.dll (static archive validation only).
+
+Authored backpack-switch removal, target data-version migration, replacement
+backpack injection, and ALAS objects belong to the ALAS offline builder.
 
 The game/editor is never launched.
 """
@@ -65,7 +66,6 @@ import war3mpq as W  # noqa: E402
 import mpq_patch as MP  # noqa: E402
 import merge_w3obj as MO  # noqa: E402
 import apply_reforged_migration as RM  # noqa: E402
-import _patch_backpack_switch as BACKPACK  # noqa: E402
 import _patch_permanent_item_charges as ITEM_CHARGES  # noqa: E402
 import fix_campaign_object_icons as DISABLED_ICONS  # noqa: E402
 import fix_campaign_loading_art as LOADING_ART  # noqa: E402
@@ -94,9 +94,12 @@ import _patch_restore_guards as RG  # noqa: E402
 import _patch_sentinel_exits as SE  # noqa: E402
 import _patch_unlock as UK  # noqa: E402
 import _stub_inplace as SI  # noqa: E402
+import fix_alas_campaign_names as NAMES  # noqa: E402
+import fix_reforged_portrait_cameras as PORTRAITS  # noqa: E402
 import fix_hash_platform as HP  # noqa: E402
 import jass_gate  # noqa: E402
 from doctor.data import campaign_info  # noqa: E402
+from doctor.data import objects as OBJ  # noqa: E402
 from doctor.viewers import map_card  # noqa: E402
 
 
@@ -111,13 +114,10 @@ CAMPAIGN_OBJECT_FILES = (
     ("war3campaign.w3b", "war3map.w3b"),
     ("war3campaign.w3q", "war3map.w3q"),
 )
-TITLE_SUFFIX = "（单机修复版）"
-CLASSIC_TITLE_SUFFIX = "（单机修复版·经典版）"
-CLEAN_REDERIVE_SUFFIX = "（清源推导版）"
-CLEAN_REDERIVE_CLASSIC_SUFFIX = "（清源推导版·经典版）"
+TARGET_SOURCE = "source"
 TARGET_CLASSIC = "classic"
 TARGET_REFORGED = "reforged"
-TARGET_CHOICES = (TARGET_CLASSIC, TARGET_REFORGED)
+TARGET_CHOICES = (TARGET_SOURCE, TARGET_CLASSIC, TARGET_REFORGED)
 PLATFORM_PREFIXES = ("Dz", "EX", "RequestExtra", "LBK", "Blz", "JAPI")
 INVALID_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 COLOR_TAG = re.compile(r"\|c[0-9a-fA-F]{8}|\|r", re.I)
@@ -142,7 +142,7 @@ class BuildResult:
     source: Path
     output: Path | None = None
     work: Path | None = None
-    target: str = TARGET_REFORGED
+    target: str = TARGET_SOURCE
     clean_rederive: bool = False
     ok: bool = False
     error: str = ""
@@ -170,17 +170,25 @@ def campaign_output_title(
     target: str,
     clean_rederive: bool = False,
 ) -> str:
-    if clean_rederive:
-        if target == TARGET_CLASSIC:
-            return title + CLEAN_REDERIVE_CLASSIC_SUFFIX
-        if target == TARGET_REFORGED:
-            return title + CLEAN_REDERIVE_SUFFIX
+    if target not in TARGET_CHOICES:
         raise BuildError("unsupported export target: " + target)
-    if target == TARGET_CLASSIC:
-        return title + CLASSIC_TITLE_SUFFIX
-    if target == TARGET_REFORGED:
-        return title + TITLE_SUFFIX
-    raise BuildError("unsupported export target: " + target)
+    return NAMES.alas_campaign_title(title)
+
+
+def select_campaign_profiles(
+    source_sha256: str,
+    clean_rederive: bool,
+) -> tuple[object | None, object | None, bool]:
+    """Separate campaign repair rules from the verified commerce-key policy."""
+    source_profile = PROFILES.for_source(source_sha256)
+    repair_profile = None if clean_rederive else source_profile
+    mall_profile = source_profile if clean_rederive else repair_profile
+    mall_default_true = (
+        mall_profile.mall_default_true
+        if mall_profile is not None
+        else (False if clean_rederive else True)
+    )
+    return repair_profile, mall_profile, mall_default_true
 
 
 def prepare_campaign_map_info(
@@ -189,10 +197,10 @@ def prepare_campaign_map_info(
     target: str,
 ) -> tuple[bytes, str]:
     """Return map-info bytes appropriate for the selected game generation."""
-    if target == TARGET_CLASSIC:
+    if target in (TARGET_SOURCE, TARGET_CLASSIC):
         if not data:
             raise BuildError(label + ": missing war3map.w3i")
-        return data, "preserved source map-info for classic"
+        return data, "preserved source map-info for " + target
     if target == TARGET_REFORGED:
         return RM.migrated_map_info(data, label)
     raise BuildError("unsupported export target: " + target)
@@ -231,7 +239,137 @@ def chapter_strings(path: Path) -> dict[int, str]:
     return split_wts(data)
 
 
-def campaign_identity(path: Path) -> CampaignIdentity:
+def resolve_scoped_object_strings(
+    local_data: bytes,
+    campaign_data: bytes,
+    extension: str,
+    map_strings: dict[int, str],
+    campaign_strings: dict[int, str],
+) -> tuple[bytes, bytes]:
+    """Resolve each object source against its own TRIGSTR namespace.
+
+    ``war3map.wts`` and ``war3campaign.wts`` both start their string IDs at 1,
+    so the same ``TRIGSTR_n`` token can mean different things in a chapter and
+    in the campaign.  Resolving a merged object file with one table can replace
+    local unit names with unrelated campaign ability or item text.
+    """
+    local_resolved = (
+        MO.resolve_trigstr(local_data, extension, map_strings)
+        if local_data
+        else b""
+    )
+    campaign_resolved = (
+        MO.resolve_trigstr(campaign_data, extension, campaign_strings)
+        if campaign_data
+        else b""
+    )
+    return local_resolved, campaign_resolved
+
+
+def combine_scoped_campaign_objects(
+    local_data: bytes,
+    campaign_data: bytes,
+    extension: str,
+) -> tuple[bytes, int, int]:
+    """Combine campaign fields with chapter overrides by object field.
+
+    A chapter and the campaign can define the same custom object ID.  The
+    chapter normally contains only the changed gameplay fields while the
+    campaign supplies names, models, and other defaults.  Keeping only the
+    first whole entry drops those inherited fields.
+    """
+    with_levels = extension.lower() in {"w3a", "w3d", "w3q"}
+    parsed: list[tuple[int, list[tuple]]] = []
+    for data, label in (
+        (campaign_data, "campaign"),
+        (local_data, "chapter"),
+    ):
+        if not data:
+            parsed.append((2, []))
+            continue
+        try:
+            version, entries, _consumed = OBJ.read_objects_bytes(
+                data,
+                with_levels,
+                fname=label + " object data",
+                with_end=True,
+            )
+        except Exception as exc:
+            raise BuildError(
+                "cannot parse %s %s object data: %s"
+                % (label, extension, exc)
+            ) from exc
+        parsed.append((version, entries))
+
+    output_version = max(version for version, _entries in parsed)
+    combined: dict[tuple[int, str, str], tuple] = {}
+    for version, entries in parsed:
+        del version
+        for table, original, new, mods in entries:
+            key = (
+                table,
+                "" if table == 1 else original,
+                new if table == 1 else original + "\0" + new,
+            )
+            previous = combined.get(key)
+            if previous is None:
+                combined[key] = (
+                    table,
+                    original,
+                    new,
+                    list(mods),
+                )
+                continue
+
+            merged_mods = list(previous[3])
+            positions = {
+                (mod[0], mod[2], mod[3]): index
+                for index, mod in enumerate(merged_mods)
+            }
+            for mod in mods:
+                field_key = (mod[0], mod[2], mod[3])
+                position = positions.get(field_key)
+                if position is None:
+                    positions[field_key] = len(merged_mods)
+                    merged_mods.append(mod)
+                else:
+                    merged_mods[position] = mod
+            combined[key] = (
+                previous[0],
+                previous[1],
+                previous[2],
+                merged_mods,
+            )
+
+    output_entries = []
+    for table, _original, _new, mods in combined.values():
+        merged = OBJ.Mods(mods)
+        if output_version >= 3 and mods:
+            merged.item_sets = [(0, len(mods))]
+        output_entries.append(
+            (table, _original, _new, merged)
+        )
+    try:
+        output = OBJ.write_objects_bytes(
+            output_version,
+            output_entries,
+            with_levels,
+        )
+    except Exception as exc:
+        raise BuildError(
+            "cannot write combined %s object data: %s"
+            % (extension, exc)
+        ) from exc
+    original_count = sum(1 for entry in output_entries if entry[0] == 0)
+    custom_count = sum(1 for entry in output_entries if entry[0] == 1)
+    return output, original_count, custom_count
+
+
+def campaign_identity(
+    path: Path,
+    *,
+    include_hash: bool = True,
+) -> CampaignIdentity:
     archive = W.MPQArchive(str(path))
     try:
         w3f = archive.read_file("war3campaign.w3f") or b""
@@ -268,11 +406,28 @@ def campaign_identity(path: Path) -> CampaignIdentity:
         description=description,
         hm3w_title=read_hm3w(path),
         chapters=chapters,
-        source_sha256=sha256_file(path),
+        source_sha256=sha256_file(path) if include_hash else "",
     )
 
 
-def discover_campaigns(source: Path) -> list[Path]:
+def discover_campaigns(
+    source: Path,
+    selected_files: list[str] | tuple[str, ...] = (),
+) -> list[Path]:
+    if selected_files:
+        campaigns: list[Path] = []
+        seen: set[Path] = set()
+        for value in selected_files:
+            path = Path(value).resolve()
+            if not path.is_file() or path.suffix.lower() != ".w3n":
+                raise BuildError("selected campaign is not a .w3n file: " + str(path))
+            if path not in seen:
+                seen.add(path)
+                campaigns.append(path)
+        if not campaigns:
+            raise BuildError("no campaign files were selected")
+        return campaigns
+
     if source.is_file():
         if source.suffix.lower() != ".w3n":
             raise BuildError("source must be a .w3n file or a directory: %s" % source)
@@ -414,7 +569,6 @@ def patch_chapter_script(
     profile_mall_true: set[str] | None = None,
     profile_mall_default_true: bool = True,
     profile_name: str | None = None,
-    remove_ability_ids: set[str] | None = None,
     critical_props_enabled: bool | None = None,
     clean_rederive_mode: bool = False,
     campaign_sha256: str = "",
@@ -422,6 +576,7 @@ def patch_chapter_script(
     gates = [gate for gate in GS.analyze_text(text) if gate["keys"]]
     mall_false: set[str] = set()
     auto_mall_true: set[str] = set()
+    explicit_mall_false = set(profile_mall_false or ())
     for gate in gates:
         for key, operation in gate["keys"]:
             if operation.startswith("=="):
@@ -439,7 +594,7 @@ def patch_chapter_script(
         # whitelist is authoritative for positive keys, while explicit and
         # automatically detected negative markers remain blacklisted.
         mall_false -= mall_true
-    mall_false |= set(profile_mall_false or ())
+    mall_false |= explicit_mall_false
     overlap = mall_false & mall_true
     if overlap:
         raise BuildError(
@@ -457,6 +612,19 @@ def patch_chapter_script(
     mall_false |= set(weakness_keys)
     anti_cheat = AC.classify(text, strings or {})
     mall_false |= set(anti_cheat["mall_false_keys"])
+
+    # Explicit campaign whitelists are proven policy. Heuristic scanners may
+    # see the same core-progress key near an unrelated risky action; that must
+    # not silently turn the key into both true and false. Explicit blacklists
+    # still conflict and fail below.
+    heuristic_mall_false = mall_false - explicit_mall_false
+    mall_false = (heuristic_mall_false - mall_true) | explicit_mall_false
+    overlap = mall_false & mall_true
+    if overlap:
+        raise BuildError(
+            "%s: explicit mall policy conflicts with whitelist: %s"
+            % (chapter, sorted(overlap))
+        )
 
     patched, stubs, unknown_natives = SI.S.stub_block(
         text,
@@ -493,6 +661,9 @@ def patch_chapter_script(
         clean_mall_wipe_records = []
         clean_campaign_patch_records = []
     patched, chat_guards, quest_guards = CG.patch(patched)
+    patched, critical_prop_invulnerabilities_removed = (
+        CP.remove_legacy_invulnerability(patched)
+    )
     if critical_props_enabled is None:
         critical_props_enabled = CAMPAIGN_PATCHES.legacy_patch_enabled(
             profile_name,
@@ -509,21 +680,6 @@ def patch_chapter_script(
     patched, drop_change_owner = PD.patch(patched)
     patched, final_cinematic_fixes = FC.patch(patched)
     patched, restore_guard_stats = RG.patch(patched)
-    backpack_switch_records: list[dict[str, object]] = []
-    if remove_ability_ids:
-        patched, backpack_switch_records = BACKPACK.patch_script(
-            patched,
-            set(remove_ability_ids),
-        )
-        remaining_backpack_switch = BACKPACK.verify_script(
-            patched,
-            set(remove_ability_ids),
-        )
-        if remaining_backpack_switch:
-            raise BuildError(
-                "%s: backpack switch script remains: %s"
-                % (chapter, remaining_backpack_switch)
-            )
     patched, campaign_patch_stats = CAMPAIGN_PATCHES.apply(
         profile_name,
         patched,
@@ -658,6 +814,9 @@ def patch_chapter_script(
         "go_quest_null_guards": quest_guards,
         "critical_props": critical_prop_count,
         "critical_props_enabled": critical_props_enabled,
+        "critical_prop_invulnerabilities_removed": (
+            critical_prop_invulnerabilities_removed
+        ),
         "region_drains_scoped": region_drain_count,
         "quest_unlock_helpers": unlock_count,
         "platform_end_calls": len(platform_ends),
@@ -675,8 +834,8 @@ def patch_chapter_script(
             "extra_pet_food_guard_count", 0
         ),
         "main_hero_death_count": campaign_patch_stats.get("main_hero_death_count", 0),
-        "backpack_switch_records": backpack_switch_records,
-        "backpack_switch_removals": len(backpack_switch_records),
+        "backpack_switch_records": [],
+        "backpack_switch_removals": 0,
         "drop_change_owner_removed": drop_change_owner,
     }
     return patched, stats
@@ -687,7 +846,6 @@ def materialized_campaign_objects(
     raw_map: Path,
     scratch: Path,
     profile_name: str | None,
-    remove_ability_ids: set[str] | None = None,
     target: str = TARGET_REFORGED,
 ) -> tuple[list[tuple[str, bytes]], list[dict[str, object]]]:
     """Merge campaign object data into a chapter map for standalone loading.
@@ -705,6 +863,9 @@ def materialized_campaign_objects(
         outer.read_file("war3campaign.wts") or b""
     )
     try:
+        map_strings = split_wts(
+            archive.read_file("war3map.wts") or b""
+        )
         map_info = archive.read_file("war3map.w3i") or b""
         prepared_info, migration_status = prepare_campaign_map_info(
             map_info,
@@ -718,8 +879,8 @@ def materialized_campaign_objects(
                 "source": "war3map.w3i",
                 "target": "war3map.w3i",
                 "origin": (
-                    "classic-source"
-                    if target == TARGET_CLASSIC
+                    "source-preserved"
+                    if target in (TARGET_SOURCE, TARGET_CLASSIC)
                     else "reforged-migration"
                 ),
                 "status": migration_status,
@@ -732,71 +893,60 @@ def materialized_campaign_objects(
             if not campaign_data:
                 continue
             local_data = archive.read_file(map_name)
+            extension = map_name.rsplit(".", 1)[-1]
+            local_trigstr_before = (
+                local_data.count(b"TRIGSTR_") if local_data else 0
+            )
+            campaign_trigstr_before = campaign_data.count(b"TRIGSTR_")
+            try:
+                local_data, campaign_data = resolve_scoped_object_strings(
+                    local_data,
+                    campaign_data,
+                    extension,
+                    map_strings,
+                    campaign_strings,
+                )
+            except Exception as exc:
+                raise BuildError(
+                    "cannot resolve scoped strings in %s: %s"
+                    % (map_name, exc)
+                ) from exc
             if local_data:
-                local_path = scratch / ("local-" + map_name)
-                campaign_path = scratch / ("campaign-" + map_name)
-                merged_path = scratch / ("merged-" + map_name)
-                local_path.write_bytes(local_data)
-                campaign_path.write_bytes(campaign_data)
                 try:
-                    original_count, custom_count = MO.merge_files(
-                        str(merged_path),
-                        [str(local_path), str(campaign_path)],
+                    (
+                        data,
+                        original_count,
+                        custom_count,
+                    ) = combine_scoped_campaign_objects(
+                        local_data,
+                        campaign_data,
+                        extension,
                     )
                 except Exception as exc:
                     raise BuildError(
                         "cannot merge %s into %s: %s"
                         % (campaign_name, map_name, exc)
                     ) from exc
-                data = merged_path.read_bytes()
                 origin = "merged"
             else:
                 data = campaign_data
                 original_count = custom_count = None
                 origin = "campaign"
-            unresolved_before = data.count(b"TRIGSTR_")
-            try:
-                data = MO.resolve_trigstr(
-                    data,
-                    map_name.rsplit(".", 1)[-1],
-                    campaign_strings,
-                )
-            except Exception as exc:
-                raise BuildError(
-                    "cannot resolve strings in %s: %s" % (map_name, exc)
-                ) from exc
             data, item_charge_records = ITEM_CHARGES.patch(
                 data,
-                map_name.rsplit(".", 1)[-1],
+                extension,
             )
-            ability_ids = set(remove_ability_ids or ())
             object_switch_stats: dict[str, object] | None = None
-            if ability_ids:
-                data, object_switch_stats = BACKPACK.patch_objects(
-                    data,
-                    map_name.rsplit(".", 1)[-1],
-                    ability_ids,
-                )
-                remaining = BACKPACK.verify_objects(
-                    data,
-                    map_name.rsplit(".", 1)[-1],
-                    ability_ids,
-                )
-                if remaining:
-                    raise BuildError(
-                        "%s: backpack switch object remains: %s"
-                        % (map_name, remaining[:5])
-                    )
             data, campaign_object_records = CAMPAIGN_PATCHES.patch_objects(
                 profile_name,
                 data,
-                map_name.rsplit(".", 1)[-1],
+                extension,
                 str(raw_map.name),
             )
             remaining_campaign_objects = CAMPAIGN_PATCHES.verify_objects(
                 profile_name,
                 data,
-                map_name.rsplit(".", 1)[-1],
+                extension,
                 str(raw_map.name),
                 campaign_object_records,
             )
@@ -807,7 +957,7 @@ def materialized_campaign_objects(
                 )
             remaining_item_charges = ITEM_CHARGES.verify(
                 data,
-                map_name.rsplit(".", 1)[-1],
+                extension,
                 item_charge_records,
             )
             if remaining_item_charges:
@@ -824,7 +974,11 @@ def materialized_campaign_objects(
                     "bytes": len(data),
                     "orig_count": original_count,
                     "custom_count": custom_count,
-                    "trigstr_before": unresolved_before,
+                    "trigstr_before": (
+                        local_trigstr_before + campaign_trigstr_before
+                    ),
+                    "local_trigstr_before": local_trigstr_before,
+                    "campaign_trigstr_before": campaign_trigstr_before,
                     "trigstr_after": data.count(b"TRIGSTR_"),
                     "backpack_switch": object_switch_stats,
                     "permanent_item_charges": item_charge_records,
@@ -1056,26 +1210,24 @@ def build_campaign(
     overwrite: bool,
     doctor_checks: bool,
     storm_checks: bool,
-    remove_backpack_switch: bool = False,
     add_disabled_icons: bool = True,
     chapter_filter: set[str] | None = None,
     limit: int = 0,
-    target: str = TARGET_REFORGED,
+    target: str = TARGET_SOURCE,
     clean_rederive: bool = False,
     add_widescreen_loading_art: bool = True,
+    fix_reforged_portraits: bool = True,
 ) -> BuildResult:
     if target not in TARGET_CHOICES:
         raise BuildError("unsupported export target: " + target)
     source = source.resolve()
     identity = campaign_identity(source)
-    profile = (
-        None
-        if clean_rederive
-        else PROFILES.for_source(identity.source_sha256)
+    profile, mall_profile, profile_mall_default_true = select_campaign_profiles(
+        identity.source_sha256,
+        clean_rederive,
     )
-    profile_mall_false = set(profile.mall_false) if profile else set()
-    profile_mall_true = set(profile.mall_true) if profile else set()
-    profile_mall_default_true = profile.mall_default_true if profile else True
+    profile_mall_false = set(mall_profile.mall_false) if mall_profile else set()
+    profile_mall_true = set(mall_profile.mall_true) if mall_profile else set()
     container_adapter = (
         CAMPAIGN_PATCHES.container_pipeline(
             profile.name if profile else None
@@ -1083,17 +1235,6 @@ def build_campaign(
         if target == TARGET_REFORGED and not clean_rederive
         else None
     )
-    remove_ability_ids = (
-        CAMPAIGN_PATCHES.backpack_switch_ids(
-            profile.name if profile else None
-        )
-        if remove_backpack_switch
-        else set()
-    )
-    if remove_backpack_switch and not remove_ability_ids:
-        raise BuildError(
-            "the selected campaign has no declared backpack-switch ability"
-        )
     chapters = list(identity.chapters)
     if chapter_filter:
         chapters = [
@@ -1144,9 +1285,13 @@ def build_campaign(
         else None
     )
     fixed_chapters: dict[str, bytes] = {}
+    disabled_icon_cache: dict[bytes, bytes] = {}
     disabled_icon_info = None
     if not extract_only and add_disabled_icons:
-        disabled_icon_info = DISABLED_ICONS.build_patch(source)
+        disabled_icon_info = DISABLED_ICONS.build_patch(
+            source,
+            disabled_icon_cache,
+        )
     try:
         for index, chapter_name in enumerate(chapters, 1):
             print("[%s %d/%d] %s" % (source.name, index, len(chapters), chapter_name), flush=True)
@@ -1172,7 +1317,6 @@ def build_campaign(
                 profile_mall_true,
                 profile_mall_default_true,
                 profile.name if profile else None,
-                remove_ability_ids,
                 False if clean_rederive else None,
                 clean_rederive,
                 identity.source_sha256,
@@ -1192,7 +1336,6 @@ def build_campaign(
                 raw_path,
                 work / "object-merge" / Path(chapter_name).stem,
                 profile.name if profile else None,
-                remove_ability_ids,
                 target,
             )
             if target == TARGET_REFORGED and add_widescreen_loading_art:
@@ -1201,12 +1344,21 @@ def build_campaign(
                 )
             else:
                 loading_patches, loading_record = [], None
+            chapter_disabled_icon_info = None
+            disabled_icon_patches: list[tuple[str, bytes]] = []
+            if add_disabled_icons:
+                chapter_disabled_icon_info = DISABLED_ICONS.build_chapter_patch(
+                    raw_path,
+                    source,
+                    disabled_icon_cache,
+                )
+                disabled_icon_patches = chapter_disabled_icon_info[4]
             inject_script(
                 raw_path,
                 script_name,
                 patched_script,
                 fixed_path,
-                object_patches + loading_patches,
+                object_patches + loading_patches + disabled_icon_patches,
             )
             if container_outer is not None and container_adapter is not None:
                 donor_map = container_outer.read_file(chapter_name)
@@ -1221,6 +1373,9 @@ def build_campaign(
                         fixed_path.read_bytes(),
                     )
                 )
+            portrait_records: list[dict[str, object]] = []
+            if target == TARGET_REFORGED and fix_reforged_portraits:
+                portrait_records = PORTRAITS.patch(fixed_path)
             clear_platform_flags(fixed_path)
             platform = platform_entry_stats(fixed_path)
             if platform["nonzero"]:
@@ -1235,6 +1390,17 @@ def build_campaign(
                 verify.close()
             if read_back != patched_script:
                 raise BuildError("%s: repaired script read-back mismatch" % chapter_name)
+            if chapter_disabled_icon_info is not None:
+                bad_chapter_icons = DISABLED_ICONS.verify_patch(
+                    fixed_path,
+                    chapter_disabled_icon_info[1],
+                    chapter_disabled_icon_info[3],
+                )
+                if bad_chapter_icons:
+                    raise BuildError(
+                        "%s: chapter disabled-icon validation failed: %s"
+                        % (chapter_name, bad_chapter_icons[:5])
+                    )
 
             checks: dict[str, Any] = {}
             if doctor_checks:
@@ -1255,6 +1421,12 @@ def build_campaign(
                 "platform_hash": platform,
                 "materialized_campaign_objects": object_records,
                 "widescreen_loading_art": loading_record,
+                "reforged_portrait_cameras": portrait_records,
+                "disabled_icons": (
+                    DISABLED_ICONS.summary(chapter_disabled_icon_info)
+                    if chapter_disabled_icon_info is not None
+                    else None
+                ),
                 "patch_stats": stats,
                 "doctor": checks,
             }
@@ -1311,14 +1483,21 @@ def build_campaign(
                         continue
                     patches.append((name, data))
                     known_patch_names.add(name.casefold())
-                disabled_icon_validation = {
-                    "icon_references": len(icon_refs),
-                    "unique_enabled_icons": len(icon_by_source),
-                    "covered_enabled_icons": sum(
-                        1 for names in icon_existing.values() if names
-                    ),
-                    "generated_icon_files": len(icon_asset_patches),
-                }
+                disabled_icon_validation = DISABLED_ICONS.summary(
+                    disabled_icon_info
+                )
+                chapter_icon_totals = [
+                    chapter.get("disabled_icons") or {}
+                    for chapter in result.chapters
+                ]
+                disabled_icon_validation["chapter_icon_references"] = sum(
+                    int(item.get("icon_references", 0))
+                    for item in chapter_icon_totals
+                )
+                disabled_icon_validation["chapter_generated_icon_files"] = sum(
+                    int(item.get("generated_icon_files", 0))
+                    for item in chapter_icon_totals
+                )
             if target == TARGET_REFORGED and add_widescreen_loading_art:
                 background_patches, background_record = (
                     LOADING_ART.campaign_background_patches(source)
@@ -1389,6 +1568,10 @@ def build_campaign(
                 "attributes_disabled": attributes is None or struct.unpack_from("<I", attributes, 4)[0] == 0,
                 "campaign_title": title,
                 "widescreen_loading_art": background_record,
+                "reforged_portrait_cameras_removed": sum(
+                    len(chapter.get("reforged_portrait_cameras") or ())
+                    for chapter in result.chapters
+                ),
                 "output_sha256": sha256_file(partial),
                 "output_bytes": partial.stat().st_size,
             }
@@ -1432,6 +1615,7 @@ def build_campaign(
         "identity": identity.__dict__,
         "profile": {
             "name": profile.name if profile else None,
+            "mall_policy_profile": mall_profile.name if mall_profile else None,
             "mall_false": sorted(profile_mall_false),
             "mall_true": sorted(profile_mall_true),
             "mall_default_true": profile_mall_default_true,
@@ -1458,6 +1642,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="extracted sources/scripts/reports; default: <source>/_singleplayer_work")
     parser.add_argument("--campaign", action="append", default=[],
                         help="only build campaigns whose filename/title contains this text")
+    parser.add_argument(
+        "--campaign-file",
+        action="append",
+        default=[],
+        help="exact .w3n file selected in the campaign list; may be repeated",
+    )
     parser.add_argument("--chapters", default="",
                         help="comma-separated chapter names to process")
     parser.add_argument("--limit", type=int, default=0,
@@ -1471,15 +1661,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-storm-check", action="store_true",
                         help="skip game Storm.dll archive validation")
     parser.add_argument(
-        "--remove-backpack-switch",
-        action="store_true",
-        help="remove the campaign's authored backpack-switch ability",
-    )
-    parser.add_argument(
         "--target",
         choices=TARGET_CHOICES,
-        default=TARGET_REFORGED,
-        help="export for classic 1.27 or Reforged (default: reforged)",
+        default=TARGET_SOURCE,
+        help=(
+            "preserve source data-version (default), or explicitly export "
+            "classic 1.27 / Reforged compatibility output"
+        ),
     )
     parser.add_argument(
         "--clean-rederive",
@@ -1497,9 +1685,19 @@ def main(argv: list[str] | None = None) -> int:
         help="keep the original loading-screen and campaign background artwork",
     )
     parser.add_argument(
+        "--skip-reforged-portraits",
+        action="store_true",
+        help="keep legacy portrait cameras instead of removing them for Reforged",
+    )
+    parser.add_argument(
         "--inspect-json",
         action="store_true",
         help="print campaign identity metadata as one JSON object and exit",
+    )
+    parser.add_argument(
+        "--no-hash",
+        action="store_true",
+        help="with --inspect-json, skip the full-archive SHA-256 calculation",
     )
     parser.add_argument("--dry-run", action="store_true",
                         help="print campaign/chapter inventory only")
@@ -1511,7 +1709,10 @@ def main(argv: list[str] | None = None) -> int:
             print("inspect-json requires a .w3n file", file=sys.stderr)
             return 2
         try:
-            identity = campaign_identity(source)
+            identity = campaign_identity(
+                source,
+                include_hash=not args.no_hash,
+            )
         except Exception as exc:
             print("cannot inspect campaign: %s" % exc, file=sys.stderr)
             return 2
@@ -1529,7 +1730,7 @@ def main(argv: list[str] | None = None) -> int:
     output_dir = (args.output_dir or (source if source.is_dir() else source.parent) / "singleplayer").resolve()
     work_root = (args.work_dir or (source if source.is_dir() else source.parent) / "_singleplayer_work").resolve()
     try:
-        campaigns = discover_campaigns(source)
+        campaigns = discover_campaigns(source, args.campaign_file)
     except BuildError as exc:
         parser.error(str(exc))
     wanted = [value.casefold() for value in args.campaign if value.strip()]
@@ -1576,13 +1777,13 @@ def main(argv: list[str] | None = None) -> int:
                 args.overwrite,
                 not args.no_doctor_check,
                 not args.no_storm_check,
-                args.remove_backpack_switch,
                 not args.skip_disabled_icons,
                 chapter_filter,
                 args.limit,
                 args.target,
                 args.clean_rederive,
                 not args.skip_loading_art,
+                not args.skip_reforged_portraits,
             )
             if not result.ok and result.error:
                 raise BuildError(result.error)

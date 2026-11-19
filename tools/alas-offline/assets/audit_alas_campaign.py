@@ -42,7 +42,6 @@ ASSETS = (
     "war3campImported\\Frostmourne.mdx",
     "war3campImported\\DemonBoltImpactSilent.mdx",
     "war3campImported\\IceStompRaised.mdx",
-    "war3campImported\\Rune-Blue-Aura_Raised20.mdx",
     "WingOfTheLucifer.MDX",
     "FWIND.MDX",
     "DoomgGuardWings.mdx",
@@ -1049,13 +1048,6 @@ def audit(
                             failures.append(
                                 f"{name}: obsolete native charge token {token!r}"
                             )
-                    if (
-                        not lua_data
-                        and "set fx = fr_ground_effects[i]" not in script
-                    ):
-                        failures.append(
-                            f"{name}: Frostmourne cleanup is not handle-safe"
-                        )
                     for token in (() if lua_data else (
                         "function FR_OnSoulDeath takes",
                         "GetKillingUnit()",

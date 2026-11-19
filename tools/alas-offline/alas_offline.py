@@ -12,14 +12,25 @@ from dataclasses import asdict
 from pathlib import Path
 
 from offline_core import (
+    EQUIPMENT_MODE_CHOICES,
+    EQUIPMENT_MODE_DEFAULT,
     OfflineBuilder,
     OfflineToolError,
     analyze_source,
     clear_tool_cache,
+    default_cache_dir,
     default_output_dir,
     suggested_output_name,
 )
 from version import APP_VERSION, BUILD_DATE
+
+
+EQUIPMENT_MODE_ITEM_LABEL = "item（装备栏技能，默认）"
+EQUIPMENT_MODE_COMMAND_LABEL = "command（普通背包 + 英雄技能）"
+EQUIPMENT_MODE_LABELS = {
+    "item": EQUIPMENT_MODE_ITEM_LABEL,
+    "command": EQUIPMENT_MODE_COMMAND_LABEL,
+}
 
 
 def safe_console_log(text: str) -> None:
@@ -101,11 +112,19 @@ def run_cli(argv: list[str]) -> int:
     )
     parser.add_argument(
         "--equipment-mode",
-        choices=("command", "item"),
-        default="command",
+        choices=EQUIPMENT_MODE_CHOICES,
+        default=EQUIPMENT_MODE_DEFAULT,
         help=(
-            "equipment skill ownership: command (default, normal bag + "
-            "hero skills) or item (new bag/loadout)"
+            "equipment skill ownership: item (default, equipment-panel "
+            "skill) or command (normal bag + hero skills)"
+        ),
+    )
+    parser.add_argument(
+        "--remove-source-backpack-switch",
+        action="store_true",
+        help=(
+            "remove the authored KK backpack-switch ability before "
+            "applying Reforged data migration and the ALAS backpack"
         ),
     )
     parser.add_argument(
@@ -194,6 +213,9 @@ def run_cli(argv: list[str]) -> int:
             compact_archive=not args.no_compact,
             reforged_migrate=args.reforged_migrate,
             equipment_mode=args.equipment_mode,
+            remove_source_backpack_switch=(
+                args.remove_source_backpack_switch
+            ),
             new_backpack=args.new_backpack,
             new_backpack_panels=tuple(
                 item.strip().lower()
@@ -218,8 +240,7 @@ def run_cli(argv: list[str]) -> int:
         )
     except Exception as exc:  # noqa: BLE001
         message = "错误: " + str(exc) + "\n\n" + traceback.format_exc()
-        local = Path(os.environ.get("LOCALAPPDATA", Path.home()))
-        log = local / "ALASOffline" / "cli-error.log"
+        log = default_cache_dir() / "cli-error.log"
         log.parent.mkdir(parents=True, exist_ok=True)
         log.write_text(message, encoding="utf-8")
         if sys.stderr:
@@ -321,9 +342,12 @@ class OfflineApp:
             value="Reforged 数据迁移：请先预检查源文件。"
         )
         self.equipment_mode_var = tk.StringVar(
-            value="command（普通背包，默认）"
+            value=EQUIPMENT_MODE_LABELS[EQUIPMENT_MODE_DEFAULT]
         )
         self.new_backpack_var = tk.BooleanVar(value=False)
+        self.remove_source_backpack_switch_var = tk.BooleanVar(
+            value=False
+        )
         self.new_backpack_inventory_var = tk.BooleanVar(value=True)
         self.new_backpack_stats_var = tk.BooleanVar(value=True)
         self.new_backpack_equipment_var = tk.BooleanVar(value=False)
@@ -419,9 +443,9 @@ class OfflineApp:
         ttk.Combobox(
             row2,
             textvariable=self.equipment_mode_var,
-            values=(
-                "command（普通背包 + 英雄技能）",
-                "item（装备栏技能）",
+            values=tuple(
+                EQUIPMENT_MODE_LABELS[mode]
+                for mode in EQUIPMENT_MODE_CHOICES
             ),
             state="readonly",
             width=30,
@@ -455,6 +479,15 @@ class OfflineApp:
             state="disabled",
         )
         self.new_backpack_check.pack(side="left")
+        self.remove_source_backpack_check = ttk.Checkbutton(
+            row3,
+            text="移除原作者切换背包（由 ALAS 接管）",
+            variable=self.remove_source_backpack_switch_var,
+            state="disabled",
+        )
+        self.remove_source_backpack_check.pack(
+            side="left", padx=(14, 0)
+        )
         self.new_backpack_panel_checks = []
         for text, variable in (
             ("30 格背包", self.new_backpack_inventory_var),
@@ -466,6 +499,11 @@ class OfflineApp:
                 row3,
                 text=text,
                 variable=variable,
+                command=(
+                    self.on_talent_panel_toggle
+                    if variable is self.new_backpack_talents_var
+                    else None
+                ),
                 state="disabled",
             )
             check.pack(side="left", padx=(14, 0))
@@ -651,6 +689,7 @@ class OfflineApp:
             for widget in (
                 self.reforged_migrate_check,
                 self.new_backpack_check,
+                self.remove_source_backpack_check,
                 self.universal_talents_check,
                 self.melee_hero_talents_check,
                 self.wild_equipment_drops_check,
@@ -692,9 +731,36 @@ class OfflineApp:
         enabled = self.new_backpack_var.get() and available
         if self.new_backpack_var.get() and not available:
             self.new_backpack_var.set(False)
-        state = "normal" if enabled else "disabled"
-        for check in self.new_backpack_panel_checks:
-            check.configure(state=state)
+        source_switch = bool(
+            info is not None
+            and getattr(info, "source_backpack_switch_ids", ())
+        )
+        if self.new_backpack_var.get() and source_switch:
+            self.remove_source_backpack_switch_var.set(True)
+        fixed_panels = (
+            self.new_backpack_inventory_var,
+            self.new_backpack_stats_var,
+        )
+        panel_variables = (
+            self.new_backpack_inventory_var,
+            self.new_backpack_stats_var,
+            self.new_backpack_equipment_var,
+            self.new_backpack_talents_var,
+        )
+        for variable, check in zip(
+            panel_variables,
+            self.new_backpack_panel_checks,
+        ):
+            fixed = variable in fixed_panels
+            if enabled and fixed:
+                variable.set(True)
+            check.configure(
+                state=(
+                    "disabled"
+                    if not enabled or fixed
+                    else "normal"
+                )
+            )
         self.update_universal_talents_capability(info)
 
     def on_reforged_migration_toggle(self) -> None:
@@ -721,6 +787,12 @@ class OfflineApp:
         ):
             self.reforged_migrate_var.set(True)
         self.update_universal_talents_capability(info)
+
+    def on_talent_panel_toggle(self) -> None:
+        if not self.new_backpack_talents_var.get():
+            self.universal_talents_var.set(False)
+            self.melee_hero_talents_var.set(False)
+        self.update_universal_talents_capability(self.preflight_info)
 
     def on_wild_equipment_drops_toggle(self) -> None:
         if self.wild_equipment_drops_var.get():
@@ -758,6 +830,15 @@ class OfflineApp:
             self.reforged_migrate_var.set(False)
         self.reforged_migrate_check.configure(
             state="normal" if migration_available else "disabled"
+        )
+        source_switch = bool(
+            info is not None
+            and getattr(info, "source_backpack_switch_ids", ())
+        )
+        if not source_switch:
+            self.remove_source_backpack_switch_var.set(False)
+        self.remove_source_backpack_check.configure(
+            state="normal" if source_switch else "disabled"
         )
         if info is None:
             self.reforged_migrate_hint_var.set(
@@ -843,7 +924,11 @@ class OfflineApp:
                 info, "universal_talents_supported", False
             )
         )
-        supported = source_supported and self.new_backpack_var.get()
+        supported = (
+            source_supported
+            and self.new_backpack_var.get()
+            and self.new_backpack_talents_var.get()
+        )
         if not supported:
             self.universal_talents_var.set(False)
         self.universal_talents_check.configure(
@@ -865,6 +950,14 @@ class OfflineApp:
         elif source_supported and not self.new_backpack_var.get():
             self.universal_talents_hint_var.set(
                 "需先勾选“新背包系统”。"
+            )
+            self.universal_talents_hint_label.configure(
+                foreground="#8a5a00"
+            )
+        elif source_supported and not self.new_backpack_talents_var.get():
+            self.universal_talents_hint_var.set(
+                "\u9700\u5148\u52fe\u9009\u201c\u5929\u8d4b\u680f\u201d"
+                "\u9875\u7b7e\u3002"
             )
             self.universal_talents_hint_label.configure(
                 foreground="#8a5a00"
@@ -895,9 +988,17 @@ class OfflineApp:
             self.universal_talents_hint_label.configure(
                 foreground="#355b32"
             )
-        elif source_supported:
+        elif source_supported and not self.new_backpack_var.get():
             self.universal_talents_hint_var.set(
                 "请先勾选“新背包系统”。"
+            )
+            self.universal_talents_hint_label.configure(
+                foreground="#8a5a00"
+            )
+        elif source_supported and not self.new_backpack_talents_var.get():
+            self.universal_talents_hint_var.set(
+                "\u8bf7\u5148\u52fe\u9009\u201c\u5929\u8d4b\u680f\u201d"
+                "\u9875\u7b7e\u3002"
             )
             self.universal_talents_hint_label.configure(
                 foreground="#8a5a00"
@@ -1088,6 +1189,9 @@ class OfflineApp:
                 equipment_mode=self.equipment_mode_var.get().split(
                     "（", 1
                 )[0],
+                remove_source_backpack_switch=(
+                    self.remove_source_backpack_switch_var.get()
+                ),
                 new_backpack=new_backpack,
                 new_backpack_panels=tuple(new_backpack_panels),
                 universal_talents=self.universal_talents_var.get(),

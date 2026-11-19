@@ -5,6 +5,7 @@ import struct
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from PIL import Image, ImageDraw, ImageOps
 
@@ -21,6 +22,18 @@ from doctor.viewers import map_card  # noqa: E402
 
 
 class WidescreenCompositionTest(unittest.TestCase):
+    def test_widescreen_screen_is_not_reprocessed(self) -> None:
+        self.assertTrue(
+            ART._screen_is_widescreen({
+                "size": list(ART.TARGET_SIZE),
+            })
+        )
+        self.assertFalse(
+            ART._screen_is_widescreen({
+                "size": [512, 512],
+            })
+        )
+
     def test_square_art_is_centered_without_distortion(self) -> None:
         source = Image.new("RGB", (512, 512), "#6a4228")
         draw = ImageDraw.Draw(source)
@@ -105,6 +118,74 @@ class LoadingModelGeometryTest(unittest.TestCase):
         xs, ys = model["vrtx"][0::3], model["vrtx"][1::3]
         self.assertAlmostEqual(max(xs), 16 / 9, places=5)
         self.assertAlmostEqual(max(ys), 1.0, places=5)
+
+
+class CampaignBackgroundCompatibilityTest(unittest.TestCase):
+    def _run_campaign_background(
+        self,
+        textures: list[str],
+        archive_entries: dict[str, bytes],
+    ) -> tuple[list[tuple[str, bytes]], dict[str, object] | None]:
+        class FakeArchive:
+            def files(self) -> list[str]:
+                return list(archive_entries)
+
+            def read_file(self, name: str) -> bytes | None:
+                return archive_entries.get(name)
+
+            def close(self) -> None:
+                pass
+
+        with (
+            mock.patch.object(ART.W, "MPQArchive", return_value=FakeArchive()),
+            mock.patch.object(
+                ART.campaign_info,
+                "parse",
+                return_value={"background_path": b"MainMenu.mdx"},
+            ),
+            mock.patch.object(
+                ART.mdxtex,
+                "mdx_textures",
+                return_value=textures,
+            ),
+        ):
+            result = ART.campaign_background_patches(Path("source.w3n"))
+
+        return result
+
+    def test_complex_campaign_background_is_preserved(self) -> None:
+        patches, record = self._run_campaign_background(
+            ["texture%d.blp" % index for index in range(15)],
+            {
+                "war3campaign.w3f": b"campaign",
+                "MainMenu.mdx": b"MDLX",
+            },
+        )
+
+        self.assertEqual(patches, [])
+        self.assertIsNotNone(record)
+        assert record is not None
+        self.assertTrue(record["skipped"])
+        self.assertEqual(record["layout"], "complex")
+        self.assertEqual(len(record["textures"]), 15)
+
+    def test_missing_native_texture_preserves_single_background(self) -> None:
+        patches, record = self._run_campaign_background(
+            ["Textures\\grad2b.blp"],
+            {
+                "war3campaign.w3f": b"campaign",
+                "MainMenu.mdx": b"MDLX",
+            },
+        )
+
+        self.assertEqual(patches, [])
+        self.assertIsNotNone(record)
+        assert record is not None
+        self.assertTrue(record["skipped"])
+        self.assertEqual(
+            record["missing_textures"],
+            ["Textures\\grad2b.blp"],
+        )
 
 
 if __name__ == "__main__":

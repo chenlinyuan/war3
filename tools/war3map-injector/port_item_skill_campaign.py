@@ -84,10 +84,6 @@ FR_ASSETS = (
     ("Frostmourne10.blp", "Frostmourne10.blp"),
     ("Frostmourne100.blp", "Frostmourne100.blp"),
     ("IceStompRaised.mdx", r"war3campImported\IceStompRaised.mdx"),
-    (
-        "Rune-Blue-Aura_Raised20.mdx",
-        r"war3campImported\Rune-Blue-Aura_Raised20.mdx",
-    ),
 )
 ICON_ASSETS = (
     (
@@ -1564,7 +1560,6 @@ def make_assets(work: Path) -> list[tuple[Path, str]]:
             source = cleaned
         assets.append((source, internal))
 
-    game = None
     game = OBJ.GameBase(locale="zhcn", balance=None)
     impact_data = game.casc.read_data(SILENT_HIT_IMPACT_SOURCE)
     if not impact_data.startswith(b"MDLX"):

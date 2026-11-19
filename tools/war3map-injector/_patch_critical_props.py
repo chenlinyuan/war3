@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Make "mission-critical scenery" invulnerable.
+"""Neutralize fatal death actions for "mission-critical scenery".
 
 Pattern found in this campaign: a pre-placed unit is registered as
 
@@ -10,11 +10,12 @@ and the quest log says e.g. 「能量产生器不能被摧毁」 (194213 第 3 �
 destroyed by whoever is attacking the base, which instant-fails the chapter while
 the player is still in the opening dialogue.
 
-Fix: for every `gg_unit_*` (a static pre-placed prop, never the hero variable
-`udg_ak`) whose death trigger calls `CustomDefeatBJ`, insert
-`call SetUnitInvulnerable(<unit>, true)` right after the `CreateUnit` line that
-creates it.  Bosses are not affected: their death triggers call `CustomVictoryBJ`,
-not `CustomDefeatBJ`.
+Fix: neutralize only the fatal trigger actions. Do not make the unit
+invulnerable because the author may use death for scripted progression and
+because a player-controlled hero can also match this shape. Also remove the
+known legacy marker inserted by older versions of this tool.
+Bosses are not affected: their death triggers call `CustomVictoryBJ`, not
+`CustomDefeatBJ`.
 """
 import re
 import sys
@@ -22,19 +23,21 @@ import sys
 RX_FUNC = re.compile(r"(?m)^function\s+(\w+)\s+takes\s")
 RX_ACT = re.compile(r"TriggerAddAction\(\s*(gg_trg_\w+)\s*,\s*function\s+(\w+)\)")
 RX_REG = re.compile(r"TriggerRegisterUnitEvent\(\s*(gg_trg_\w+)\s*,\s*(gg_unit_\w+)\s*,\s*EVENT_UNIT_DEATH\)")
-RX_CREATE = r"(?m)^([ \t]*)set\s+%s\s*=\s*CreateUnit\([^\n]*\n"
+RX_LEGACY_INVULNERABLE = re.compile(
+    r"(?m)^[ \t]*call[ \t]+SetUnitInvulnerable\("
+    r"[^,\r\n]+,[ \t]*true\)[ \t]*"
+    r"//[ \t]*IB: critical prop must not die[ \t]*(?:\r?\n|$)"
+)
+
+
+def remove_legacy_invulnerability(text):
+    """Remove only the old generated critical-prop invulnerability line."""
+    return RX_LEGACY_INVULNERABLE.subn("", text)
 
 
 def patch(text):
-    props = critical_props(text)
-    new, n = text, 0
-    for unit in props:
-        m = re.search(RX_CREATE % re.escape(unit), new)
-        if not m:
-            continue
-        ins = "%scall SetUnitInvulnerable(%s, true) // IB: critical prop must not die\n" % (m.group(1), unit)
-        new = new[:m.end()] + ins + new[m.end():]
-        n += 1
+    new, n = remove_legacy_invulnerability(text)
+    props = critical_props(new)
     # 2) 把"机关死亡 -> 判负 + 清光玩家单位"的触发器动作里那两行改成空操作
     marks = [(m.start(), m.group(1)) for m in RX_FUNC.finditer(new)]
     spans = {}
@@ -82,7 +85,7 @@ def main():
     for p in sys.argv[1:]:
         raw = open(p, "rb").read()
         new, n = patch(raw.decode("utf-8", "surrogateescape"))
-        print("%-20s critical props made invulnerable: %d"
+        print("%-20s critical prop death actions neutralized: %d"
               % (p.replace("\\", "/").split("/")[-1], n))
         if n:
             with open(p, "wb") as f:
